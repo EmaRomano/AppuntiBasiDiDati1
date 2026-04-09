@@ -1,0 +1,54 @@
+## Core latex/pdflatex auxiliary files
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb
+
+## Intermediate documents
+*.dvi
+*.xdv
+
+## Temporary files for packages
+# listings, tcolorbox, hyperref
+*.atfi
+*.snm
+*.nav
+*.vrb
+*.maf
+*.mtc
+*.mtc0
+*.pyg
+
+## Synctex (permette di saltare dal PDF al codice e viceversa)
+*.synctex.gz
+*.synctex(busy)
+
+## PDF finale (Opzionale)
+# Alcuni preferiscono ignorarlo e tenerlo solo in locale. 
+# Se vuoi caricarlo su Git, commenta la riga sotto con un #.
+*.pdf
+
+## Java
+*.class
+*.jar
+*.war
+*.ear
+
+## Directory di build
+bin/
+out/
+build/
+target/
+
+## IDE specifico (VS Code / IntelliJ)
+.vscode/
+.idea/
+*.iml
