@@ -1,16 +1,28 @@
 \chapter{Introduzione ai Sistemi di Basi di Dati}
 
-\section{Concetti di Base}
-\begin{definition}[Base di Dati]
-    Una collezione di dati correlati che rappresenta un mini-mondo, caratterizzata da una proprietà di persistenza e condivisione.
-\end{definition}
+\section{Progettazione Concettuale}
 
-\section{L'approccio Database vs Approccio File}
-Le differenze fondamentali risiedono in:
-\begin{itemize}
-    \item \textbf{Auto-descrizione}: Presenza di un catalogo (meta-dati).
-    \item \textbf{Astrazione}: Indipendenza tra programmi e dati.
-    \item \textbf{Integrità}: Supporto a transazioni e controllo della concorrenza.
-\end{itemize}
+La progettazione concettuale ha l'obiettivo di descrivere il \textit{cosa} deve essere memorizzato nella base di dati, indipendentemente dal software che verrà utilizzato (DBMS).
 
-% Qui potresti inserire il diagramma ANSI/SPARC che è il pilastro del capitolo
+Sebbene i testi classici (Atzeni, Elmasri) utilizzino il modello Entity-Relationship (ER), la metodologia moderna predilige l'uso dei \textbf{Class Diagrams} (UML).
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|l|l|l|}
+    \hline
+    \textbf{Concetto} & \textbf{Modello ER} & \textbf{Class Diagram (UML)} \\ \hline
+    Insieme di oggetti & Entità & Classe \\ \hline
+    Proprietà & Attributo & Attributo (con tipo) \\ \hline
+    Legame logico & Relazione & Associazione \\ \hline
+    Gerarchia & Generalizzazione ($ISA$) & Ereditarietà \\ \hline
+    \end{tabular}
+    \caption{Corrispondenza tra concetti ER e UML.}
+\end{table}
+
+\section{Elementi Fondamentali}
+
+\subsection{Classi (Entità)}
+Una classe rappresenta un insieme di oggetti della realtà con proprietà comuni. In UML è rappresentata da un rettangolo diviso in sezioni (nome, attributi).
+
+\subsection{Associazioni}
+Rappresentano relazioni logiche tra classi. Fondamentali sono le \textbf{molteplicità} (es. $1..*$), che indicano quante istanze di una classe possono essere legate a un'istanza dell'altra.
