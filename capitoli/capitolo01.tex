@@ -1,28 +1,117 @@
-\chapter{Introduzione ai Sistemi di Basi di Dati}
+\chapter{Progettazione Concettuale}
 
-\section{Progettazione Concettuale}
+\section{Progettazione Concettuale con Class Diagrams}
 
-La progettazione concettuale ha l'obiettivo di descrivere il \textit{cosa} deve essere memorizzato nella base di dati, indipendentemente dal software che verrà utilizzato (DBMS).
+La progettazione concettuale è la fase in cui si modella il \textit{cosa} deve essere rappresentato nella base di dati, ignorando i dettagli implementativi del DBMS. Sebbene la letteratura classica utilizzi il modello Entity-Relationship (ER), l'approccio moderno predilige l'uso dei \textbf{Class Diagrams UML}.
+\vspace{\baselineskip}
 
-Sebbene i testi classici (Atzeni, Elmasri) utilizzino il modello Entity-Relationship (ER), la metodologia moderna predilige l'uso dei \textbf{Class Diagrams} (UML).
+Il punto di partenza è un testo in linguaggio naturale (specifiche). La costruzione del diagramma segue una strategia di mapping semantico:
+
+\begin{itemize}
+    \item \textbf{Sostantivi $\rightarrow$ Classi (Entità):} Rappresentano oggetti con esistenza autonoma (es. \textit{Studente, Corso}).
+    \item \textbf{Verbi $\rightarrow$ Associazioni (Relazioni):} Descrivono i legami logici tra le classi (es. \textit{Iscrive, Sostiene}).
+    \item \textbf{Aggettivi o Specifiche $\rightarrow$ Attributi:} Proprietà atomiche che descrivono una classe (es. \textit{Nome, Matricola}).
+\end{itemize}
+\vspace{\baselineskip}
+
+Gli elementi costitutivi di un Class Diagram sono:
+\begin{description}
+    \item[Classe:] Rappresentata da un rettangolo. Nella progettazione concettuale ci si concentra su \textit{Nome} e \textit{Attributi}. Le \textit{Operazioni} (metodi) vengono solitamente omesse.
+    \item[Associazione:] Una linea che connette due classi. Indica che esiste una correlazione logica tra le istanze delle classi coinvolte.
+    \item[Cardinalità:] Indicano il numero minimo e massimo di istanze di una classe che possono essere legate a una singola istanza della classe opposta.
+\end{description}
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{|l|l|l|}
-    \hline
-    \textbf{Concetto} & \textbf{Modello ER} & \textbf{Class Diagram (UML)} \\ \hline
-    Insieme di oggetti & Entità & Classe \\ \hline
-    Proprietà & Attributo & Attributo (con tipo) \\ \hline
-    Legame logico & Relazione & Associazione \\ \hline
-    Gerarchia & Generalizzazione ($ISA$) & Ereditarietà \\ \hline
+    \caption{Sintassi delle Cardinalità UML}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Sintassi} & \textbf{Significato} \\
+        \midrule
+        \texttt{1} & Esattamente uno (Obbligatorio) \\
+        \texttt{0..1} & Zero o uno \\
+        \texttt{*} o \texttt{0..*} & Zero o molti \\
+        \texttt{1..*} & Uno o molti (Almeno uno) \\
+        \bottomrule
     \end{tabular}
-    \caption{Corrispondenza tra concetti ER e UML.}
 \end{table}
 
-\section{Elementi Fondamentali}
+Un attributo si dice \textbf{totale} se ha cardinalità minima strettamente maggiore di zero, \textbf{parziale} altrimenti: quindi il primo deve sempre avere un valore, mentre per uno parziale il valore è opzionale. 
 
-\subsection{Classi (Entità)}
-Una classe rappresenta un insieme di oggetti della realtà con proprietà comuni. In UML è rappresentata da un rettangolo diviso in sezioni (nome, attributi).
+Un attributo si dice \textbf{singolo} se ha cardinalità massima minore o uguale a uno, \textbf{multiplo} altrimenti.
+\vspace{\baselineskip}
 
-\subsection{Associazioni}
-Rappresentano relazioni logiche tra classi. Fondamentali sono le \textbf{molteplicità} (es. $1..*$), che indicano quante istanze di una classe possono essere legate a un'istanza dell'altra.
+Un attributo è \textbf{atomico} se il database non ne percepisce la struttura interna. Gli attributi atomici possono essere:
+
+\begin{itemize}
+    \item \textbf{Primitivi}: Rappresentano valori elementari non scomponibili.
+    \begin{itemize}
+        \item \textit{Numerici}: \texttt{int, float, decimal}.
+        \item \textit{Alfanumerici}: \texttt{string, char}.
+        \item \textit{Logici}: \texttt{boolean}.
+    \end{itemize}
+    \item \textbf{Predefiniti Strutturati}: Tipi di dato complessi forniti dal sistema e trattati come atomici dal DBMS.
+    \begin{itemize}
+        \item \textit{Temporali}: \texttt{date, time, timestamp}.
+        \item \textit{Oggetti Binari}: \texttt{blob} (immagini, file), \texttt{clob} (testi estesi).
+    \end{itemize}
+\end{itemize}
+\vspace{\baselineskip}
+
+Un errore comune è modellare come attributo ciò che dovrebbe essere una classe. La regola empirica è:
+\begin{enumerate}
+    \item Se l'informazione è un valore semplice (es. \textit{Età}), è un \textbf{Attributo}.
+    \item Se l'informazione ha proprietà proprie o deve essere legata ad altre entità (es. \textit{Indirizzo} inteso come via, civico e CAP), deve essere una \textbf{Classe} autonoma.
+\end{enumerate}
+\vspace{\baselineskip}
+
+\begin{warning}
+    L'insieme degli attributi devono permettere di identificare univocamente ogni istanza della classe (chiave primaria). Se non è possibile, è necessario aggiungere un attributo identificativo (es. \textit{ID} o \textit{Matricola}).
+\end{warning}
+
+\begin{observation}
+    Sebbene in Java usi \texttt{-} (private) e \texttt{+} (public), nei diagrammi per database la visibilità è meno rilevante, ma mantenere il - per gli attributi aiuta a ricordare l'incapsulamento dei dati.
+\end{observation}
+
+\subsection{Ruoli nelle Associazioni}
+
+Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe svolge all'interno di un'associazione. Viene indicato alle estremità della linea di associazione.
+
+\begin{itemize}
+    \item \textbf{Utilità}: I ruoli sono essenziali per chiarire il significato del legame, specialmente quando l'associazione è \textit{riflessiva} (connette una classe a sé stessa) o quando esistono più associazioni tra le stesse classi.
+    \item \textbf{Naming Convention}: Solitamente si utilizza un sostantivo che descrive la responsabilità (es. \textit{responsabile, supervisore, partecipante}).
+    \item \textbf{Corrispondenza OOP}: Nella programmazione ad oggetti, il nome del ruolo coincide spesso con il nome dell'attributo (o del campo) che contiene il riferimento all'oggetto correlato.
+\end{itemize}
+
+\begin{example}[Associazione Riflessiva]
+    Si consideri la classe \texttt{Persona} e l'associazione \textit{Genitorialità}. Senza ruoli, il legame sarebbe ambiguo. Assegnando i ruoli \textbf{genitore} e \textbf{figlio} alle due estremità, la semantica del modello diventa univoca.
+\end{example}
+
+\begin{observation}
+    Spesso si tende a omettere il nome dell'associazione (il verbo al centro della linea) se i ruoli sono già sufficientemente esplicativi. In molti schemi professionali vengono mostrati solo i ruoli, perché sono più vicini alla struttura logica finale del database.
+\end{observation}
+
+\subsection{Navigabilità e Direzionalità}
+
+Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguarda la \textbf{navigabilità} delle associazioni.
+
+\begin{itemize}
+    \item \textbf{In Java (OOP)}: Le associazioni sono spesso \textit{unidirezionali} per favorire il disaccoppiamento tra le classi. La direzione indica quale oggetto mantiene il riferimento (puntatore) verso l'altro.
+    \item \textbf{Nelle Basi di Dati}: Le associazioni sono intrinsecamente \textit{bidirezionali}. Una relazione tra due entità rappresenta un fatto logico che può essere interrogato partendo da entrambi i lati (es. tramite operatori di \textit{Join} in SQL).
+\end{itemize}
+
+Dunque nel class diagram concettuale per database, normalmente si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
+
+
+\subsection{Tipi Enumerativi (Enumerazioni)}
+
+Quando il dominio di un attributo è costituito da un insieme di valori costante, discreto e predefinito, si utilizza il costrutto della \textbf{Enumerazione}.
+
+\begin{description}
+    \item[Definizione:] Un'enumerazione è un tipo di dato speciale che permette a un attributo di assumere solo uno dei valori elencati in una lista chiusa.
+    \item[Rappresentazione UML:] Si modella come una classe speciale contrassegnata dallo \textit{stereotype} \guillemotleft enumeration\guillemotright. Non possiede attributi propri, ma elenca semplicemente i valori ammissibili (letterali).
+\end{description}
+
+\begin{tip}
+    Dal punto di vista della programmazione Java, l'enumerazione UML mappa direttamente il costrutto \texttt{enum}. Nel database fisico, questo verrà tradotto o in un vincolo di \textit{CHECK} su una colonna di testo, o in una tabella di lookup dedicata.
+\end{tip}
