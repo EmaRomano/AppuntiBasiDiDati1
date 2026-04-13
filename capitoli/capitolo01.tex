@@ -38,7 +38,7 @@ Gli elementi costitutivi di un Class Diagram sono:
 
 Un attributo si dice \textbf{totale} se ha cardinalità minima strettamente maggiore di zero, \textbf{parziale} altrimenti: quindi il primo deve sempre avere un valore, mentre per uno parziale il valore è opzionale. 
 
-Un attributo si dice \textbf{singolo} se ha cardinalità massima minore o uguale a uno, \textbf{multiplo} altrimenti.
+Un attributo si dice \textbf{singolo} se ha cardinalità massima uguale a uno, \textbf{multiplo} altrimenti.
 \vspace{\baselineskip}
 
 Un attributo è \textbf{atomico} se il database non ne percepisce la struttura interna. Gli attributi atomici possono essere:
@@ -100,7 +100,7 @@ Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguar
     \item \textbf{Nelle Basi di Dati}: Le associazioni sono intrinsecamente \textit{bidirezionali}. Una relazione tra due entità rappresenta un fatto logico che può essere interrogato partendo da entrambi i lati (es. tramite operatori di \textit{Join} in SQL).
 \end{itemize}
 
-Dunque nel class diagram concettuale per database, normalmente si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
+Dunque nel class diagram concettuale per database, si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
 
 
 \subsection{Tipi Enumerativi (Enumerazioni)}
