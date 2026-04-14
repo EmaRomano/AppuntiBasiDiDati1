@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1776073991.24026 "/home/emanuele/latex workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1776073992.12283 0
+["pdflatex"] 1776173502.52715 "/home/emanuele/latex workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1776173503.46271 0
   "/home/emanuele/latex workspace/AppuntiBasiDiDati1/main.tex" 1776073705.6345 641 44287c3594a020e6d9586fdb098ebadb ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc" 1254269338 2375 baa924870cfb487815765f9094cf3728 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc" 1202520719 2840 216e6e45ad352e2456e1149f28885bee ""
@@ -227,12 +227,12 @@
   "/usr/share/texlive/texmf-dist/web2c/texmf.cnf" 1775001600 40900 887e0dc8cac988a9e9c574af364cf837 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1775819933.49244 534784 d684c38d04ccbdfb8199430bb24895f5 ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1775819911 7572851 a1a78ce79b09edd74faa1b27660fb5fa ""
-  "capitoli/capitolo01.aux" 1776073992.01223 1933 f126cc4241046083c467ce48c80be041 "pdflatex"
-  "capitoli/capitolo01.tex" 1776073991.00383 7607 847383b1d6758cf227e1cd77bc272b9a ""
-  "main.aux" 1776073992.01223 689 b50a5fe54ca73472f99c25d9f4e835fe "pdflatex"
-  "main.out" 1776073992.0137 1085 52ac42ac3362ad7ee592cb0020bb76e1 "pdflatex"
+  "capitoli/capitolo01.aux" 1776173503.33028 1933 f126cc4241046083c467ce48c80be041 "pdflatex"
+  "capitoli/capitolo01.tex" 1776173502.28282 7896 c3243cb5b9a2a57562a3fdf5d91ca304 ""
+  "main.aux" 1776173503.33128 689 b50a5fe54ca73472f99c25d9f4e835fe "pdflatex"
+  "main.out" 1776173503.33381 1085 52ac42ac3362ad7ee592cb0020bb76e1 "pdflatex"
   "main.tex" 1776073705.6345 641 44287c3594a020e6d9586fdb098ebadb ""
-  "main.toc" 1776073992.01411 540 a5e29cbd0d67a7eb13f1e802fc163aab "pdflatex"
+  "main.toc" 1776173503.33422 540 a5e29cbd0d67a7eb13f1e802fc163aab "pdflatex"
   "preambolo.tex" 1776061923.10708 3367 4f1a25f6991aa9a8e39a8caa9b2d0f3d ""
   (generated)
   "capitoli/capitolo01.aux"
