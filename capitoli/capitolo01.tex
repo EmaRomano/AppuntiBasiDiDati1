@@ -126,7 +126,12 @@ In un diagramma standard, saremmo costretti a omettere il voto o a inserirlo for
 
 % Diagramma 1: Relazione semplice (M:N) senza attributi
 % [Codice PlantUML 1]
-\includegraphics[width=0.2\textwidth]{immagini/cap01_im01.pdf}
+\begin{figure}[htbp] % [htbp] aiuta a non far saltare l'immagine in una pagina vuota
+    \centering
+    \includegraphics[width=0.2\textwidth]{immagini/cap01_im01.pdf} 
+    \caption{Associazione Studente-Corso.}
+    \label{fig:studente_corso}
+\end{figure}
 
 \subsubsection{2. Introduzione della Classe di Associazione}
 L'UML risolve il problema permettendo a un'associazione di avere una propria classe collegata. Questa classe ha un doppio valore: è sia un legame logico tra le istanze, sia un contenitore di attributi.

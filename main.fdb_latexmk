@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1776184291.0224 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1776184292.14629 0
+["pdflatex"] 1776184925.56116 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1776184926.64326 0
   "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" 1776073705.6345 641 44287c3594a020e6d9586fdb098ebadb ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc" 1254269338 2375 baa924870cfb487815765f9094cf3728 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc" 1202520719 2840 216e6e45ad352e2456e1149f28885bee ""
@@ -234,13 +234,13 @@
   "/usr/share/texlive/texmf-dist/web2c/texmf.cnf" 1775001600 40900 887e0dc8cac988a9e9c574af364cf837 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1776180857.69195 4547344 09b200d6d21f1c0b39cba8696f0a38d2 ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1776180569 7758585 b87c9409558cb9127c55d304fd89c153 ""
-  "capitoli/capitolo01.aux" 1776184292.01836 2744 7d396007065e358dd262be3f12814b8a "pdflatex"
-  "capitoli/capitolo01.tex" 1776184289.69026 10069 d61aec16576e290e30d6ae77ec07e249 ""
+  "capitoli/capitolo01.aux" 1776184926.52191 2958 22aa09cfc62fafab3633e62dfd8cfb67 "pdflatex"
+  "capitoli/capitolo01.tex" 1776184924.24184 10261 fe10af43ec19693455957a2a25906a7b ""
   "immagini/cap01_im01.pdf" 1776183952.88655 5792 2786efce4e9b56a7187b428213b0de1f ""
-  "main.aux" 1776184292.01836 783 99339dc9dc426a83c785ad0110642fa9 "pdflatex"
-  "main.out" 1776184292.02082 1518 063d1f66f34756d074448fd1c5b42e1b "pdflatex"
+  "main.aux" 1776184926.52191 783 99339dc9dc426a83c785ad0110642fa9 "pdflatex"
+  "main.out" 1776184926.52391 1518 063d1f66f34756d074448fd1c5b42e1b "pdflatex"
   "main.tex" 1776073705.6345 641 44287c3594a020e6d9586fdb098ebadb ""
-  "main.toc" 1776184292.02138 1036 3a6d51006d94fb63a48ad0aa0d654006 "pdflatex"
+  "main.toc" 1776184926.52391 1024 36c2033b035182c09134e22071ac5314 "pdflatex"
   "preambolo.tex" 1776176447.68262 3408 ef65b4fc454936ac0bc6cef95b53d333 ""
   (generated)
   "capitoli/capitolo01.aux"
