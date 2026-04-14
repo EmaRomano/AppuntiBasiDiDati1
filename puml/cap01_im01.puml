@@ -1,0 +1,15 @@
+@startuml cap01_im01
+skinparam classAttributeIconSize 0
+
+class Studente {
+    + matricola: String
+    + nome: String
+}
+
+class Corso {
+    + codice: String
+    + titolo: String
+}
+
+Studente "*" -- "*" Corso : sostiene >
+@enduml
