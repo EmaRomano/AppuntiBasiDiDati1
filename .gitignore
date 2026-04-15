@@ -34,7 +34,7 @@
 ## PDF finale (Opzionale)
 # Alcuni preferiscono ignorarlo e tenerlo solo in locale. 
 # Se vuoi caricarlo su Git, commenta la riga sotto con un #.
-*.pdf
+#*.pdf
 
 ## Java
 *.class
@@ -52,3 +52,7 @@ target/
 .vscode/
 .idea/
 *.iml
+
+# Cartelle generate da PlantUML
+puml/
+plantuml.exportOutDir/
