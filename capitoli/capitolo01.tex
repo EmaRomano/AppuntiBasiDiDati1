@@ -110,43 +110,50 @@ Quando il dominio di un attributo è costituito da un insieme di valori costante
 
 In UML, le enumerazioni sono rappresentate come classi con lo stereotipo \guillemotleft enumeration\guillemotright. Non hanno attributi propri, ma contengono un elenco di valori letterali che rappresentano le possibili istanze del tipo enumerativo.
 
-\section{Classi di Associazione}
+\subsection{Classi di Associazione}
 
 Nella modellazione concettuale, capita spesso che un'associazione tra due classi possieda delle proprietà proprie. Se un attributo non descrive intrinsecamente né la classe A né la classe B, ma esiste solo in funzione della loro relazione, ci troviamo di fronte alla necessità di una \textbf{Classe di Associazione}.
 
-\subsection{Il problema: Attributi sulle relazioni}
-Si consideri il caso classico di un sistema universitario: uno \textbf{Studente} sostiene un \textbf{Corso}. Vogliamo memorizzare il \textit{voto} conseguito.
+Si consideri, ad esempio, il caso classico di un sistema universitario: uno \textbf{Studente} sostiene un \textbf{Corso}. Vogliamo memorizzare il \textit{voto} conseguito.
 \begin{itemize}
     \item Il \textit{voto} non è un attributo dello \texttt{Studente} (egli ha voti diversi per corsi diversi).
     \item Il \textit{voto} non è un attributo del \texttt{Corso} (il corso ha voti diversi per studenti diversi).
 \end{itemize}
 
-\subsubsection{1. Esempio senza classe di associazione}
 In un diagramma standard, saremmo costretti a omettere il voto o a inserirlo forzatamente in una delle due classi, creando un errore concettuale e ridondanza.
 
-% Diagramma 1: Relazione semplice (M:N) senza attributi
+% Diagramma 1: Relazione molti-a-molti senza attributi
 % [Codice PlantUML 1]
-\begin{figure}[htbp] % [htbp] aiuta a non far saltare l'immagine in una pagina vuota
+\begin{figure}[htbp] 
     \centering
     \includegraphics[width=0.2\textwidth]{immagini/cap01_im01.pdf} 
     \caption{Associazione Studente-Corso.}
     \label{fig:studente_corso}
 \end{figure}
 
-\subsubsection{2. Introduzione della Classe di Associazione}
 L'UML risolve il problema permettendo a un'associazione di avere una propria classe collegata. Questa classe ha un doppio valore: è sia un legame logico tra le istanze, sia un contenitore di attributi.
 
 % Diagramma 2: Classe di associazione (Esame)
 % [Codice PlantUML 2]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.3\textwidth]{immagini/cap01_im02.pdf} 
+    \caption{Studente-Corso con classe di associazione Esame.}
+    \label{fig:studente_corso}
+\end{figure}
 
 Sintatticamente, si rappresenta con un rettangolo di classe collegato alla linea di associazione tramite una \textbf{linea tratteggiata}. Essa eredita implicitamente le "chiavi" di entrambe le classi coinvolte.
 
-\subsubsection{3. Esplicitazione (Reificazione) della Classe di Associazione}
 In molte fasi di progettazione logica, o per chiarezza di implementazione, la classe di associazione viene "esplicitata" (o reificata). La classe di associazione diventa una classe intermedia a tutti gli effetti, e l'associazione molti-a-molti originale si trasforma in due associazioni uno-a-molti.
 
 % Diagramma 3: Classe esplicitata
 % [Codice PlantUML 3]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.2\textwidth]{immagini/cap01_im03.pdf} 
+    \caption{Reificazione della classe di associazione Esame.}
+    \label{fig:studente_corso}
+\end{figure}
 
-\begin{important}
-    L'esplicitazione è spesso necessaria perché molti strumenti di modellazione o linguaggi di programmazione non supportano nativamente il costrutto della classe di associazione. In questo caso, la classe intermedia (es. \texttt{Esame}) funge da "ponte" tra le due entità principali.
-\end{important}
+L'esplicitazione è spesso necessaria perché molti strumenti di modellazione o linguaggi di programmazione non supportano nativamente il costrutto della classe di associazione. In questo caso, la classe intermedia (es. \texttt{Esame}) funge da "ponte" tra le due entità principali.
+

@@ -2,14 +2,14 @@
 skinparam classAttributeIconSize 0
 
 class Studente {
-    + matricola: String
-    + nome: String
+    - matricola: String
+    -nome: String
 }
 
 class Corso {
-    + codice: String
-    + titolo: String
+    - codice: String
+    - titolo: String
 }
 
-Studente "*" -- "*" Corso : sostiene >
+Studente "*" -- "*" Corso 
 @enduml

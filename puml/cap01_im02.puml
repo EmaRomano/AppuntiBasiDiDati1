@@ -1,0 +1,13 @@
+@startuml
+class Studente {
+    - matricola: String
+}
+class Corso {
+    - codice: String
+}
+class Esame {
+    - voto: int
+    - data: Date
+}
+(Studente, Corso) .. Esame
+@enduml
