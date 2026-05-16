@@ -54,5 +54,4 @@ target/
 *.iml
 
 # Cartelle generate da PlantUML
-puml/
 plantuml.exportOutDir/

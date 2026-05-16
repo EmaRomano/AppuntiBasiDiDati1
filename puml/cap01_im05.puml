@@ -1,0 +1,33 @@
+@startuml
+skinparam classAttributeIconSize 0
+left to right direction
+
+class Fornitore {
+    - id: Long
+    - nome: String
+}
+
+class Prodotto {
+    - id: Long
+    - descrizione: String
+}
+
+class Progetto {
+    - id: Long
+    - denominazione: String
+}
+
+' La classe di associazione viene promossa a entità centrale (tabella di giunzione)
+class Fornitura {
+    - fornitoreId: Long
+    - prodottoId: Long
+    - progettoId: Long
+    - quantita: int
+    - data: Date
+}
+
+' Le relazioni diventano binarie 1-a-molti dirette verso la classe centrale
+Fornitore "1" -- "*" Fornitura
+Prodotto "1" -- "*" Fornitura
+Progetto "1" -- "*" Fornitura
+@enduml
