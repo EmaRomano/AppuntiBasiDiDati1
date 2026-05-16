@@ -1,20 +1,39 @@
-% --- Pacchetti Fondamentali ---
+% =============================================================================
+% PREAMBOLO ORGANIZZATO PER APPUNTI JAVA BACKEND
+% =============================================================================
+
+% --- 1. CODIFICA E LINGUA ---
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[italian]{babel}
-\usepackage{amsmath, amssymb, amsthm} 
+
+% --- 2. TIPOGRAFIA E FONT ---
+\usepackage{lmodern}         % Font scalabile
+\usepackage{microtype}       % Migliora la giustificazione e l'aspetto del testo
+\usepackage{fontawesome5}    % Icone per i box
+
+% --- 3. LAYOUT E GEOMETRIA ---
 \usepackage{geometry}
 \geometry{margin=2.5cm}
-\usepackage{xcolor}
-\usepackage{listings}
 \usepackage{calc} 
-\usepackage{lmodern} % Font scalabile per evitare errori di dimensione
-\usepackage{enumitem} 
-\setlist{nosep} % Liste compatte
-\usepackage[most]{tcolorbox}
-\usepackage{tabularx}
 
-% --- Configurazione Link (Hyperref) ---
+% --- 4. MATEMATICA E LOGICA ---
+\usepackage{amsmath, amssymb, amsthm} 
+
+% --- 5. COLORI E GRAFICA ---
+\usepackage{xcolor}
+\usepackage{graphicx}
+\graphicspath{ {./images/} } 
+\usepackage{tikz}
+\usetikzlibrary{positioning, shadows, arrows.meta}
+
+% --- 6. TABELLE E LISTE ---
+\usepackage{tabularx}
+\usepackage{booktabs}        % Tabelle professionali (\toprule, \midrule, \bottomrule)
+\usepackage{enumitem} 
+\setlist{nosep}              % Liste compatte di default
+
+% --- 7. NAVIGAZIONE (Hyperref va quasi sempre caricato dopo gli altri) ---
 \usepackage{hyperref}
 \hypersetup{
     colorlinks=true,
@@ -24,41 +43,32 @@
     citecolor=green!60!black
 }
 
-% --- Ambienti in Stile Matematico ---
-\theoremstyle{definition}
-\newtheorem{definition}{Definizione}[chapter]
-\newtheorem{observation}{Osservazione}[chapter]
-\newtheorem{caution}{Attenzione}[chapter]
-\newtheorem{example}{Esempio}[chapter]
-
-% --- Configurazione Titoli (Titlesec) ---
+% --- 8. STILE DEI TITOLI (Titlesec) ---
 \usepackage[explicit]{titlesec}
 
-% Capitolo: Mostra solo il Titolo, nasconde il numero (ma lo mantiene per l'indice)
+% Capitolo: Mostra solo il Titolo, mantiene numero nell'indice
 \titleformat{\chapter}[block]
   {\normalfont\bfseries\Huge}
   {}
   {0pt}
   {\thispagestyle{empty}#1}
-
 \titlespacing*{\chapter}{0pt}{0pt}{4ex}
 
-% Sezioni e Sottosezioni: Mantengono la numerazione (es. 1.1, 1.2)
-\titleformat{\section}
-  {\normalfont\bfseries\large}
-  {\thesection} 
-  {1em}
-  {#1}
-
-\titleformat{\subsection}
-  {\normalfont\bfseries}
-  {\thesubsection}
-  {1em}
-  {#1}
-
+% Sezioni e Sottosezioni
+\titleformat{\section}{\normalfont\bfseries\large}{\thesection}{1em}{#1}
+\titleformat{\subsection}{\normalfont\bfseries}{\thesubsection}{1em}{#1}
 \titlespacing*{\section}{0pt}{1.5ex plus 1ex minus .2ex}{0.8ex plus .2ex}
 
-% --- Ambiente per il Codice Java ---
+% --- 9. AMBIENTI MATEMATICI (Theorems) ---
+\theoremstyle{definition}
+\newtheorem{definition}{Definizione}[chapter]
+\newtheorem{observation}{Osservazione}[chapter]
+\newtheorem{caution}{Attenzione}[chapter]
+\newtheorem{example}{Esempio}[chapter]
+\newtheorem*{important}{\color{red}IMPORTANTE}
+
+% --- 10. AMBIENTE CODICE (Listings) ---
+\usepackage{listings}
 \lstset{
     language=Java,
     basicstyle=\ttfamily\small,
@@ -74,60 +84,55 @@
     tabsize=4
 }
 
-% 1. Pacchetto per le tabelle professionali (risolve l'errore \toprule)
-\usepackage{booktabs}
+% --- 11. AMBIENTI GRAFICI (Tcolorbox) ---
+\usepackage[most]{tcolorbox}
 
-\usepackage{microtype}
+% Definizione Colori Personalizzati
+\definecolor{bestprac-color}{RGB}{0, 150, 136} 
+\definecolor{tip-color}{RGB}{33, 150, 243}      
+\definecolor{warning-color}{RGB}{255, 152, 0}   
+\definecolor{danger-color}{RGB}{244, 67, 54}    
+\definecolor{details-color}{RGB}{80, 100, 120}
 
-\usepackage{tikz}
-
-\usepackage{graphicx}
-
-
-\usetikzlibrary{er, positioning, arrows}
-
-% 2. Definizione dell'ambiente "important" (risolve l'errore Environment undefined)
-% Usiamo uno stile simile a observation ma con un colore diverso o un'icona
-\theoremstyle{definition}
-\newtheorem*{important}{\color{red}IMPORTANTE}
-
-% 3. Per sicurezza, definiamo anche warning se non lo avevi fatto prima
-\newtheorem*{warning}{\color{orange}ATTENZIONE}
-
-% --- Definizione Ambiente Tip (Coerente con tcolorbox) ---
-\newtcolorbox{tip}[1][]{
-  colback=blue!5!white,
-  colframe=blue!75!black,
-  fonttitle=\bfseries,
-  title=Tip: #1,
-  arc=2mm,
-  outer arc=2mm,
-  before skip=10pt,
-  after skip=10pt
+% Stile Base Comune
+\tcbset{
+    manualstyle/.style={
+        enhanced, breakable,
+        before skip=15pt, after skip=15pt,
+        left=10mm, right=2mm, top=2mm, bottom=2mm,
+        sharp corners, boxrule=0pt, frame hidden,
+        borderline west={1.5mm}{0pt}{#1},
+        colback=#1!5!white,
+        fonttitle=\bfseries\sffamily,
+        coltitle=#1,
+        attach title to upper,
+        after title={\par\smallskip},
+    }
 }
 
-% --- Definizione Ambiente Pending (Cose in sospeso) ---
-\newtcolorbox{pending}[1][]{
-  colback=orange!5!white,
-  colframe=orange!75!black,
-  fonttitle=\bfseries,
-  title=In Sospeso: #1,
-  arc=2mm,
-  outer arc=2mm,
-  before skip=10pt,
-  after skip=10pt
+% Creazione dei Box con icone
+\newtcolorbox{bestpractice}[1][Best Practice]{
+    manualstyle=bestprac-color, title=#1,
+    overlay={\node[anchor=north west, xshift=2.5mm, yshift=-2.5mm] at (frame.north west) {\textcolor{bestprac-color}{\faCheckCircle}};}
 }
 
-% --- Configurazione specifica per SQL ---
-\lstdefinestyle{SQLstyle}{
-    language=SQL,
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue!80!black}\bfseries,
-    commentstyle=\color{gray},
-    stringstyle=\color{green!50!black},
-    morekeywords={REFERENCES, KEY, PRIMARY, FOREIGN, CONSTRAINT, TRIGGER, FUNCTION, DATABASE},
-    frame=single,
-    breaklines=true,
-    postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space}, % Segnala dove va a capo
-    tabsize=2
+\newtcolorbox{tip}[1][Tip]{
+    manualstyle=tip-color, title=#1,
+    overlay={\node[anchor=north west, xshift=3mm, yshift=-2.5mm] at (frame.north west) {\textcolor{tip-color}{\faLightbulb}};}
+}
+
+\newtcolorbox{warningbox}[1][Attenzione]{ % Rinominato per evitare conflitto con amsthm se necessario
+    manualstyle=warning-color, title=#1,
+    overlay={\node[anchor=north west, xshift=2.5mm, yshift=-2.5mm] at (frame.north west) {\textcolor{warning-color}{\faExclamationTriangle}};}
+}
+
+\newtcolorbox{danger}[1][Pericolo]{
+    manualstyle=danger-color, title=#1,
+    overlay={\node[anchor=north west, xshift=2.5mm, yshift=-2.5mm] at (frame.north west) {\textcolor{danger-color}{\faExclamationCircle}};}
+}
+
+\newtcolorbox{dettagli}[1][Dettagli]{
+    manualstyle=details-color, title=#1,
+    fontupper=\small, fonttitle=\small\bfseries,
+    overlay={\node[anchor=north west, xshift=3mm, yshift=-2.5mm] at (frame.north west) {\textcolor{details-color}{\faSearch}};}
 }

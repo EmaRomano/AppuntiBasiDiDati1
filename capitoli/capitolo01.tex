@@ -63,11 +63,10 @@ Un errore comune è modellare come attributo ciò che dovrebbe essere una classe
     \item Se l'informazione è un valore semplice (es. \textit{Età}), è un \textbf{Attributo}.
     \item Se l'informazione ha proprietà proprie o deve essere legata ad altre entità (es. \textit{Indirizzo} inteso come via, civico e CAP), deve essere una \textbf{Classe} autonoma.
 \end{enumerate}
-\vspace{\baselineskip}
 
-\begin{warning}
-    L'insieme degli attributi devono permettere di identificare univocamente ogni istanza della classe (chiave primaria). Se non è possibile, è necessario aggiungere un attributo identificativo (es. \textit{ID} o \textit{Matricola}).
-\end{warning}
+\begin{warningbox}[]
+    L'insieme degli attributi devono permettere di identificare univocamente ogni istanza della classe.
+\end{warningbox}
 
 \begin{observation}
     Sebbene in Java usi \texttt{-} (private) e \texttt{+} (public), nei diagrammi per database la visibilità è meno rilevante, ma mantenere il - per gli attributi aiuta a ricordare l'incapsulamento dei dati.
@@ -99,7 +98,8 @@ Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguar
     \item \textbf{In Java (OOP)}: Le associazioni sono spesso \textit{unidirezionali} per favorire il disaccoppiamento tra le classi. La direzione indica quale oggetto mantiene il riferimento (puntatore) verso l'altro.
     \item \textbf{Nelle Basi di Dati}: Le associazioni sono intrinsecamente \textit{bidirezionali}. Una relazione tra due entità rappresenta un fatto logico che può essere interrogato partendo da entrambi i lati (es. tramite operatori di \textit{Join} in SQL).
 \end{itemize}
-\vspace{\baselineskip}
+
+\medskip
 
 Dunque nel class diagram concettuale per database, si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
 
@@ -155,3 +155,60 @@ In molte fasi di progettazione logica, o per chiarezza di implementazione, la cl
 
 L'esplicitazione è spesso necessaria perché molti strumenti di modellazione o linguaggi di programmazione non supportano nativamente il costrutto della classe di associazione. In questo caso, la classe intermedia (es. \texttt{Esame}) funge da "ponte" tra le due entità principali.
 
+\begin{tip}
+    La classe di associazione è significativa solo su associazioni \textit{molti-a-molti}, ma occasionalmente si usa anche per altri tipi di associazioni. 
+\end{tip}
+
+\subsection{Grado di un'Associazione e Relazioni Ternarie}
+
+Il \textbf{grado} di un'associazione è definito come il numero di classi coinvolte nel legame logico. 
+\begin{itemize}
+    \item \textbf{Associazioni Binarie (Grado 2):} Collegano due classi. Costituiscono la quasi totalità delle relazioni in un database.
+    \item \textbf{Associazioni N-arie (Grado $N \ge 3$):} Collegano tre o più classi contemporaneamente. Il caso più comune è l'associazione \textbf{ternaria}.
+\end{itemize}
+
+\medskip
+
+Un'associazione ternaria si rende necessaria quando il legame logico esiste solo se si considerano tre entità simultaneamente; la scomposizione in relazioni binarie separate causerebbe una perdita irreparabile di informazione semantica. In UML si rappresenta graficamente interponendo un \textbf{rombo} tra le linee che collegano le tre classi.
+
+Si consideri, ad esempio, uno scenario di logistica industriale in cui sono coinvolte tre classi: \texttt{Fornitore}, \texttt{Prodotto} e \texttt{Progetto} (cantiere di destinazione). 
+L'atto del rifornimento è un evento atomico: il \textit{Fornitore A} fornisce il \textit{Prodotto X} specificamente per il \textit{Progetto Y}. Se provassimo a mappare questo dominio con tre relazioni binarie (\textit{Fornitore-Prodotto}, \textit{Prodotto-Progetto}, \textit{Fornitore-Progetto}), sapremmo quali prodotti vende un fornitore e quali prodotti usa un progetto, ma non sapremmo mai \textbf{quale specifico fornitore ha portato quel determinato prodotto a quel singolo progetto}.
+
+% Diagramma 4: Esempio associazione ternaria
+% [Codice PlantUML 4]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.5\textwidth]{immagini/cap01_im04.pdf} 
+    \caption{Esempio associazione ternaria con classe di associazione.}
+    \label{fig:ass_tern}
+\end{figure}
+
+\begin{tip}[Interpretazione di una associazione n-aria]
+Per comprendere a fondo l'associazione ternaria, si può pensare che una delle tre classi non si colleghi singolarmente alle altre due, ma alla loro \textbf{coppia}. Nel nostro esempio, il \texttt{Progetto} non è legato separatamente a un \texttt{Prodotto} e a un \texttt{Fornitore}, ma è associato stabilmente alla coppia $(Prodotto, Fornitore)$, intesa come specifica combinazione. Analogamente per le altre due classi. 
+\end{tip}
+
+Poiché i DBMS relazionali e i framework ORM (come JPA/Hibernate) non supportano le relazioni native a tre vie, si deve \textbf{esplicitare} (o reificare) l'associazione prima dell'implementazione.
+
+La reificazione trasforma il rombo dell'associazione in una classe vera e propria, che chiameremo \texttt{AssegnazioneFornitura}. L'associazione ternaria originale viene così frantumata in tre associazioni binarie distinte di tipo \textbf{1-a-Molti}:
+\begin{itemize}
+    \item Da \texttt{Fornitore} a \texttt{AssegnazioneFornitura} (Cardinalità \texttt{1} $\rightarrow$ \texttt{*})
+    \item Da \texttt{Prodotto} a \texttt{AssegnazioneFornitura} (Cardinalità \texttt{1} $\rightarrow$ \texttt{*})
+    \item Da \texttt{Progetto} a \texttt{AssegnazioneFornitura} (Cardinalità \texttt{1} $\rightarrow$ \texttt{*})
+\end{itemize}
+
+% Diagramma 5: Reificazione associazione ternaria
+% [Codice PlantUML 5]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.5\textwidth]{immagini/cap01_im05.pdf} 
+    \caption{Reificazione dell'associazione ternaria.}
+    \label{fig:reif_ass_tern}
+\end{figure}
+
+Nella realtà, gli eventi n-ari catturano quasi sempre proprietà quantitative. Riprendendo l'esempio precedente, l'atto della fornitura genera intrinsecamente una \textit{quantità} di pezzi consegnati e una \textit{data} di consegna. Questi attributi non appartengono a nessuna delle tre classi isolate, ma alla loro combinazione. In UML si modella una \textbf{Classe di Associazione} (es. \texttt{Fornitura}) collegata tramite una linea tratteggiata al rombo dell'associazione ternaria.
+
+Il processo di esplicitazione in questo scenario è immediato: la classe di associazione \texttt{Fornitura} viene promossa a classe centrale del cluster, inglobando gli attributi \texttt{quantità} e \texttt{data}. Le tre classi originarie si collegano a essa tramite relazioni binarie dirette.
+
+\begin{warningbox}[La trappola delle cardinalità ternarie]
+Nelle associazioni ternarie UML, la cardinalità posta vicino a una classe (es. \texttt{Progetto}) indica quante istanze di quella classe possono combinarsi con una \textbf{coppia fissa} di istanze delle altre due classi (\texttt{Fornitore} e \texttt{Prodotto}). Questa logica è controintuitiva e differisce dai diagrammi ER classici (notazione di Chen), inducendo spesso i progettisti in errore. Sostituire subito la ternaria con una classe esplicitata azzera ogni ambiguità interpretativa.
+\end{warningbox}
