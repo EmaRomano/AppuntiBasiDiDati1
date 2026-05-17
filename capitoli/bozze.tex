@@ -2,34 +2,9 @@
 
 \section{Aspetti implementativi dell'ereditarietà}
 
-Una generalizzazione può essere classificata combinando due tipi di vincoli ortogonali, utili a descrivere la natura delle istanze nel dominio reale:
-
-\begin{enumerate}
-    \item \textbf{Completezza (Totale vs Parziale):}
-    \begin{itemize}
-        \item \textbf{Totale (Completa):} Ogni istanza della superclasse deve obbligatoriamente appartenere ad almeno una delle subclassi. Non esistono elementi ``generici'' (corrisponde al concetto di \textit{Classe Astratta} in OOP).
-        \item \textbf{Parziale (Incompleta):} Un'istanza della superclasse può esistere senza dover per forza appartenere a una delle subclassi catalogate.
-    \end{itemize}
-    \item \textbf{Disgiunzione (Disgiunta vs Sovrapposta):}
-    \begin{itemize}
-        \item \textbf{Disgiunta:} Un'istanza della superclasse può appartenere al massimo a \textbf{una sola} delle subclassi. Le sottoclassi sono mutuamente esclusive.
-        \item \textbf{Sovrapposta (Overlapping):} Una singola istanza della superclasse può appartenere contemporaneamente a più subclassi distinte.
-    \end{itemize}
-\end{enumerate}
-
-\begin{example}[Esempi di Vincoli]
-Si considerino i seguenti scenari aziendali:
-\begin{itemize}
-    \item \textbf{Totale / Disgiunta:} La superclasse \texttt{ContoBancario} ha come subclassi \texttt{ContoCorrente} e \texttt{ContoDeposito}. Un conto deve essere obbligatoriamente di un tipo o dell'altro, e non può essere entrambe le cose contemporaneamente.
-    \item \textbf{Parziale / Sovrapposta:} La superclasse \texttt{Persona} ha come subclassi \texttt{Studente} e \texttt{Dipendente}. All'interno dell'anagrafica universitaria, una persona può essere solo un cittadino esterno (parziale), oppure può essere contemporaneamente uno studente che lavora per l'ateneo (sovrapposta).
-\end{itemize}
-\end{example}
-
-\begin{bestpractice}[Il dilemma del Backend: Mappatura Relazionale]
 Poiché il modello relazionale delle basi di dati si basa su tabelle bidimensionali e non prevede il concetto nativo di ereditarietà, lo sviluppatore backend deve scegliere come tradurre la gerarchia UML in tabelle SQL. Esistono tre strategie standard, ognuna con precisi trade-off ingegneristici. 
 
 Immaginiamo la gerarchia: \texttt{Utente} (id, email) $\rightarrow$ \texttt{Cliente} (voti) e \texttt{Admin} (livelloAccesso).
-\end{bestpractice}
 
 
 
