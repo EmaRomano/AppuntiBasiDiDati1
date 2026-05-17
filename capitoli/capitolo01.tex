@@ -72,7 +72,7 @@ Un errore comune è modellare come attributo ciò che dovrebbe essere una classe
     Sebbene in Java usi \texttt{-} (private) e \texttt{+} (public), nei diagrammi per database la visibilità è meno rilevante, ma mantenere il - per gli attributi aiuta a ricordare l'incapsulamento dei dati.
 \end{observation}
 
-\subsection{Ruoli nelle Associazioni}
+\section{Ruoli nelle Associazioni}
 
 Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe svolge all'interno di un'associazione. Viene indicato alle estremità della linea di associazione.
 
@@ -90,7 +90,7 @@ Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe 
     Spesso si tende a omettere il nome dell'associazione (il verbo al centro della linea) se i ruoli sono già sufficientemente esplicativi. In molti schemi professionali vengono mostrati solo i ruoli, perché sono più vicini alla struttura logica finale del database.
 \end{observation}
 
-\subsection{Navigabilità e Direzionalità}
+\section{Navigabilità e Direzionalità}
 
 Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguarda la \textbf{navigabilità} delle associazioni.
 
@@ -104,13 +104,13 @@ Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguar
 Dunque nel class diagram concettuale per database, si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
 
 
-\subsection{Tipi Enumerativi (Enumerazioni)}
+\section{Tipi Enumerativi (Enumerazioni)}
 
 Quando il dominio di un attributo è costituito da un insieme di valori costante, discreto e predefinito, si utilizza il costrutto della \textbf{Enumerazione}. Si tratta di un tipo di dato speciale che permette a un attributo di assumere solo uno dei valori elencati in una lista chiusa.
 
 In UML, le enumerazioni sono rappresentate come classi con lo stereotipo \guillemotleft enumeration\guillemotright. Non hanno attributi propri, ma contengono un elenco di valori letterali che rappresentano le possibili istanze del tipo enumerativo.
 
-\subsection{Classi di Associazione}
+\section{Classi di Associazione}
 
 Nella modellazione concettuale, capita spesso che un'associazione tra due classi possieda delle proprietà proprie. Se un attributo non descrive intrinsecamente né la classe A né la classe B, ma esiste solo in funzione della loro relazione, ci troviamo di fronte alla necessità di una \textbf{Classe di Associazione}.
 
@@ -159,7 +159,7 @@ L'esplicitazione è spesso necessaria perché molti strumenti di modellazione o 
     La classe di associazione è significativa solo su associazioni \textit{molti-a-molti}, ma occasionalmente si usa anche per altri tipi di associazioni. 
 \end{tip}
 
-\subsection{Grado di un'Associazione e Relazioni Ternarie}
+\section{Grado di un'Associazione e Relazioni Ternarie}
 
 Il \textbf{grado} di un'associazione è definito come il numero di classi coinvolte nel legame logico. 
 \begin{itemize}
@@ -213,7 +213,7 @@ Il processo di esplicitazione in questo scenario è immediato: la classe di asso
 Nelle associazioni ternarie UML, la cardinalità posta vicino a una classe (es. \texttt{Progetto}) indica quante istanze di quella classe possono combinarsi con una \textbf{coppia fissa} di istanze delle altre due classi (\texttt{Fornitore} e \texttt{Prodotto}). Questa logica è controintuitiva e differisce dai diagrammi ER classici (notazione di Chen), inducendo spesso i progettisti in errore. Sostituire subito la ternaria con una classe esplicitata azzera ogni ambiguità interpretativa.
 \end{warningbox}
 
-\subsection{Aggregazione e Composizione}
+\section{Aggregazione e Composizione}
 
 Nello sviluppo dei Class Diagrams, le associazioni standard indicano un legame logico simmetrico. Tuttavia, per modellare scenari in cui esiste un rapporto di possesso o di subordinazione strutturale, l'UML introduce le \textbf{relazioni tutto-parte} (part-whole relationships). Queste si dividono in due varianti fondamentali, distinte in base al vincolo sul ciclo di vita degli oggetti coinvolti: l'aggregazione e la composizione.
 
@@ -262,3 +262,23 @@ Si consideri un sistema di e-commerce con le classi \texttt{Ordine} (il Tutto) e
 
     Il caso della composizione è invece più significativo, perché il diagramma fornisce un'informazione in più: la parte non può esistere senza il tutto. 
 \end{dettagli}
+
+\section{Generalizzazione ed Ereditarietà}
+
+La \textbf{generalizzazione} (o ereditarietà) modella una relazione di tipo \textit{``IS-A''} (è-un) tra una classe più generale, detta \textbf{Superclasse} (o classe padre), e una o più classi più specifiche, dette \textbf{Subclassi} (o classi figlie). 
+
+Le subclassi ereditano automaticamente tutti gli attributi, i ruoli e le associazioni della superclasse, senza necessità di ridefinirli, e possono estendere il modello introducendo attributi o associazioni propri.
+
+\textbf{Sintassi UML:} Si rappresenta graficamente con una linea che termina con una \textbf{freccia con la punta triangolare vuota} rivolta verso la superclasse.
+
+% Diagramma 8: aggregazione
+% [Codice PlantUML 8]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.7\textwidth]{immagini/cap01_im08.pdf} 
+    \caption{Esempio di ereditarietà}
+\end{figure}
+
+
+
+

@@ -1,0 +1,29 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+abstract class Utente {
+    - id: Long
+    - email: String
+    - passwordHash: String
+}
+
+class Cliente {
+    - numeroTessera: String
+    - puntiFedelta: int
+}
+
+class Admin {
+    - livelloSicurezza: int
+    - stringaTokenGCP: String
+}
+
+class Moderatore {
+    - sezioneCompetenza: String
+    - numeroSegnalazioniGestite: int
+}
+
+' Il simbolo <|-- rappresenta la freccia di ereditarietà UML (punta triangolare vuota)
+Utente <|-- Cliente
+Utente <|-- Admin
+Utente <|-- Moderatore
+@enduml
