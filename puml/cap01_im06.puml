@@ -1,0 +1,18 @@
+@startuml
+skinparam classAttributeIconSize 0
+left to right direction
+
+class Universita {
+    - nome: String
+    - docenti: List<Professore>
+}
+
+class Professore {
+    - matricola: String
+    - nome: String
+    - cognome: String
+}
+
+' L'aggregazione si esprime con 'o--' (il rombo vuoto va sul lato di Universita)
+Universita "1" o-- "*" Professore : colleziona >
+@enduml

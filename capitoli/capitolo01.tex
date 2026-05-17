@@ -65,7 +65,7 @@ Un errore comune è modellare come attributo ciò che dovrebbe essere una classe
 \end{enumerate}
 
 \begin{warningbox}[]
-    L'insieme degli attributi devono permettere di identificare univocamente ogni istanza della classe.
+    L'insieme degli attributi deve permettere di identificare univocamente ogni istanza della classe.
 \end{warningbox}
 
 \begin{observation}
@@ -82,7 +82,7 @@ Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe 
     \item \textbf{Corrispondenza OOP}: Nella programmazione ad oggetti, il nome del ruolo coincide spesso con il nome dell'attributo (o del campo) che contiene il riferimento all'oggetto correlato.
 \end{itemize}
 
-\begin{example}[Associazione Riflessiva]
+\begin{example}[Associazione Riflessiva o Ricorsiva]
     Si consideri la classe \texttt{Persona} e l'associazione \textit{Genitorialità}. Senza ruoli, il legame sarebbe ambiguo. Assegnando i ruoli \textbf{genitore} e \textbf{figlio} alle due estremità, la semantica del modello diventa univoca.
 \end{example}
 
@@ -212,3 +212,53 @@ Il processo di esplicitazione in questo scenario è immediato: la classe di asso
 \begin{warningbox}[La trappola delle cardinalità ternarie]
 Nelle associazioni ternarie UML, la cardinalità posta vicino a una classe (es. \texttt{Progetto}) indica quante istanze di quella classe possono combinarsi con una \textbf{coppia fissa} di istanze delle altre due classi (\texttt{Fornitore} e \texttt{Prodotto}). Questa logica è controintuitiva e differisce dai diagrammi ER classici (notazione di Chen), inducendo spesso i progettisti in errore. Sostituire subito la ternaria con una classe esplicitata azzera ogni ambiguità interpretativa.
 \end{warningbox}
+
+\subsection{Aggregazione e Composizione}
+
+Nello sviluppo dei Class Diagrams, le associazioni standard indicano un legame logico simmetrico. Tuttavia, per modellare scenari in cui esiste un rapporto di possesso o di subordinazione strutturale, l'UML introduce le \textbf{relazioni tutto-parte} (part-whole relationships). Queste si dividono in due varianti fondamentali, distinte in base al vincolo sul ciclo di vita degli oggetti coinvolti: l'aggregazione e la composizione.
+
+L'\textbf{aggregazione} rappresenta una relazione in cui un oggetto ``Tutto'' (aggregante) contiene o colleziona uno o più oggetti ``Parte'' (aggregati), ma questi ultimi mantengono un'esistenza autonoma all'interno del dominio. Si tratta di un legame \textit{``has-a''} ad accoppiamento debole.
+
+\begin{itemize}
+    \item \textbf{Sintassi UML:} Si rappresenta graficamente con una linea che termina con un \textbf{rombo vuoto} (bianco) posizionato sul lato della classe ``Tutto''.
+    \item \textbf{Ciclo di vita:} La distruzione dell'oggetto aggregante \textbf{non} comporta la distruzione degli oggetti aggregati.
+\end{itemize}
+
+\begin{example}[Università e Professore]
+Si consideri la classe \texttt{Universita} (il Tutto) e la classe \texttt{Professore} (la Parte). Un'università raccoglie un insieme di docenti. Tuttavia, se l'università dovesse cessare la sua attività, i singoli professori non verrebbero eliminati dal sistema: essi continuerebbero ad esistere come entità autonome e potrebbero essere associati ad altri atenei.
+\end{example}
+
+% Diagramma 6: aggregazione
+% [Codice PlantUML 6]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.5\textwidth]{immagini/cap01_im06.pdf} 
+    \caption{Esempio di aggregazione}
+\end{figure}
+
+
+
+La \textbf{composizione} è una forma di aggregazione più stringente, esclusiva e gerarchica. In questo scenario, l'oggetto ``Parte'' è una componente indissolubile del ``Tutto''. Una parte può appartenere a un solo tutto alla volta e non ha alcuna autonomia esistenziale.
+
+\begin{itemize}
+    \item \textbf{Sintassi UML:} Si rappresenta con una linea che termina con un \textbf{rombo pieno} (nero) posizionato sul lato della classe ``Tutto''.
+    \item \textbf{Ciclo di vita:} Il ciclo di vita delle parti è totalmente subordinato a quello del tutto. Di conseguenza, la distruzione dell'oggetto composto (Tutto) determina l'istanza di \textbf{distruzione automatica} di tutte le sue parti. La cardinalità dal lato del tutto è rigorosamente \texttt{1} o \texttt{0..1}.
+\end{itemize}
+
+\begin{example}[Ordine ed Elemento d'Ordine]
+Si consideri un sistema di e-commerce con le classi \texttt{Ordine} (il Tutto) e \texttt{RigaOrdine} (la Parte, che descrive il prodotto e la quantità). Una riga d'ordine ha significato logico solo se contestualizzata all'interno dello specifico acquisto. Se l'utente decide di eliminare l'intero \texttt{Ordine}, il sistema deve rimuovere a cascata tutte le relative istanze di \texttt{RigaOrdine}.
+\end{example}
+
+% Diagramma 7: aggregazione
+% [Codice PlantUML 7]
+\begin{figure}[htbp] 
+    \centering
+    \includegraphics[width=0.5\textwidth]{immagini/cap01_im07.pdf} 
+    \caption{Esempio di composizione}
+\end{figure}
+
+\begin{dettagli}[]
+    L'aggregazione non ha alcuna necessità tecnica stringente: una semplice associazione fa esattamente lo stesso identico lavoro. A livello di tabelle, sia un'associazione generica sia un'aggregazione si tradurranno nello stesso modo, la differenza è puramente semantica e documentale, non implementativa. Alcuni autorevoli ingegneri del software (tra cui Martin Fowler, uno dei padri dell'architettura software moderna) sostengono da anni che l'aggregazione UML sia fondamentalmente inutile perché la linea di demarcazione con l'associazione standard è troppo sfumata e crea più ambiguità che benefici. Fowler la definisce ironicamente "un effetto placebo grafico".
+
+    Il caso della composizione è invece più significativo, perché il diagramma fornisce un'informazione in più: la parte non può esistere senza il tutto. 
+\end{dettagli}

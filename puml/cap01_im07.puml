@@ -1,0 +1,19 @@
+@startuml
+skinparam classAttributeIconSize 0
+left to right direction
+
+class Ordine {
+    - id: Long
+    - dataOrdine: Date
+    - righe: List<RigaOrdine>
+}
+
+class RigaOrdine {
+    - id: Long
+    - quantita: int
+    - prezzoUnitario: BigDecimal
+}
+
+' La composizione si esprime con '*--' (il rombo pieno va sul lato di Ordine)
+Ordine "1" *-- "*" RigaOrdine : contiene >
+@enduml
