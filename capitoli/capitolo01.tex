@@ -279,6 +279,10 @@ Le subclassi ereditano automaticamente tutti gli attributi, i ruoli e le associa
     \caption{Esempio di ereditarietà}
 \end{figure}
 
+È fondamentale comprendere che \textbf{l'ereditarietà non esiste nel modello relazionale delle basi di dati}. I database relazionali non possiedono strutture gerarchiche native; essi conoscono esclusivamente il concetto di tabella (relazione), che è per sua natura una struttura ``piatta'' e bidimensionale. 
+
+La generalizzazione appartiene quindi in modo esclusivo al livello della \textbf{progettazione concettuale}. In questa fase, lo scopo del Class Diagram è modellare il dominio reale nel modo più fedele e naturale possibile, catturandone la semantica e i vincoli logici (ovvero i rapporti di sotto-tipo/sopra-tipo) ed eliminando qualsiasi vincolo tecnologico. Il problema di come ``appiattire'' questa gerarchia per adattarla a un database relazionale sarà l'obiettivo centrale della successiva fase di progettazione logica.
+
 
 
 
