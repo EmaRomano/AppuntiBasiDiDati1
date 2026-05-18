@@ -72,7 +72,7 @@ Un errore comune è modellare come attributo ciò che dovrebbe essere una classe
     Sebbene in Java usi \texttt{-} (private) e \texttt{+} (public), nei diagrammi per database la visibilità è meno rilevante, ma mantenere il - per gli attributi aiuta a ricordare l'incapsulamento dei dati.
 \end{observation}
 
-\section{Ruoli nelle Associazioni}
+\subsection{Ruoli nelle Associazioni}
 
 Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe svolge all'interno di un'associazione. Viene indicato alle estremità della linea di associazione.
 
@@ -90,7 +90,7 @@ Un \textbf{ruolo} identifica la funzione specifica che un'istanza di una classe 
     Spesso si tende a omettere il nome dell'associazione (il verbo al centro della linea) se i ruoli sono già sufficientemente esplicativi. In molti schemi professionali vengono mostrati solo i ruoli, perché sono più vicini alla struttura logica finale del database.
 \end{observation}
 
-\section{Navigabilità e Direzionalità}
+\subsection{Navigabilità e Direzionalità}
 
 Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguarda la \textbf{navigabilità} delle associazioni.
 
@@ -104,7 +104,7 @@ Una differenza cruciale tra la modellazione OOP e quella per basi di dati riguar
 Dunque nel class diagram concettuale per database, si evitano solitamente le frecce di navigabilità. Una linea semplice indica che l'informazione è disponibile per l'interrogazione in modo simmetrico. La "direzionalità" fisica verrà stabilita solo nella fase di progettazione logica attraverso il posizionamento delle chiavi esterne.
 
 
-\section{Tipi Enumerativi (Enumerazioni)}
+\subsection{Tipi Enumerativi (Enumerazioni)}
 
 Quando il dominio di un attributo è costituito da un insieme di valori costante, discreto e predefinito, si utilizza il costrutto della \textbf{Enumerazione}. Si tratta di un tipo di dato speciale che permette a un attributo di assumere solo uno dei valori elencati in una lista chiusa.
 
@@ -114,7 +114,7 @@ In UML, le enumerazioni sono rappresentate come classi con lo stereotipo \guille
     A differenza dei diagrammi in OOP, le enumerazioni \textbf{non sono classi}, ma semplicemente un tipo di dato speciale; \textbf{non hanno associazioni con le classi}. 
 \end{warningbox}
 
-\section{Classi di Associazione}
+\subsection{Classi di Associazione}
 
 Nella modellazione concettuale, capita spesso che un'associazione tra due classi possieda delle proprietà proprie. Se un attributo non descrive intrinsecamente né la classe A né la classe B, ma esiste solo in funzione della loro relazione, ci troviamo di fronte alla necessità di una \textbf{Classe di Associazione}.
 
@@ -163,7 +163,7 @@ L'esplicitazione è spesso necessaria perché molti strumenti di modellazione o 
     La classe di associazione è significativa solo su associazioni \textit{molti-a-molti}, ma occasionalmente si usa anche per altri tipi di associazioni. 
 \end{tip}
 
-\section{Grado di un'Associazione e Relazioni Ternarie}
+\subsection{Grado di un'Associazione e Relazioni Ternarie}
 
 Il \textbf{grado} di un'associazione è definito come il numero di classi coinvolte nel legame logico. 
 \begin{itemize}
@@ -217,7 +217,7 @@ Il processo di esplicitazione in questo scenario è immediato: la classe di asso
 Nelle associazioni ternarie UML, la cardinalità posta vicino a una classe (es. \texttt{Progetto}) indica quante istanze di quella classe possono combinarsi con una \textbf{coppia fissa} di istanze delle altre due classi (\texttt{Fornitore} e \texttt{Prodotto}). Questa logica è controintuitiva e differisce dai diagrammi ER classici (notazione di Chen), inducendo spesso i progettisti in errore. Sostituire subito la ternaria con una classe esplicitata azzera ogni ambiguità interpretativa.
 \end{warningbox}
 
-\section{Aggregazione e Composizione}
+\subsection{Aggregazione e Composizione}
 
 Nello sviluppo dei Class Diagrams, le associazioni standard indicano un legame logico simmetrico. Tuttavia, per modellare scenari in cui esiste un rapporto di possesso o di subordinazione strutturale, l'UML introduce le \textbf{relazioni tutto-parte} (part-whole relationships). Queste si dividono in due varianti fondamentali, distinte in base al vincolo sul ciclo di vita degli oggetti coinvolti: l'aggregazione e la composizione.
 
@@ -267,13 +267,13 @@ Si consideri un sistema di e-commerce con le classi \texttt{Ordine} (il Tutto) e
     Il caso della composizione è invece più significativo, perché il diagramma fornisce un'informazione in più: la parte non può esistere senza il tutto. 
 \end{dettagli}
 
-\section{Generalizzazione ed Ereditarietà}
+\subsection{Generalizzazioni/Specializzazioni}
 
-La \textbf{generalizzazione} (o ereditarietà) modella una relazione di tipo \textit{``IS-A''} (è-un) tra una classe più generale, detta \textbf{Superclasse} (o classe padre), e una o più classi più specifiche, dette \textbf{Subclassi} (o classi figlie). 
+L'ereditarietà modella una relazione di tipo \textit{``IS-A''} (è-un) tra una classe più generale, detta \textbf{Generalizzazione} (o Superclasse, per analogia con i contesti OOP), e una o più classi più specifiche, dette \textbf{Specializzazioni} (o Sottoclassi). 
 
-Le subclassi ereditano automaticamente tutti gli attributi, i ruoli e le associazioni della superclasse, senza necessità di ridefinirli, e possono estendere il modello introducendo attributi o associazioni propri.
+Le specializzazioni ereditano automaticamente tutti gli attributi, i ruoli e le associazioni della generalizzazione, senza necessità di ridefinirli, e possono estendere il modello introducendo attributi o associazioni propri.
 
-\textbf{Sintassi UML:} Si rappresenta graficamente con una linea che termina con una \textbf{freccia con la punta triangolare vuota} rivolta verso la superclasse.
+\textbf{Sintassi UML:} Si rappresenta graficamente con una linea che termina con una \textbf{freccia con la punta triangolare vuota} rivolta verso la generalizzazione.
 
 % Diagramma 8: aggregazione
 % [Codice PlantUML 8]
@@ -283,7 +283,7 @@ Le subclassi ereditano automaticamente tutti gli attributi, i ruoli e le associa
     \caption{Esempio di ereditarietà}
 \end{figure}
 
-È fondamentale comprendere che \textbf{l'ereditarietà non esiste nel modello relazionale delle basi di dati}. I database relazionali non possiedono strutture gerarchiche native; essi conoscono esclusivamente il concetto di tabella (relazione), che è per sua natura una struttura ``piatta'' e bidimensionale. 
+È fondamentale comprendere che \textbf{l'ereditarietà non esiste nel modello relazionale delle basi di dati} (o almeno, non secondo il modello relazionale dei dati che noi studieremo). I database relazionali non possiedono strutture gerarchiche native; essi conoscono esclusivamente il concetto di tabella (relazione), che è per sua natura una struttura ``piatta'' e bidimensionale. 
 
 La generalizzazione appartiene quindi in modo esclusivo al livello della \textbf{progettazione concettuale}. In questa fase, lo scopo del Class Diagram è modellare il dominio reale nel modo più fedele e naturale possibile, catturandone la semantica e i vincoli logici (ovvero i rapporti di sotto-tipo/sopra-tipo) ed eliminando qualsiasi vincolo tecnologico. Il problema di come ``appiattire'' questa gerarchia per adattarla a un database relazionale sarà l'obiettivo centrale della successiva fase di progettazione logica.
 
@@ -294,12 +294,12 @@ Una generalizzazione può essere classificata combinando due tipi di vincoli ort
 \begin{enumerate}
     \item \textbf{Completezza (Totale vs Parziale):}
     \begin{itemize}
-        \item \textbf{Totale (Completa):} Ogni istanza della superclasse deve obbligatoriamente appartenere ad almeno una delle subclassi. Non esistono elementi ``generici'' (corrisponde al concetto di \textit{Classe Astratta} in OOP).
-        \item \textbf{Parziale (Incompleta):} Un'istanza della superclasse può esistere senza dover per forza appartenere a una delle subclassi catalogate.
+        \item \textbf{Totale (Complete):} Ogni istanza della superclasse deve obbligatoriamente appartenere ad almeno una delle subclassi. Non esistono elementi ``generici'' (corrisponde al concetto di \textit{Classe Astratta} in OOP).
+        \item \textbf{Parziale (Incomplete):} Un'istanza della superclasse può esistere senza dover per forza appartenere a una delle subclassi catalogate.
     \end{itemize}
     \item \textbf{Disgiunzione (Disgiunta vs Sovrapposta):}
     \begin{itemize}
-        \item \textbf{Disgiunta:} Un'istanza della superclasse può appartenere al massimo a \textbf{una sola} delle subclassi. Le sottoclassi sono mutuamente esclusive.
+        \item \textbf{Disgiunta (Disjoint):} Un'istanza della superclasse può appartenere al massimo a \textbf{una sola} delle subclassi. Le sottoclassi sono mutuamente esclusive.
         \item \textbf{Sovrapposta (Overlapping):} Una singola istanza della superclasse può appartenere contemporaneamente a più subclassi distinte.
     \end{itemize}
 \end{enumerate}
@@ -315,6 +315,37 @@ Si considerino i seguenti scenari aziendali:
     \item \textbf{Parziale / Sovrapposta:} La superclasse \texttt{Persona} ha come subclassi \texttt{Studente} e \texttt{Dipendente}. All'interno dell'anagrafica universitaria, una persona può essere solo un cittadino esterno (parziale), oppure può essere contemporaneamente uno studente che lavora per l'ateneo (sovrapposta).
 \end{itemize}
 \end{example}
+
+\section{La Documentazione di Supporto: I Dizionari dei Dati}
+
+Il Class Diagram, pur essendo uno strumento visivo formidabile, non è espressivamente sufficiente a catturare l'intera semantica di un dominio applicativo. Elementi come il significato preciso di un attributo, il contesto d'uso di un'associazione o le regole aziendali complesse (\textit{Business Rules}) non possono essere espressi tramite nodi e archi. 
+
+La progettazione concettuale si completa quindi attraverso i \textbf{Dizionari dei Dati}, estensioni testuali strutturate che definiscono formalmente ogni componente dello schema concettuale. Questi documenti rappresentano la specifica dei requisiti su cui si baserà lo sviluppo dello strato di persistenza e della logica di business.
+
+\medskip
+
+I dizionari dei dati sono: 
+\begin{itemize}
+    \item \textbf{Dizionario delle Classi}: descrive in modo univoco ogni entità del sistema. Si presenta come una tabella in cui ogni riga rappresenta una classe. Per ogni classe vengono forniti il nome (prima colonna), una descrizione in linguaggio naturale per evitare ambiguità terminologiche (seconda colonna), nome, tipo e descrizione di ciascun attributo (terza colonna).
+    \item \textbf{Dizionario delle Associazioni}: si presenta come una tabella analoga alla precedente, in cui ogni riga rappresenta un'associazione. Per ogni associazione vengono forniti il nome (prima colonna), descrizione (seconda colonna), le classi coinvolte con ruolo, molteplicità e descrizione (terza colonna). 
+    \item \textbf{Dizionario dei Vincoli}: è il documento più critico. I \textbf{Vincoli di Integrità Esogeni} (o regole di business) sono restrizioni sul dominio dei dati che \textbf{non possono} essere espresse graficamente nel Class Diagram tramite la normale sintassi UML. Mentre una cardinalità \texttt{1..*} esprime un vincolo strutturale grafico, una regola del tipo \textit{``Un cliente non può effettuare un ordine se il suo account è sospeso''} non ha un simbolo UML dedicato. Viene quindi codificata nel dizionario dei vincoli in linguaggio naturale o tramite espressioni logico-matematiche formali (come l'OCL - \textit{Object Constraint Language}). Si presenta come una tabella a due colonne in cui ogni riga rappresenta un vincolo, nella prima colonna si inserisce il nome del vincolo oppure un suo identificatore univoco (es. \texttt{BR} - Business Rule), nella seconda colonna la sua descrizione in linguaggio naturale. 
+\end{itemize}
+
+\begin{example}[Catalogo dei Vincoli d'Integrità]
+\begin{description}
+    \item 
+    \item[\texttt{BR01} (Coerenza Temporale):] La data di spedizione di un \texttt{Ordine} deve essere strettamente successiva o uguale alla sua data di creazione.
+    \item[\texttt{BR02} (Integrità Finanziaria):] L'attributo \texttt{totale} di un \texttt{Ordine} deve essere matematicamente pari alla sommatoria del prodotto tra \texttt{quantita} e \texttt{prezzoUnitario} di tutte le istanze di \texttt{RigaOrdine} a esso collegate.
+    \item[\texttt{BR03} (Regola di Business):] Un \texttt{Utente} con ruolo \texttt{Admin} non può associare a sé stesso un'istanza di \texttt{Ordine} in veste di \texttt{acquirente}.
+\end{description}
+\end{example}
+
+\begin{bestpractice}[]
+    Nel dizionario dei vincoli non vanno inseriti vincoli che sono già espressi nel class diagram. 
+
+    I vincoli devono garantire la qualità interna dei dati nella base di dati. 
+\end{bestpractice}
+
 
 
 
