@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1779035134.83649 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1779035136.07028 0
+["pdflatex"] 1779096215.69085 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1779096216.94978 0
   "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" 1779018705.89104 637 4f3f8b5daf6418a9ed64c24668b1c57a ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free1.enc" 1622837620 3042 0e2b14b9be7d01075a4c4591d5d1781b ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free2.enc" 1622837620 2906 e48aa7c95dea478a2e011bcb4f7878c9 ""
@@ -246,8 +246,8 @@
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1776180857.69195 4547344 09b200d6d21f1c0b39cba8696f0a38d2 ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1776180569 7758585 b87c9409558cb9127c55d304fd89c153 ""
   "capitoli/bozze.tex" 1779020322.29329 2917 1d75256cb164607f01071c599ccf9d4e ""
-  "capitoli/capitolo01.aux" 1779035135.9194 3949 4ba58e1b16742fc78fa7b68004d78f08 "pdflatex"
-  "capitoli/capitolo01.tex" 1779035134.56789 23038 d823b0f0cfba53bc2382b9113a87f004 ""
+  "capitoli/capitolo01.aux" 1779096216.79505 3949 bdd84245dad9078cb5ae88563971c5d5 "pdflatex"
+  "capitoli/capitolo01.tex" 1779096215.44006 23249 c734f3c8cd157d2263a7228cee021800 ""
   "immagini/cap01_im01.pdf" 1776260351.34033 5718 8ce05015010384b89d5a81872515e4fb ""
   "immagini/cap01_im02.pdf" 1776260892.44951 6626 ae082302345900891d076fbc4c712a9b ""
   "immagini/cap01_im03.pdf" 1776261320.1281 6755 5f5b4798b10ee26f4fa5c6be68c91641 ""
@@ -256,10 +256,10 @@
   "immagini/cap01_im06.pdf" 1779012535.97109 6166 e446c85139e9161c87c560341404f8ec ""
   "immagini/cap01_im07.pdf" 1779012774.71163 6452 d6af398e1f03846ad4b5fcd3cdb16b1b ""
   "immagini/cap01_im08.pdf" 1779019237.44907 9651 075d0465d2f549768e5ecd5061274b8c ""
-  "main.aux" 1779035135.9294 1471 8440e8c54cfdc1478de2bc7c3be1d5f3 "pdflatex"
-  "main.out" 1779035135.93145 2293 1e298367822c1e21d3ae24b97fd0172b "pdflatex"
+  "main.aux" 1779096216.80605 1471 8440e8c54cfdc1478de2bc7c3be1d5f3 "pdflatex"
+  "main.out" 1779096216.80842 2293 1e298367822c1e21d3ae24b97fd0172b "pdflatex"
   "main.tex" 1779018705.89104 637 4f3f8b5daf6418a9ed64c24668b1c57a ""
-  "main.toc" 1779035135.93197 1377 56646a62cc2a95ea0a046ebd76f49ff8 "pdflatex"
+  "main.toc" 1779096216.80906 1377 7ccb2089aaeb27dd874b4df4ef73b343 "pdflatex"
   "preambolo.tex" 1778823791.121 4529 76fec61e0c3d9e24ba968ac563690627 ""
   (generated)
   "capitoli/capitolo01.aux"
