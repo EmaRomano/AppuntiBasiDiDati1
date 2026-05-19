@@ -1,0 +1,74 @@
+\chapter{Il Modello Relazionale}
+
+\section{Introduzione}
+
+Il passaggio dalla progettazione concettuale alla progettazione logica rappresenta la transizione dal \textit{cosa} deve essere rappresentato al \textit{come} organizzare concretamente i dati all'interno di un sistema di gestione di basi di dati (DBMS). Questo processo richiede l'adozione di uno specifico \textbf{modello dei dati}.
+
+Sebbene la storia dell'informatica abbia visto l'evoluzione di diversi paradigmi — come il modello gerarchico, quello reticolare e quello orientato agli oggetti —, la nostra trattazione si concentrerà sul \textbf{modello relazionale}, che costituisce lo standard industriale prevalente. Vale la pena notare che i DBMS moderni più diffusi (come PostgreSQL e Oracle) adottano un'evoluzione di questo approccio, denominata \textbf{modello relazionale a oggetti}, la quale estende le fondamenta del modello relazionale puro integrando costrutti tipici del paradigma OOP.
+
+\medskip
+
+Uno dei principali vantaggi nell'aver adottato i \textbf{Class Diagrams UML} nella fase concettuale risiede nella loro assoluta indipendenza tecnologica: essi si adattano teoricamente a qualunque modello logico finale. Di contro, questa spiccata espressività introduce un inevitabile \textbf{disallineamento semantico} (\textit{impedance mismatch}) quando l'obiettivo è la traduzione in uno schema relazionale puro. 
+
+Nel passaggio alla progettazione logica relazionale, le principali sfide strutturali da affrontare saranno dettate dai rigidi vincoli di atomicità e piattezza del dato tipici delle tabelle:
+\begin{itemize}
+    \item \textbf{Attributi strutturati:} Il modello relazionale esige che i valori degli attributi siano atomici e non strutturati. Non è quindi possibile nidificare record, oggetti o tipi di dato complessi all'interno di una colonna.
+    \item \textbf{Attributi a valore multiplo (multivalore):} Ogni cella di una tabella relazionale può contenere esclusivamente un singolo valore atomico, vietando l'uso nativo di collezioni, array, liste o set all'interno di un singolo attributo.
+    \item \textbf{Assenza di ereditarietà:} Il modello relazionale puro non supporta nativamente le gerarchie di generalizzazione-specializzazione, costringendo il progettista ad applicare strategie di ``appiattimento'' o di scomposizione strutturale.
+\end{itemize}
+
+\section{Concetti Fondamentali}
+
+Il \textbf{modello relazionale} si basa sul concetto matematico di relazione. Questo modello rappresenta la struttura logica e piatta su cui verranno mappati i dati dell'applicazione. Per formalizzare rigorosamente il modello, è necessario definire i suoi tre componenti atomici: i domini, lo schema e la relazione stessa.
+
+\medskip
+
+Un \textbf{dominio} (indicato con $D$) è un insieme di valori atomici, ovvero non ulteriormente scomponibili. 
+Ogni dominio è caratterizzato da un nome e da un tipo di dato (es: \texttt{int, varchar, date}).
+
+\medskip
+
+Uno \textbf{schema relazionale} (o schema di tabella) definisce la struttura logica dei dati. Esso è costituito da un nome $R$ e da un insieme di attributi $A_1, A_2, \dots, A_n$, a ciascuno dei quali è associato un dominio $D_i$.
+
+Lo schema viene denotato formalmente come:
+$$R(A_1: D_1, A_2: D_2, \dots, A_n: D_n)$$
+
+Lo schema relazionale corrisponde dunque esattamente al concetto di \textbf{Classe}. Esso definisce la struttura dei dati, i nomi dei campi e i rispettivi tipi, agendo come un ``blueprint'' statico.
+
+Matematicamente, date le premesse precedenti, definiamo il dominio totale dello schema come il prodotto cartesiano dei domini dei singoli attributi:
+$$D_{tot} = D_1 \times D_2 \times \dots \times D_n$$
+
+\medskip
+
+Una \textbf{relazione} $r$ sullo schema $R$ è un sottoinsieme finito del prodotto cartesiano dei domini degli attributi:
+$$r \subseteq D_1 \times D_2 \times \dots \times D_n$$
+
+Gli elementi che compongono questo sottoinsieme sono detti \textbf{tuple} (o n-uple). Una tupla è un vettore di valori $(v_1, v_2, \dots, v_n)$ tale che ogni $v_i \in D_i$.
+
+\begin{tip}[]
+La corrispondenza con OOP è la seguente:
+\begin{itemize}
+    \item Una \textbf{Tupla} corrisponde al singolo \textbf{Oggetto} (una istanza della classe contenente dati reali).
+    \item La \textbf{Relazione} corrisponde all'insieme di tutti gli oggetti di quella classe \textbf{attualmente persistiti} nel database in un determinato istante temporale (lo stato corrente della tabella).
+\end{itemize}
+\end{tip}
+
+\begin{example}[Formalizzazione di un'Anagrafica]
+Definiamo lo schema relazionale per la classe \texttt{Studente}:
+$$STUDENTE(\text{matricola}: \text{String}, \text{ nome}: \text{String}, \text{ eta}: \text{Integer})$$
+
+Il prodotto cartesiano di questi tre domini genererebbe infinite combinazioni (comprese matricole inesistenti accoppiate a nomi casuali ed età assurde). 
+
+La \textbf{relazione} $r(\text{STUDENTE})$ conterrà invece solo le tuple degli studenti reali inseriti nel sistema:
+$$r = \{(\text{'654321'}, \text{'Giovanni'}, 22), (\text{'123456'}, \text{'Mario'}, 24)\}$$
+\end{example}
+
+\begin{tip}[In sintesi:]
+Nel passaggio dalla progettazione concettuale alla modellazione logica, i concetti del paradigma orientato agli oggetti (\textit{OOP}) e del Class Diagram si traducono come segue:
+
+\begin{itemize}
+    \item \textbf{Classi $\rightarrow$ Schemi Relazionali:} Le classi si traducono in schemi di relazione, identificati da un nome (corrispondente al nome della classe) e da un insieme di attributi.
+    \item \textbf{Attributi $\rightarrow$ Domini:} A ciascun attributo dello schema è associato un \textbf{dominio}, ovvero l'insieme di tutti i possibili valori atomici che quell'attributo può assumere (equivalente al tipo di dato in programmazione).
+    \item \textbf{Istanze $\rightarrow$ Relazione (Stato):} Una \textbf{relazione} è un sottoinsieme discreto e finito del dominio totale (il prodotto cartesiano di tutti i singoli domini). Essa rappresenta l'insieme delle tuple (istanze o oggetti) effettivamente memorizzate e persistite nel sistema in un dato momento temporale.
+\end{itemize}
+\end{tip}
