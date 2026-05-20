@@ -97,35 +97,15 @@ Esempio: STUDENTE (CF, matr, nome, cognome, data di nascita).
 
 Nella parte di progettazione concettuale con class diagram abbiamo supposto che l'insieme degli attributi possa identificare in maniera univoca una istanza della classe. Questa ipotesi ci garantisce che \textit{esiste sempre almeno una superchiave}: alla peggio, basta prendere l'insieme di tutti gli attributi.   
 
-\medskip
+\medskip 
 
-una chiave candidata è una superchiave minimale, ovvero con un numero minimo di attributi: eliminando uno qualsiasi dei suoi attributi quello che si ottiene non è più una superchiave. 
+% Consideriamo ora, nel class diagram, l'associazione studente-esame (uno a molti). A partire da una istanza di esame, per risalire allo studente che ha sostenuto quell'esame uso la chiave esterna matricola, da cui risalgo all'identificatore dello studente (matr, chiave primaria di STUDENTE).
 
-È chiaro che una superchiave con un unico attributo è necessariamente una chiave candidata. 
+% Da sottolineare quando si vanno rendere le associazioni molti a molti:
 
-Esempio: ESAME(matricola, corso, voto, data, lode)
+% sono problematiche perché il modello relazionale mi impone un valore unico per ciascun attributo, quindi non posso usare lo stesso metodo che uso per le associazioni uno a molti. 
 
-{matricola, corso} è l'unica chiave candidata. 
-
-La chiave primaria (di uno schema relazionale) è una chiave candidata scelta come identificativo delle istanze (nello schema relazionale). 
-
-È chiaro che potendoci essere più chiavi candidate, la scelta della chiave primaria non è in genere unica. Si tratta di una scelta di tipo progettuale la cui bontà dipende dallo specifico problema che si sta modellando.
-
-Nell'esempio di STUDENTE possiamo quindi scegliere la chiave primaria tra CF e matricola. Sceglieremo come chiave primaria la matricola. Nello schema relazionale questa scelta si indica graficamente sottolineando gli attributi che rappresentano la chiave primaria. 
-
-Una chiave esterna (di uno schema relazionale rispetto ad un altro schema) è un insieme di attributi dello schema relazionale che sono in corrispondenza biunivoca con gli attributi dell'altro schema in modo tale che attributi corrispondenti abbiano lo stesso dominio. 
-
-Esempio: matricola è una chiave esterna di ESAME per STUDENTE (è in corrispondenza con matr in STUDENTE, sua chiave primaria, ed è dello stesso tipo)
-
-La scelta della chiave esterna si indica graficamente con una doppia sottolineatura. 
-
-Consideriamo ora, nel class diagram, l'associazione studente-esame (uno a molti). A partire da una istanza di esame, per risalire allo studente che ha sostenuto quell'esame uso la chiave esterna matricola, da cui risalgo all'identificatore dello studente (matr, chiave primaria di STUDENTE).
-
-Da sottolineare quando si vanno rendere le associazioni molti a molti:
-
-sono problematiche perché il modello relazionale mi impone un valore unico per ciascun attributo, quindi non posso usare lo stesso metodo che uso per le associazioni uno a molti. 
-
-Il metodo per le associazioni molti a molti è del tutto generale ed in teoria si potrebbe usare per tutti i tipi di associazione; tuttavia questo metodo si usa solo dove strettamente necessario, perché ha un costo. 
+% Il metodo per le associazioni molti a molti è del tutto generale ed in teoria si potrebbe usare per tutti i tipi di associazione; tuttavia questo metodo si usa solo dove strettamente necessario, perché ha un costo. 
 
 \section{Le Chiavi}
 
