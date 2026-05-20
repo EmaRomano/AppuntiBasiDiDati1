@@ -146,7 +146,7 @@ Siano $R_1$ e $R_2$ due schemi relazionali (non necessariamente distinti). Un in
 
 \medskip
 
-Il vincolo impone che per ogni tupla $t_1$ nell'istanza corrente di $R_1$, il valore di $t_1[FK]$ deve essere nullo (\texttt{NULL}), oppure coincidere esattamente con il valore $t_2[PK]$ di una tupla $t_2$ attualmente esistente nell'istanza di $R_2$.
+Il vincolo impone che per ogni tupla $t_1$ nell'istanza corrente di $R_1$, il valore di $t_1[FK]$ deve essere nullo (\texttt{NULL}), oppure coincidere esattamente con il valore $t_2[PK]$ di \textbf{una tupla} $t_2$ \textbf{attualmente esistente} nell'istanza di $R_2$.
 
 Nello schema testuale, la presenza di una chiave esterna si denota convenzionalmente con una \textbf{doppia sottolineatura}.
 
@@ -155,15 +155,36 @@ Nello schema testuale, la presenza di una chiave esterna si denota convenzionalm
 \subsection{Associazioni 1 a 1}
 
 Un'associazione \textbf{1 a 1} tra due classi $A$ e $B$ indica che a un'istanza di $A$ corrisponde al massimo un'istanza di $B$, e viceversa. 
-Nel modello relazionale, questo legame si traduce mantenendo due schemi di relazione separati (due tabelle) e introducendo una \textbf{Chiave Esterna (FK)} in uno dei due schemi che punta alla Chiave Primaria (PK) dell'altro.
+Nel modello relazionale, questo legame si traduce introducendo una \textbf{Chiave Esterna (FK)} in uno dei due schemi che punta alla Chiave Primaria (PK) dell'altro.
+
+\begin{example}[Associazione esattamente 1 a 1]
+Si consideri un'associazione in cui la partecipazione è rigida e obbligatoria per entrambe le classi (1..1 $\leftrightarrow$ 1..1), ad esempio tra l'entità \texttt{STUDENTE(matricola, nome, cognome)} e il suo \texttt{FASCICOLO(codice, dataCreazione)}. Ogni studente possiede esattamente un fascicolo e ogni fascicolo appartiene esattamente a uno studente.
+Traduciamo il modello aggiungendo la chiave esterna nello schema del fascicolo:
+\begin{itemize}
+    \item $\texttt{STUDENTE}(\underline{\text{matricola}}, \text{ nome}, \text{ cognome})$
+    \item $\texttt{FASCICOLO}(\underline{\text{codice}}, \text{ dataCreazione}, \underline{\underline{\text{ matricolaStudente}}})$
+\end{itemize}
+\end{example}
 
 Affinché la relazione rimanga rigorosamente 1 a 1, non è sufficiente definire la chiave esterna. Se ci limitassimo a questo, la tabella che ospita la FK potrebbe avere più tuple che puntano alla stessa PK della tabella bersaglio, trasformando di fatto la relazione in una 1 a N.
+
+Riprendendo l'esempio precedente, se l'attributo \texttt{studente} nello schema \texttt{FASCICOLO} fosse definito unicamente come chiave esterna, nulla impedirebbe al database di registrare due tuple distinte di fascicoli (es. codice \texttt{'F01'} e \texttt{'F02'}) aventi entrambe il valore \texttt{studente = '12345'}. Questo corromperebbe la semantica concettuale, asserendo che la matricola 12345 possiede \textit{molti} fascicoli.
 
 Per garantire la biunivocità dell'associazione, è obbligatorio imporre un \textbf{vincolo di univocità} sugli attributi che compongono la chiave esterna.
 Matematicamente, se lo schema $R_1$ contiene la chiave esterna $FK$ verso $R_2$, deve valere che per ogni coppia di tuple distinte $t_x, t_y \in r(R_1)$:
 $$t_x[FK] \neq t_y[FK] \quad \text{(escludendo i valori NULL)}$$
 
-La scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione):
+\begin{dettagli}[Perché usare una sola Chiave Esterna?]
+Vista la forte simmetria di un'associazione 1 a 1, potrebbe sorgere spontaneo il dubbio: perché non posizionare una chiave esterna in \textit{entrambi} gli schemi (es. aggiungere \texttt{fascicolo} dentro \texttt{STUDENTE} e \texttt{studente} dentro \texttt{FASCICOLO})? 
+La teoria relazionale esclude questa pratica per tre ragioni fondamentali:
+\begin{enumerate}
+    \item \textbf{Ridondanza e Rischio di Anomalie:} Il legame logico verrebbe salvato due volte. Se per errore un sistema aggiornasse un lato senza allineare l'altro (es. lo Studente punta al Fascicolo A, ma il Fascicolo A punta a un altro Studente), il database entrerebbe in uno stato incoerente.
+    \item \textbf{Bidirezionalità Intrinseca:} Come già stabilito, la presenza di una singola chiave esterna è matematicamente sufficiente per stabilire un'uguaglianza logica tra le tuple. Il motore del database può navigare il legame in entrambe le direzioni senza bisogno di puntatori doppi.
+    \item \textbf{Dipendenza Circolare (Deadlock di Inserimento):} Poiché in questo esempio la partecipazione è obbligatoria da ambo i lati, le rispettive chiavi esterne dovrebbero avere un vincolo \texttt{NOT NULL}. Tuttavia, questo creerebbe un paradosso logico: non si potrebbe inserire uno studente nel database perché manca il suo fascicolo, e non si potrebbe inserire il fascicolo perché manca lo studente a cui associarlo. Inserire la chiave esterna in un solo schema spezza questo circolo vizioso.
+\end{enumerate}
+\end{dettagli}
+
+Nell'esempio precedente si aveva una situazione di relazione esattamente 1 a 1 e la scelta dello schema in cui inserire la chiave esterna era indifferente. In altri casi, la scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione):
 
 \begin{enumerate}
     \item \textbf{Partecipazione Obbligatoria vs Opzionale (0..1 $\leftrightarrow$ 1..1):}
@@ -185,13 +206,79 @@ Seguendo la regola, posizioniamo la chiave esterna nel \texttt{Dipartimento}:
 
 \medskip
 
-Vincoli su \texttt{DIPARTIMENTO.direttore}:
+Vincoli su \texttt{DIPARTIMENTO.codiceDirettore}:
 \begin{itemize}
-    \item \textbf{Foreign Key:} punta a \texttt{PROFESSORE.matricola}
+    \item \textbf{Foreign Key:} punta a \texttt{PROFESSORE.codiceDocente}
     \item \textbf{UNIQUE:} per garantire che lo stesso professore non diriga due dipartimenti (vincolo 1:1).
     \item \textbf{NOT NULL:} per garantire che ogni dipartimento abbia un direttore (cardinalità minima 1).
 \end{itemize}
 \end{example}
+
+\subsection{Associazioni 1 a Molti (1:N)}
+
+Nel modello relazionale, questa associazione si traduce secondo una regola fissa e inderogabile, dettata dal vincolo di atomicità degli attributi (assenza di attributi multivalore): la \textbf{Chiave Esterna (FK) deve essere sempre inserita nello schema dal lato ``Molti'' ($B$)}, e punterà alla Chiave Primaria (PK) dello schema dal lato ``Uno'' ($A$).
+
+A differenza dell'associazione 1 a 1, in questo caso \textbf{non} si deve applicare alcun vincolo di univocità (\texttt{UNIQUE}) sulla chiave esterna. È infatti intrinseco nella natura dell'associazione 1:N che più tuple della relazione $B$ possano possedere lo stesso valore per l'attributo FK, puntando così alla medesima istanza di $A$.
+
+\begin{example}[Impiegati in un Dipartimento]
+Si consideri l'associazione tra \texttt{Dipartimento} (1) e \texttt{Impiegato} (N). Un dipartimento ospita molti impiegati, ma un impiegato afferisce a un solo dipartimento.
+La chiave esterna viene posizionata nello schema \texttt{IMPIEGATO}:
+
+\begin{itemize}
+    \item $\texttt{DIPARTIMENTO}(\underline{\text{codice}}, \text{nome}, \text{sede})$
+    \item $\texttt{IMPIEGATO}(\underline{\text{matricola}}, \text{nome}, \text{cognome}, \underline{\underline{\text{codiceDipartimento}}})$
+\end{itemize}
+\end{example}
+
+\begin{observation}[Monodirezionalità Apparente]
+Anche in questo caso, la posizione fisica della chiave esterna genera una \textit{monodirezionalità apparente}. Guardando lo schema, sembra che un impiegato "conosca" il proprio dipartimento, ma che il dipartimento sia ignaro dei propri impiegati (poiché non ha attributi che li referenziano). 
+
+Come già chiarito, questa è solo un'illusione strutturale: l'informazione è conservata intatta dalla logica dei valori. Il database è sempre in grado di ricavare l'elenco degli impiegati di uno specifico dipartimento, semplicemente interrogando la tabella \texttt{IMPIEGATO} e filtrando le tuple che possiedono quel determinato \texttt{codiceDipartimento}.
+\end{observation}
+
+\subsection{Associazioni Molti a Molti (N:N)}
+
+Nei casi precedenti (1:1 e 1:N), la traduzione avveniva inserendo una chiave esterna direttamente in uno dei due schemi coinvolti. 
+Se provassimo ad applicare questa logica a un'associazione N:N, violeremmo il vincolo fondamentale del modello relazionale:
+\begin{itemize}
+    \item Inserire la chiave esterna di \texttt{CORSO} nello schema \texttt{STUDENTE} costringerebbe una tupla studente a contenere un attributo \textbf{multivalore} (una lista di codici di corsi).
+    \item Viceversa, inserire la chiave esterna di \texttt{STUDENTE} in \texttt{CORSO} creerebbe una lista di matricole dentro la tupla del corso.
+\end{itemize}
+Poiché il modello relazionale ammette esclusivamente valori atomici, l'uso di chiavi esterne dirette è matematicamente impossibile.
+
+\medskip
+
+Per tradurre un'associazione Molti a Molti, la teoria relazionale impone la creazione di un \textbf{terzo schema di relazione autonomo}, comunemente chiamato \textit{tabella di giunzione}, \textit{tabella ponte} o \textit{relazione associativa}.
+
+Questa nuova tabella conterrà esclusivamente (almeno nella sua forma base) le chiavi esterne che puntano alle chiavi primarie dei due schemi originari. La \textbf{Chiave Primaria} di questa nuova tabella sarà composta dall'unione delle due chiavi esterne (chiave primaria composta).
+
+\begin{example}[Studenti e Corsi]
+Si consideri l'associazione N:N tra \texttt{STUDENTE} e \texttt{CORSO}.
+Creiamo la tabella ponte \texttt{FREQUENZA}:
+
+\begin{itemize}
+    \item $\texttt{STUDENTE}(\underline{\text{matricola}}, \text{nome})$
+    \item $\texttt{CORSO}(\underline{\text{codice}}, \text{titolo}, \text{cfu})$
+    \item $\texttt{FREQUENZA}(\underline{\underline{\text{matricolaStudente}}}, \underline{\underline{\text{codiceCorso}}})$
+\end{itemize}
+
+\medskip
+
+Vincoli sulla tabella \texttt{FREQUENZA}:
+\begin{itemize}
+    \item \textbf{Primary Key:} È composta dalla coppia (\texttt{matricolaStudente}, \texttt{codiceCorso}). Questo garantisce che uno studente non possa essere iscritto due volte allo stesso identico corso.
+    \item \textbf{Foreign Key 1:} \texttt{matricolaStudente} punta a \texttt{STUDENTE.matricola}.
+    \item \textbf{Foreign Key 2:} \texttt{codiceCorso} punta a \texttt{CORSO.codice}.
+\end{itemize}
+\end{example}
+
+\begin{observation}[Delegazione della Complessità]
+Dal punto di vista della progettazione (struttura statica), il pattern della tabella di giunzione rende la risoluzione delle associazioni N:N un processo banale e standardizzato.
+La reale complessità viene delegata alla fase operativa (interrogazione dei dati). Per estrarre, ad esempio, i nomi degli studenti e i titoli dei corsi da loro frequentati, il DBMS dovrà eseguire computazionalmente onerosi \textbf{JOIN multipli}, attraversando la tabella ponte per ricongiungere i dati disaccoppiati.
+
+È chiaro che questo metodo per rendere le associazioni è del tutto generale e, in teoria, potrebbe essere usato per tutti i tipi di associazione; tuttavia, si tratta ovviamente di una cattiva pratica in virtù del costo computazionale che è stato appena discusso. 
+\end{observation}
+
 
 
 

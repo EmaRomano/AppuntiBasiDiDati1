@@ -30,19 +30,5 @@ Viene creata una tabella per la superclasse e una tabella distinta per ciascuna 
     \item \textbf{Svantaggi:} Calo drastico delle performance su gerarchie profonde. Ogni singola lettura di una sottoclasse richiede un'operazione di \texttt{JOIN} tra la tabella padre e la tabella figlia.
 \end{itemize}
 
-\section{lezione 7}
-Dalla progettazione concettuale alla progettazione logica. In mezzo c'è la scelta del modello dei dati. Noi seguiremo il modello dei dati relazionale dei dati. Ci sono anche altri modelli: gerarchico, ad oggetti, relazionale ad oggetti. Ad esempio Oracle e Postgres (che sono i sistemi più utilizzati) usano quest'ultimo modello. 
-
-\medskip
-
-Uno dei vantaggi della scelta del class diagram per la progettazione concettuale è che si adatta bene a qualsiasi tipo di modello dei dati. Lo svantaggio è che pone alcuni problemi da risolvere nel passaggio dalla progettazione concettuale a quella logica. In questo passaggio, nel caso di modello dei dati relazionale, le principali difficoltà saranno: 
-\begin{itemize}
-    \item attributi strutturati: il modello relazionale dei dati esige valori non strutturati per gli attributi.
-    \item attributi a valore multiplo: il modello relazionale dei dati esige un valore unico.
-    \item il modello relazionale non supporta le gerarchie generalizzazione-specializzazione. 
-\end{itemize}
-
-\medskip
-
 
 
