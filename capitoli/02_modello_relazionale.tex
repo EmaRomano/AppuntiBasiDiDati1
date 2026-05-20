@@ -17,6 +17,7 @@ Nel passaggio alla progettazione logica relazionale, le principali sfide struttu
     \item \textbf{Assenza di ereditarietà:} Il modello relazionale puro non supporta nativamente le gerarchie di generalizzazione-specializzazione, costringendo il progettista ad applicare strategie di ``appiattimento'' o di scomposizione strutturale.
 \end{itemize}
 
+
 \section{Concetti Fondamentali}
 
 Il \textbf{modello relazionale} si basa sul concetto matematico di relazione. Questo modello rappresenta la struttura logica e piatta su cui verranno mappati i dati dell'applicazione. Per formalizzare rigorosamente il modello, è necessario definire i suoi tre componenti atomici: i domini, lo schema e la relazione stessa.
@@ -25,10 +26,15 @@ Il \textbf{modello relazionale} si basa sul concetto matematico di relazione. Qu
 
 Un \textbf{dominio} (indicato con $D$) è un insieme di valori atomici, ovvero non ulteriormente scomponibili. 
 Ogni dominio è caratterizzato da un nome e da un tipo di dato (es: \texttt{int, varchar, date}).
+\begin{observation}[Il Tipo di Dato come Dominio Implicito]
+Nella transizione dalla teoria all'ingegneria del software, il \textbf{tipo di dato} (es. \texttt{int}, \texttt{varchar}, \texttt{date}) definisce l'insieme universo di partenza, agendo come \textbf{dominio massimo implicito} dell'attributo. 
+
+Eventuali restrizioni logiche (come un \textit{range} di valori validi per un voto universitario o un'età) si configurano come un \textbf{sottoinsieme} di tale dominio base. Vedremo in seguito come vengono implementate limitazioni specifiche. 
+\end{observation}
 
 \medskip
 
-Uno \textbf{schema relazionale} (o schema di tabella) definisce la struttura logica dei dati. Esso è costituito da un nome $R$ e da un insieme di attributi $A_1, A_2, \dots, A_n$, a ciascuno dei quali è associato un dominio $D_i$.
+Uno \textbf{schema relazionale} (o schema di tabella) definisce la struttura logica dei dati. Esso è costituito da un nome $R$ e da un insieme di attributi $A_1, A_2, \dots, A_n$, a ciascuno dei quali è associato un dominio $D_i$, che denoteremo anche con $dom(A_i)$.
 
 Lo schema viene denotato formalmente come:
 $$R(A_1: D_1, A_2: D_2, \dots, A_n: D_n)$$
@@ -63,6 +69,10 @@ La \textbf{relazione} $r(\text{STUDENTE})$ conterrà invece solo le tuple degli 
 $$r = \{(\text{'654321'}, \text{'Giovanni'}, 22), (\text{'123456'}, \text{'Mario'}, 24)\}$$
 \end{example}
 
+\begin{observation}
+    È significativo evidenziare che una relazione \textit{è un insieme}, dunque \textit{non ammette duplicati e non rappresenta una struttura ordinata}. 
+\end{observation}
+
 \begin{tip}[In sintesi:]
 Nel passaggio dalla progettazione concettuale alla modellazione logica, i concetti del paradigma orientato agli oggetti (\textit{OOP}) e del Class Diagram si traducono come segue:
 
@@ -72,3 +82,109 @@ Nel passaggio dalla progettazione concettuale alla modellazione logica, i concet
     \item \textbf{Istanze $\rightarrow$ Relazione (Stato):} Una \textbf{relazione} è un sottoinsieme discreto e finito del dominio totale (il prodotto cartesiano di tutti i singoli domini). Essa rappresenta l'insieme delle tuple (istanze o oggetti) effettivamente memorizzate e persistite nel sistema in un dato momento temporale.
 \end{itemize}
 \end{tip}
+
+\section{Chiavi}
+
+Abbiamo dunque visto come si traducono classi e attributi del class diagram nel modello relazionale dei dati, non ancora come si traducono le relazioni. A questo scopo bisogna introdurre i concetti di cui parleremo in questo paragrafo. Vedremo che anche le associazioni si traducono in schemi relazionali. 
+
+\medskip
+
+Una superchiave (di uno schema relazionale) è un sottoinsieme degli attributi i cui valori identificano in maniera univoca una istanza dello schema relazionale. 
+
+Esempio: STUDENTE (CF, matr, nome, cognome, data di nascita). 
+
+{CF} e {matricola} sono superchiavi, così come tutti i sottoinsiemi che li contengono. 
+
+Nella parte di progettazione concettuale con class diagram abbiamo supposto che l'insieme degli attributi possa identificare in maniera univoca una istanza della classe. Questa ipotesi ci garantisce che \textit{esiste sempre almeno una superchiave}: alla peggio, basta prendere l'insieme di tutti gli attributi.   
+
+\medskip
+
+una chiave candidata è una superchiave minimale, ovvero con un numero minimo di attributi: eliminando uno qualsiasi dei suoi attributi quello che si ottiene non è più una superchiave. 
+
+È chiaro che una superchiave con un unico attributo è necessariamente una chiave candidata. 
+
+Esempio: ESAME(matricola, corso, voto, data, lode)
+
+{matricola, corso} è l'unica chiave candidata. 
+
+La chiave primaria (di uno schema relazionale) è una chiave candidata scelta come identificativo delle istanze (nello schema relazionale). 
+
+È chiaro che potendoci essere più chiavi candidate, la scelta della chiave primaria non è in genere unica. Si tratta di una scelta di tipo progettuale la cui bontà dipende dallo specifico problema che si sta modellando.
+
+Nell'esempio di STUDENTE possiamo quindi scegliere la chiave primaria tra CF e matricola. Sceglieremo come chiave primaria la matricola. Nello schema relazionale questa scelta si indica graficamente sottolineando gli attributi che rappresentano la chiave primaria. 
+
+Una chiave esterna (di uno schema relazionale rispetto ad un altro schema) è un insieme di attributi dello schema relazionale che sono in corrispondenza biunivoca con gli attributi dell'altro schema in modo tale che attributi corrispondenti abbiano lo stesso dominio. 
+
+Esempio: matricola è una chiave esterna di ESAME per STUDENTE (è in corrispondenza con matr in STUDENTE, sua chiave primaria, ed è dello stesso tipo)
+
+La scelta della chiave esterna si indica graficamente con una doppia sottolineatura. 
+
+Consideriamo ora, nel class diagram, l'associazione studente-esame (uno a molti). A partire da una istanza di esame, per risalire allo studente che ha sostenuto quell'esame uso la chiave esterna matricola, da cui risalgo all'identificatore dello studente (matr, chiave primaria di STUDENTE).
+
+Da sottolineare quando si vanno rendere le associazioni molti a molti:
+
+sono problematiche perché il modello relazionale mi impone un valore unico per ciascun attributo, quindi non posso usare lo stesso metodo che uso per le associazioni uno a molti. 
+
+Il metodo per le associazioni molti a molti è del tutto generale ed in teoria si potrebbe usare per tutti i tipi di associazione; tuttavia questo metodo si usa solo dove strettamente necessario, perché ha un costo. 
+
+\section{Le Chiavi}
+
+Fino ad ora abbiamo analizzato come tradurre classi e attributi del Class Diagram nel modello relazionale, lasciando in sospeso la traduzione delle associazioni. Per poter modellare le relazioni tra tabelle, è prima necessario introdurre il concetto di chiave.
+
+\medskip
+
+Sia $R(A_1, A_2, \dots, A_n)$ uno schema di relazione. Un sottoinsieme di attributi $SK \subseteq \{A_1, A_2, \dots, A_n\}$ si definisce \textbf{superchiave} se i suoi valori identificano in modo univoco ogni singola tupla all'interno di qualsiasi istanza valida della relazione. 
+
+\begin{example}[Superchiavi di un'Anagrafica]
+Si consideri lo schema: 
+$$\texttt{STUDENTE}({\text{CF}}, \text{ matricola}, \text{ nome}, \text{ cognome}, \text{ dataNascita})$$
+I singoletti $\{\text{CF}\}$ e $\{\text{matricola}\}$ sono superchiavi. Di conseguenza, \textbf{qualsiasi sottoinsieme che li contenga} (es: $\{\text{CF}, \text{nome}\}$ o $\{\text{matricola}, \text{cognome}\}$) è a sua volta una superchiave.
+\end{example}
+
+\begin{observation}[Ipotesi di Esistenza]
+Nella fase di progettazione concettuale si assume l'ipotesi che ogni istanza di una classe sia distinguibile dalle altre. Questa proprietà ci garantisce che \textbf{esiste sempre almeno una superchiave} per ogni schema relazionale: nella peggiore delle ipotesi (assenza di identificatori naturali), la superchiave coinciderà con l'insieme di tutti gli attributi dello schema.
+\end{observation}
+
+\medskip
+
+Un sottoinsieme di attributi $K$ è una \textbf{chiave candidata} se è una \textbf{superchiave minimale}. Dire che una superchiave è \textit{minimale} significa che è \textbf{irriducibile}: eliminando un qualsiasi attributo da $K$, l'insieme rimanente perde la proprietà di univocità e cessa di essere una superchiave. 
+
+Questo \textbf{non} significa che debba avere il numero minimo di attributi in assoluto (cardinalità minima). Se nello schema coesistono una superchiave irriducibile di cardinalità 1 e una di cardinalità 2, sono entrambe, con pari dignità, chiavi candidate.
+
+È evidente che una superchiave composta da un unico attributo (un singoletto) è di fatto e necessariamente una chiave candidata.
+
+\begin{example}[Chiave Candidata Composta]
+Si consideri lo schema che mappa la classe degli esami universitari:
+$$\texttt{ESAME}(\text{matricola}, \text{ corso}, \text{ voto}, \text{ data})$$
+In questo scenario, il sottoinsieme $\{\text{matricola}, \text{corso}\}$ rappresenta una chiave candidata (di fatto, è l'unica chiave candidata in questo caso). Essa è minimale perché se eliminassimo \texttt{corso}, la sola \texttt{matricola} non garantirebbe l'univocità (uno studente può sostenere più esami); viceversa, eliminando \texttt{matricola}, il solo \texttt{corso} conterrebbe i voti di tutti gli studenti.
+\end{example}
+
+\medskip
+
+Poiché in uno schema relazionale possono coesistere più chiavi candidate, il progettista deve sceglierne una da eleggere come identificatore ufficiale delle tuple. La chiave candidata scelta prende il nome di \textbf{Chiave Primaria} (\textit{Primary Key} - PK).
+
+La selezione della chiave primaria è una decisione puramente ingegneristica e architetturale. Nello schema relazionale scritto, la chiave primaria si indica \textbf{sottolineando} gli attributi che la compongono.
+
+\begin{example}[Scelta della PK]
+Riprendendo lo schema \texttt{STUDENTE}, le chiavi candidate sono \texttt{CF} e \texttt{matricola}. Sceglieremo come chiave primaria la \texttt{matricola}:
+$$\texttt{STUDENTE}(\text{CF}, \underline{\text{matricola}}, \text{nome}, \text{cognome})$$
+\end{example}
+
+\medskip
+
+La \textbf{Chiave Esterna} (\textit{Foreign Key} - FK) è lo strumento fondamentale del modello relazionale per tradurre le associazioni.
+
+Siano $R_1$ e $R_2$ due schemi relazionali (non necessariamente distinti). Un insieme di attributi $FK$ di $R_1$ è una chiave esterna che punta a $R_2$ se:
+\begin{enumerate}
+    \item Gli attributi in $FK$ sono in corrispondenza biunivoca con gli attributi che compongono la \textbf{chiave primaria} ($PK$) di $R_2$.
+    \item I domini degli attributi corrispondenti sono identici ($dom(FK_i) = dom(PK_i)$).
+\end{enumerate}
+
+\medskip
+
+Il vincolo impone che per ogni tupla $t_1$ nell'istanza corrente di $R_1$, il valore di $t_1[FK]$ deve essere nullo (\texttt{NULL}), oppure coincidere esattamente con il valore $t_2[PK]$ di una tupla $t_2$ attualmente esistente nell'istanza di $R_2$.
+
+Nello schema testuale, la presenza di una chiave esterna si denota convenzionalmente con una \textbf{doppia sottolineatura}.
+
+
+
