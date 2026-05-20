@@ -1,4 +1,4 @@
-\chapter{Il Modello Relazionale}
+\chapter{Modello Relazionale e Progettazione Logica}
 
 \section{Introduzione}
 
@@ -83,22 +83,6 @@ Nel passaggio dalla progettazione concettuale alla modellazione logica, i concet
 \end{itemize}
 \end{tip}
 
-\section{Chiavi}
-
-Abbiamo dunque visto come si traducono classi e attributi del class diagram nel modello relazionale dei dati, non ancora come si traducono le relazioni. A questo scopo bisogna introdurre i concetti di cui parleremo in questo paragrafo. Vedremo che anche le associazioni si traducono in schemi relazionali. 
-
-\medskip
-
-Una superchiave (di uno schema relazionale) è un sottoinsieme degli attributi i cui valori identificano in maniera univoca una istanza dello schema relazionale. 
-
-Esempio: STUDENTE (CF, matr, nome, cognome, data di nascita). 
-
-{CF} e {matricola} sono superchiavi, così come tutti i sottoinsiemi che li contengono. 
-
-Nella parte di progettazione concettuale con class diagram abbiamo supposto che l'insieme degli attributi possa identificare in maniera univoca una istanza della classe. Questa ipotesi ci garantisce che \textit{esiste sempre almeno una superchiave}: alla peggio, basta prendere l'insieme di tutti gli attributi.   
-
-\medskip 
-
 % Consideriamo ora, nel class diagram, l'associazione studente-esame (uno a molti). A partire da una istanza di esame, per risalire allo studente che ha sostenuto quell'esame uso la chiave esterna matricola, da cui risalgo all'identificatore dello studente (matr, chiave primaria di STUDENTE).
 
 % Da sottolineare quando si vanno rendere le associazioni molti a molti:
@@ -165,6 +149,47 @@ Siano $R_1$ e $R_2$ due schemi relazionali (non necessariamente distinti). Un in
 Il vincolo impone che per ogni tupla $t_1$ nell'istanza corrente di $R_1$, il valore di $t_1[FK]$ deve essere nullo (\texttt{NULL}), oppure coincidere esattamente con il valore $t_2[PK]$ di una tupla $t_2$ attualmente esistente nell'istanza di $R_2$.
 
 Nello schema testuale, la presenza di una chiave esterna si denota convenzionalmente con una \textbf{doppia sottolineatura}.
+
+\section{Traduzione delle Associazioni}
+
+Un'associazione \textbf{1 a 1} tra due classi $A$ e $B$ indica che a un'istanza di $A$ corrisponde al massimo un'istanza di $B$, e viceversa. 
+Nel modello relazionale, questo legame si traduce mantenendo due schemi di relazione separati (due tabelle) e introducendo una \textbf{Chiave Esterna (FK)} in uno dei due schemi che punta alla Chiave Primaria (PK) dell'altro.
+
+\subsubsection{Il vincolo UNIQUE sulla Chiave Esterna}
+Affinché la relazione rimanga rigorosamente 1 a 1, non è sufficiente definire la chiave esterna. Se ci limitassimo a questo, la tabella che ospita la FK potrebbe avere più tuple che puntano alla stessa PK della tabella bersaglio, trasformando di fatto la relazione in una 1 a N.
+
+Per garantire la biunivocità dell'associazione, è obbligatorio imporre un \textbf{vincolo di univocità} (in SQL, il vincolo \texttt{UNIQUE}) sugli attributi che compongono la chiave esterna.
+Matematicamente, se lo schema $R_1$ contiene la chiave esterna $FK$ verso $R_2$, deve valere che per ogni coppia di tuple distinte $t_x, t_y \in r(R_1)$:
+$$t_x[FK] \neq t_y[FK] \quad \text{(escludendo i valori NULL)}$$
+
+\subsubsection{Dove posizionare la Chiave Esterna?}
+La scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione):
+
+\begin{enumerate}
+    \item \textbf{Partecipazione Obbligatoria vs Opzionale (0..1 $\leftrightarrow$ 1..1):}
+    Se la classe $A$ partecipa in modo opzionale (0..1) e la classe $B$ in modo obbligatorio (1..1), la chiave esterna \textbf{deve essere inserita nello schema $B$}. 
+    In questo modo, la $FK$ in $B$ potrà essere dichiarata \texttt{NOT NULL} (vincolo di esistenza garantito). Se la mettessimo in $A$, saremmo costretti ad ammettere valori \texttt{NULL} per le istanze di $A$ che non partecipano all'associazione, sprecando spazio e riducendo l'eleganza relazionale.
+    
+    \item \textbf{Entrambe Obbligatorie (1..1 $\leftrightarrow$ 1..1):}
+    Se entrambe le partecipazioni sono rigide, la FK può essere posizionata indifferentemente in $A$ o in $B$. (In alcuni casi estremi di forte coesione, le due tabelle possono persino essere fuse in un unico schema relazionale).
+\end{enumerate}
+
+\begin{example}[Direzione di un Dipartimento]
+Si consideri l'associazione 1 a 1 tra \texttt{Professore} (0..1) e \texttt{Dipartimento} (1..1): un professore può dirigere al massimo un dipartimento, ma un dipartimento deve avere esattamente un direttore.
+
+Seguendo la regola, posizioniamo la chiave esterna nel \texttt{Dipartimento}:
+\begin{itemize}
+    \item $\texttt{PROFESSORE}(\underline{\text{matricola}}, \text{nome}, \text{cognome})$
+    \item $\texttt{DIPARTIMENTO}(\underline{\text{codice}}, \text{nome}, \underline{\underline{\text{direttore}}})$
+\end{itemize}
+
+Vincoli su \texttt{DIPARTIMENTO.direttore}:
+\begin{itemize}
+    \item \textbf{Foreign Key:} punta a \texttt{PROFESSORE.matricola}
+    \item \textbf{UNIQUE:} per garantire che lo stesso professore non diriga due dipartimenti (vincolo 1:1).
+    \item \textbf{NOT NULL:} per garantire che ogni dipartimento abbia un direttore (cardinalità minima 1).
+\end{itemize}
+\end{example}
 
 
 
