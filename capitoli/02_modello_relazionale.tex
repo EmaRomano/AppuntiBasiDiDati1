@@ -184,16 +184,45 @@ La teoria relazionale esclude questa pratica per tre ragioni fondamentali:
 \end{enumerate}
 \end{dettagli}
 
-Nell'esempio precedente si aveva una situazione di relazione esattamente 1 a 1 e la scelta dello schema in cui inserire la chiave esterna era indifferente. In altri casi, la scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione):
+\begin{dettagli}[Scelta Architetturale: Fusione vs Separazione in associazioni 1:1]
+    In alcuni casi estremi di forte coesione, le due tabelle possono persino essere fuse in un unico schema relazionale.
 
-\begin{enumerate}
-    \item \textbf{Partecipazione Obbligatoria vs Opzionale (0..1 $\leftrightarrow$ 1..1):}
-    Se la classe $A$ partecipa in modo opzionale (0..1) e la classe $B$ in modo obbligatorio (1..1), la chiave esterna \textbf{deve essere inserita nello schema $B$}. 
-    In questo modo, la $FK$ in $B$ potrà essere dichiarata \texttt{NOT NULL} (vincolo di esistenza garantito). Se la mettessimo in $A$, saremmo costretti ad ammettere valori \texttt{NULL} per le istanze di $A$ che non partecipano all'associazione, sprecando spazio e riducendo l'eleganza relazionale.
-    
-    \item \textbf{Entrambe Obbligatorie (1..1 $\leftrightarrow$ 1..1):}
-    Se entrambe le partecipazioni sono rigide, la FK può essere posizionata indifferentemente in $A$ o in $B$. (In alcuni casi estremi di forte coesione, le due tabelle possono persino essere fuse in un unico schema relazionale).
-\end{enumerate}
+    \begin{example}
+    Si consideri l'associazione obbligatoria (1..1 $\leftrightarrow$ 1..1) tra un \texttt{Paziente} e la sua \texttt{CartellaClinica}. Ogni paziente ha una sola cartella clinica, e ogni cartella appartiene a un solo paziente.
+
+    \textbf{Scenario A: Fusione (Unico Schema)}
+    Se fondessimo le due entità, otterremmo un'unica tabella massiccia:
+    $$\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono}, \text{gruppoSanguigno}, \text{anamnesiCompleta})$$
+    \textit{Vantaggio:} Nessun \texttt{JOIN} necessario per leggere i dati completi.
+    \textit{Svantaggio:} L'attributo \texttt{anamnesiCompleta} potrebbe essere un testo lunghissimo (BLOB o TEXT). Ogni volta che un impiegato dell'accettazione interroga il database solo per cercare il numero di \texttt{telefono} del paziente, il motore del database è costretto a caricare in memoria dal disco fisso anche i megabyte di testo dell'anamnesi, sprecando enormi risorse di I/O. Inoltre, si espongono dati sensibili a personale non medico.
+
+    \textbf{Scenario B: Separazione (Due Schemi)}
+    Mantenendo gli schemi separati, applichiamo un \textit{partizionamento verticale} logico:
+    \begin{itemize}
+        \item $\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono})$
+        \item $\texttt{CARTELLA\_CLINICA}(\underline{\text{codiceCartella}}, \text{gruppoSanguigno}, \text{anamnesi}, \underline{\underline{\text{cfPaziente}}})$
+    \end{itemize}
+
+    \medskip
+
+    \textit{Vantaggi:} 
+    \begin{enumerate}
+        \item \textbf{Performance:} La tabella \texttt{PAZIENTE} è "leggera" e stretta. Le query anagrafiche quotidiane saranno fulminee e il database potrà tenere l'intera tabella nella cache RAM.
+        \item \textbf{Sicurezza:} Si possono impostare permessi di accesso (GRANT) a livello di tabella, permettendo alla segreteria di leggere \texttt{PAZIENTE} e impedendo l'accesso a \texttt{CARTELLA\_CLINICA}, riservato ai soli medici.
+    \end{enumerate}
+
+    \medskip
+
+    \textit{Svantaggio:} Quando un medico avrà bisogno del nome del paziente e della sua anamnesi contemporaneamente, il sistema dovrà pagare il costo computazionale di un \texttt{JOIN}.
+    \end{example}
+
+    \begin{tip}[La Regola Pratica]
+    La fusione in un unico schema è raccomandata quando gli attributi della seconda classe sono pochi, di piccole dimensioni (es. interi, date, stringhe brevi) e vengono interrogati quasi sempre insieme a quelli della classe principale (alta coesione). La separazione è invece mandatoria in presenza di attributi "pesanti" (es. file, immagini, testi lunghi) o sottoposti a stringenti policy di privacy.
+    \end{tip}
+
+\end{dettagli}
+
+Nell'esempio precedente si aveva una situazione di relazione esattamente 1 a 1 e la scelta dello schema in cui inserire la chiave esterna era indifferente. In altri casi, la scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione): se la classe $A$ partecipa in modo opzionale (0..1) e la classe $B$ in modo obbligatorio (1..1), la chiave esterna \textbf{deve essere inserita nello schema $B$}. In questo modo, la $FK$ in $B$ potrà essere dichiarata \texttt{NOT NULL} (vincolo di esistenza garantito). Se la mettessimo in $A$, saremmo costretti ad ammettere valori \texttt{NULL} per le istanze di $A$ che non partecipano all'associazione, sprecando spazio e riducendo l'eleganza relazionale.
 
 \begin{example}[Direzione di un Dipartimento]
 Si consideri l'associazione 1 a 1 tra \texttt{Professore} (0..1) e \texttt{Dipartimento} (1..1): un professore può dirigere al massimo un dipartimento, ma un dipartimento deve avere esattamente un direttore.
@@ -213,6 +242,14 @@ Vincoli su \texttt{DIPARTIMENTO.codiceDirettore}:
     \item \textbf{NOT NULL:} per garantire che ogni dipartimento abbia un direttore (cardinalità minima 1).
 \end{itemize}
 \end{example}
+
+\begin{dettagli}[Controllo Applicativo vs Vincolo Strutturale (UNIQUE)]
+In alcuni contesti didattici o in framework di sviluppo specifici, è possibile omettere la dichiarazione esplicita del vincolo \texttt{UNIQUE} per le associazioni 1 a 1. 
+
+In questi scenari, si assume un'ipotesi di \textbf{coerenza applicativa}: si dà per scontato che sia la logica del software sovrastante (es. i controlli nel codice backend) a impedire l'inserimento di tuple multiple, in accordo con la natura del dominio (``non può mai capitare che l'entità sia associata a molti'').
+
+Tuttavia, dal punto di vista della solidità ingegneristica e dell'integrità fisica dei dati (\textit{defensive programming}), l'omissione del vincolo \texttt{UNIQUE} rende il database strutturalmente identico a un'associazione 1 a Molti. Fissare il vincolo a livello di DBMS rimane la pratica raccomandata per garantire che i dati non vengano mai corrotti, indipendentemente da eventuali bug del software applicativo.
+\end{dettagli}
 
 \subsection{Associazioni 1 a Molti (1:N)}
 
@@ -278,6 +315,51 @@ La reale complessità viene delegata alla fase operativa (interrogazione dei dat
 
 È chiaro che questo metodo per rendere le associazioni è del tutto generale e, in teoria, potrebbe essere usato per tutti i tipi di associazione; tuttavia, si tratta ovviamente di una cattiva pratica in virtù del costo computazionale che è stato appena discusso. 
 \end{observation}
+
+\subsubsection*{Classi di Associazione}
+
+Nel modellamento concettuale tramite Class Diagram UML, capita frequentemente che un'associazione molti a molti possieda a sua volta degli attributi (formalizzati tramite una \textbf{Classe di Associazione}). Un esempio tipico è la relazione di superamento di un esame tra uno studente e un corso, la quale porta con sé attributi come il \textit{voto}, la \textit{data} e la \textit{lode}.
+
+La traduzione di questo costrutto nel modello relazionale segue fedelmente la regola dello schema ponte vista in precedenza. Gli attributi propri dell'associazione vengono semplicemente inseriti come \textbf{colonne aggiuntive all'interno della tabella di giunzione}.
+
+\begin{example}[Mappatura della Classe di Associazione Esame]
+Estendiamo l'esempio precedente trasformando lo schema ponte \texttt{FREQUENZA} in uno schema \texttt{ESAME} che ospiti anche i dati del superamento del corso:
+
+\begin{itemize}
+    \item $\texttt{STUDENTE}(\underline{\text{matricola}}, \text{nome}, \text{cognome})$
+    \item $\texttt{CORSO}(\underline{\text{codice}}, \text{titolo}, \text{cfu})$
+    \item $\texttt{ESAME}(\underline{\underline{\text{matricolaStudente}}}, \underline{\underline{\text{codiceCorso}}}, \text{voto}, \text{data}, \text{lode})$
+\end{itemize}
+
+\medskip
+
+Nello schema \texttt{ESAME}, la chiave primaria rimane la coppia composta (matricolaStudente, codiceCorso), il che modella il vincolo per cui uno studente può registrare al massimo un voto per un determinato corso. Gli attributi \texttt{voto}, \texttt{data} e \texttt{lode} diventano attributi non chiave della tabella di giunzione.
+\end{example}
+
+\subsubsection{Associazioni n-arie}
+
+La logica della tabella di giunzione, introdotta per le associazioni binarie Molti a Molti, scala in modo naturale e identico per le \textbf{associazioni n-arie} (con $n > 2$). 
+
+Quando nel diagramma concettuale un'associazione coinvolge tre o più classi (ad esempio un'associazione ternaria), la traduzione nel modello relazionale richiede la creazione di un unico \textbf{schema ponte} dedicato. Questo schema assolverà il compito di legare tutte le entità simultaneamente e conterrà:
+\begin{itemize}
+    \item Una \textbf{Chiave Esterna (FK)} per ciascuna delle $n$ entità partecipanti, che punta alla rispettiva chiave primaria.
+    \item Una \textbf{Chiave Primaria (PK) composta} dall'unione di tutte le chiavi esterne coinvolte (salvo casi particolari in cui vincoli di cardinalità massima pari a 1 su specifici rami consentano di escludere alcune FK dalla chiave primaria).
+    \item Gli eventuali attributi dell'associazione (o della Classe di Associazione), inseriti semplicemente come colonne non chiave.
+\end{itemize}
+
+\begin{example}[Associazione Ternaria di Fornitura]
+Si consideri un'associazione ternaria che modella la fornitura di materiali aziendali: un determinato \texttt{Fornitore} vende uno specifico \texttt{Prodotto} destinato a un particolare \texttt{Progetto}, in una certa \texttt{quantita}.
+
+La traduzione genera tre schemi base e un quarto schema ponte per l'associazione ternaria:
+\begin{itemize}
+    \item $\texttt{FORNITORE}(\underline{\text{partitaIva}}, \text{nomeAzienda})$
+    \item $\texttt{PRODOTTO}(\underline{\text{codiceProdotto}}, \text{descrizione})$
+    \item $\texttt{PROGETTO}(\underline{\text{idProgetto}}, \text{budget})$
+    \item $\texttt{FORNITURA}(\underline{\underline{\text{partitaIva}}}, \underline{\underline{\text{codiceProdotto}}}, \underline{\underline{\text{idProgetto}}}, \text{quantita})$
+\end{itemize}
+
+Nello schema \texttt{FORNITURA}, la chiave primaria è la tripla di attributi (partitaIva, codiceProdotto, idProgetto). L'attributo \texttt{quantita} è un attributo dell'associazione che dipende funzionalmente dall'intera tripla, in quanto esprime quanti pezzi di quel prodotto specifico sono stati comprati da quel fornitore per quel preciso progetto.
+\end{example}
 
 
 
