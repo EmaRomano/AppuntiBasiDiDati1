@@ -184,43 +184,9 @@ La teoria relazionale esclude questa pratica per tre ragioni fondamentali:
 \end{enumerate}
 \end{dettagli}
 
-\begin{dettagli}[Scelta Architetturale: Fusione vs Separazione in associazioni 1:1]
-    In alcuni casi estremi di forte coesione, le due tabelle possono persino essere fuse in un unico schema relazionale.
-
-    \begin{example}
-    Si consideri l'associazione obbligatoria (1..1 $\leftrightarrow$ 1..1) tra un \texttt{Paziente} e la sua \texttt{CartellaClinica}. Ogni paziente ha una sola cartella clinica, e ogni cartella appartiene a un solo paziente.
-
-    \textbf{Scenario A: Fusione (Unico Schema)}
-    Se fondessimo le due entità, otterremmo un'unica tabella massiccia:
-    $$\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono}, \text{gruppoSanguigno}, \text{anamnesiCompleta})$$
-    \textit{Vantaggio:} Nessun \texttt{JOIN} necessario per leggere i dati completi.
-    \textit{Svantaggio:} L'attributo \texttt{anamnesiCompleta} potrebbe essere un testo lunghissimo (BLOB o TEXT). Ogni volta che un impiegato dell'accettazione interroga il database solo per cercare il numero di \texttt{telefono} del paziente, il motore del database è costretto a caricare in memoria dal disco fisso anche i megabyte di testo dell'anamnesi, sprecando enormi risorse di I/O. Inoltre, si espongono dati sensibili a personale non medico.
-
-    \textbf{Scenario B: Separazione (Due Schemi)}
-    Mantenendo gli schemi separati, applichiamo un \textit{partizionamento verticale} logico:
-    \begin{itemize}
-        \item $\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono})$
-        \item $\texttt{CARTELLA\_CLINICA}(\underline{\text{codiceCartella}}, \text{gruppoSanguigno}, \text{anamnesi}, \underline{\underline{\text{cfPaziente}}})$
-    \end{itemize}
-
-    \medskip
-
-    \textit{Vantaggi:} 
-    \begin{enumerate}
-        \item \textbf{Performance:} La tabella \texttt{PAZIENTE} è "leggera" e stretta. Le query anagrafiche quotidiane saranno fulminee e il database potrà tenere l'intera tabella nella cache RAM.
-        \item \textbf{Sicurezza:} Si possono impostare permessi di accesso (GRANT) a livello di tabella, permettendo alla segreteria di leggere \texttt{PAZIENTE} e impedendo l'accesso a \texttt{CARTELLA\_CLINICA}, riservato ai soli medici.
-    \end{enumerate}
-
-    \medskip
-
-    \textit{Svantaggio:} Quando un medico avrà bisogno del nome del paziente e della sua anamnesi contemporaneamente, il sistema dovrà pagare il costo computazionale di un \texttt{JOIN}.
-    \end{example}
-
-    \begin{tip}[La Regola Pratica]
-    La fusione in un unico schema è raccomandata quando gli attributi della seconda classe sono pochi, di piccole dimensioni (es. interi, date, stringhe brevi) e vengono interrogati quasi sempre insieme a quelli della classe principale (alta coesione). La separazione è invece mandatoria in presenza di attributi "pesanti" (es. file, immagini, testi lunghi) o sottoposti a stringenti policy di privacy.
-    \end{tip}
-
-\end{dettagli}
+\begin{observation}
+    In alcuni casi estremi di forte coesione, le due tabelle possono persino essere fuse in un unico schema relazionale. Approfondiremo questo aspetto nel prossimo paragrafo. 
+\end{observation}
 
 Nell'esempio precedente si aveva una situazione di relazione esattamente 1 a 1 e la scelta dello schema in cui inserire la chiave esterna era indifferente. In altri casi, la scelta di quale delle due tabelle debba ospitare la FK dipende dalle \textbf{cardinalità minime} (l'opzionalità o obbligatorietà dell'associazione): se la classe $A$ partecipa in modo opzionale (0..1) e la classe $B$ in modo obbligatorio (1..1), la chiave esterna \textbf{deve essere inserita nello schema $B$}. In questo modo, la $FK$ in $B$ potrà essere dichiarata \texttt{NOT NULL} (vincolo di esistenza garantito). Se la mettessimo in $A$, saremmo costretti ad ammettere valori \texttt{NULL} per le istanze di $A$ che non partecipano all'associazione, sprecando spazio e riducendo l'eleganza relazionale.
 
@@ -360,6 +326,281 @@ La traduzione genera tre schemi base e un quarto schema ponte per l'associazione
 
 Nello schema \texttt{FORNITURA}, la chiave primaria è la tripla di attributi (partitaIva, codiceProdotto, idProgetto). L'attributo \texttt{quantita} è un attributo dell'associazione che dipende funzionalmente dall'intera tripla, in quanto esprime quanti pezzi di quel prodotto specifico sono stati comprati da quel fornitore per quel preciso progetto.
 \end{example}
+
+\section{Ristrutturazione dello Schema Concettuale}
+
+Il Class Diagram realizzato durante la progettazione concettuale ha l'unico scopo di modellare la semantica del dominio applicativo, ignorando i limiti tecnologici. Tuttavia, avvicinandosi alla progettazione logica, l'adozione dello specifico modello relazionale fa emergere vincoli strutturali e di performance che rendono il diagramma originario inefficiente o inapplicabile. 
+
+Prima di procedere alla traduzione in tabelle, è quindi necessaria una fase di \textbf{Ristrutturazione del Class Diagram}, durante la quale il modello viene riadattato e "sporcato" con dettagli implementativi. Questa fase si articola in diverse analisi sequenziali.
+
+\subsection{Analisi delle Chiavi: Chiavi Naturali vs Surrogate}
+
+La prima operazione consiste nel verificare gli identificatori (chiavi primarie) scelti per le classi. Nel modello concettuale, è prassi utilizzare come identificatori degli attributi già esistenti nel dominio della realtà, noti come \textbf{Chiavi Naturali}. 
+Tuttavia, capita spesso che per identificare univocamente un'istanza nel mondo reale sia necessario unire molti attributi, creando una \textbf{chiave primaria composta} molto ingombrante.
+
+L'uso di chiavi primarie formate da tre, quattro o più attributi genera due enormi problemi nel database relazionale:
+\begin{enumerate}
+    \item \textbf{Propagazione delle Foreign Key:} Poiché le associazioni si traducono copiando la chiave primaria nella tabella collegata, una chiave di 4 attributi costringerà tutte le tabelle figlie ad avere 4 colonne aggiuntive solo per mantenere il legame. Questo allarga a dismisura le tabelle e spreca memoria.
+    \item \textbf{Costo Computazionale:} Gli indici sulle chiavi composite sono lenti da scorrere e pesanti da aggiornare, rendendo i \texttt{JOIN} estremamente inefficienti.
+\end{enumerate}
+
+\medskip
+
+Per risolvere questo problema, si modifica il Class Diagram introducendo un nuovo attributo artificiale, privo di alcun significato nel dominio di business, chiamato \textbf{Chiave Surrogata} (o \textit{Sintetica}).
+Generalmente si tratta di un numero intero auto-incrementante (es. \texttt{id}, \texttt{codice}) o di un UUID alfanumerico. Questo attributo viene eletto a nuova Chiave Primaria, sostituendo la chiave naturale composta.
+
+\begin{example}[Introduzione di una Chiave Surrogata]
+Si consideri la classe \texttt{Stanza} di un polo universitario. Nel mondo reale, una stanza è identificata univocamente dalla combinazione di tre attributi: \texttt{edificio}, \texttt{piano} e \texttt{numeroStanza}.
+$$\texttt{STANZA}(\underline{\text{edificio}}, \underline{\text{piano}}, \underline{\text{numeroStanza}}, \text{capienza})$$
+Se un corso dovesse essere assegnato a una stanza, lo schema \texttt{CORSO} dovrebbe ereditare tutte e tre le colonne come Foreign Key.
+
+Ristrutturiamo lo schema introducendo una chiave surrogata \texttt{idStanza}:
+$$\texttt{STANZA}(\underline{\text{idStanza}}, \text{edificio}, \text{piano}, \text{numeroStanza}, \text{capienza})$$
+Ora, le tabelle collegate (come \texttt{CORSO}) dovranno importare solamente la colonna \texttt{idStanza} (un semplice intero) per stabilire l'associazione, ottimizzando drasticamente le prestazioni del database.
+\end{example}
+
+\begin{warningbox}[Attenzione alla perdita di integrità]
+Quando si sostituisce una chiave naturale con una chiave surrogata, il database userà il nuovo \texttt{id} per distinguere le righe. Questo crea un potenziale rischio: il database permetterà di inserire due righe con \texttt{id} diversi ma con gli \textbf{stessi identici dati naturali} (es. due stanze diverse assegnate allo stesso edificio, stesso piano e stesso numero). 
+Per evitare dati duplicati, è \textbf{obbligatorio} imporre un vincolo di univocità (\texttt{UNIQUE}) sull'insieme degli attributi che formavano l'originaria chiave naturale composita.
+\end{warningbox}
+
+\subsection{Analisi degli Attributi Derivati e delle Ridondanze}
+
+Durante la progettazione concettuale, è comune inserire attributi il cui valore non è indipendente, ma può essere ricavato matematicamente o logicamente da altri dati presenti nel sistema. Nel Class Diagram UML, questa caratteristica viene esplicitata anteponendo una barra (slash) al nome dell'attributo (es. \texttt{/eta}).
+
+Nel passaggio al Class Diagram revisionato (e successivamente allo schema logico), il progettista deve compiere una scelta architetturale precisa: l'attributo derivato verrà \textbf{effettivamente memorizzato} (storicizzato) nel database o verrà eliminato dallo schema e \textbf{calcolato a runtime} ogni volta che viene richiesto? Se si decide di non memorizzarlo, l'attributo scompare del tutto dallo schema revisionato.
+
+\begin{example}[Età vs Data di Nascita]
+Si consideri la classe \texttt{Persona} dotata degli attributi \texttt{dataDiNascita} ed \texttt{/eta}. L'età è banalmente derivabile per differenza tra la data odierna e la data di nascita.
+\end{example}
+
+La scelta tra memorizzazione e calcolo on-the-fly comporta un compromesso tra prestazioni di lettura, spazio occupato e coerenza dei dati.
+
+\medskip
+
+\textbf{Scenario A: Memorizzazione (Storicizzazione del dato)}
+\begin{itemize}
+    \item \textbf{Vantaggi:} Tempi di risposta immediati durante le interrogazioni (query). Il DBMS si limita a leggere il dato senza sprecare cicli di CPU per eseguire calcoli, aspetto cruciale se il dato è richiesto frequentissimamente.
+    \item \textbf{Svantaggi:} 
+    \begin{itemize}
+        \item Spreco di spazio su disco (memoria).
+        \item Rischio di \textit{inconsistenza}: se la \texttt{dataDiNascita} viene corretta ma ci si dimentica di aggiornare l'\texttt{eta}, il database conterrà informazioni contraddittorie.
+        \item Oneri di aggiornamento: dati altamente volatili (come l'età, che cambia ogni anno) richiedono procedure o \textit{trigger} che aggiornino continuamente il database, generando un carico di scrittura pesante.
+    \end{itemize}
+\end{itemize}
+
+\medskip
+
+\textbf{Scenario B: Calcolo a Runtime (Nessuna memorizzazione)}
+\begin{itemize}
+    \item \textbf{Vantaggi:} Nessun rischio di inconsistenza (il calcolo parte sempre dal "dato sorgente" aggiornato), risparmio di memoria e zero manutenzione per l'aggiornamento.
+    \item \textbf{Svantaggi:} Costo computazionale pagato al momento dell'interrogazione. Se il calcolo è complesso e viene richiesto da milioni di utenti, il server potrebbe rallentare drasticamente.
+\end{itemize}
+
+\begin{tip}[Principi Generali per gli Attributi Derivati]
+Nell'ingegneria dei dati, la scelta si basa sull'analisi del carico di lavoro previsto e sulla volatilità del dato:
+\begin{enumerate}
+    \item \textbf{Dati volatili e calcoli leggeri (Preferire il Calcolo):} Se il dato derivato cambia spesso nel tempo e l'operazione matematica è banale, l'attributo si elimina e si calcola al volo.
+    \item \textbf{Dati stabili e calcoli pesanti (Preferire la Memorizzazione):} Se il dato originario, una volta inserito, non cambia più (es. il totale di una \texttt{Fattura} emessa e consolidata, ricavato dalla somma delle sue \texttt{Righe}), conviene storicizzare il totale. Il costo di aggiornamento è zero (la fattura non cambierà) e si evitano pesanti \texttt{JOIN} e somme ad ogni lettura.
+\end{enumerate}
+\end{tip}
+
+\subsubsection*{Analisi delle Associazioni Ridondanti}
+
+Il concetto di ridondanza si estende oltre i singoli attributi e coinvolge l'intera topologia del Class Diagram. In uno schema complesso, potremmo accorgerci dell'esistenza di \textbf{associazioni derivabili} per transitività. 
+
+Ad esempio, se un \texttt{Impiegato} è associato a un \texttt{Dipartimento}, e un \texttt{Dipartimento} è associato a una \texttt{Città}, un'eventuale associazione diretta tra \texttt{Impiegato} e \texttt{Città} è da considerarsi un ciclo ridondante, poiché la città dell'impiegato è già ricavabile navigando il percorso \texttt{Impiegato $\rightarrow$ Dipartimento $\rightarrow$ Città}.
+
+Come per gli attributi, il progettista deve decidere se mantenere l'associazione diretta (tramite l'aggiunta di una chiave esterna ridondante) o se farla collassare e affidarsi alla navigazione del grafo.
+
+\begin{tip}[Principi Generali per le Associazioni Ridondanti]
+La gestione dei cicli si basa sul compromesso tra prestazioni di \textit{routing} e integrità strutturale:
+\begin{enumerate}
+    \item \textbf{Evitare anomalie strutturali (Preferire l'eliminazione):} La regola generale impone di rimuovere le associazioni ridondanti. Mantenere un legame diretto crea il rischio di inconsistenze: potremmo, per errore, assegnare l'Impiegato al Dipartimento di Milano, ma associarlo direttamente alla Città di Roma. 
+    \item \textbf{Ottimizzazione estrema (Mantenere il legame diretto):} Si deroga alla regola precedente solo in sistemi ad altissimo traffico (\textit{read-heavy}) in cui il percorso di navigazione è molto lungo (es. richiede di attraversare 4 o 5 tabelle con relative operazioni di \texttt{JOIN}). In quel caso, si introduce l'associazione ridondante come scorciatoia prestazionale, assumendosi l'onere (spesso tramite \textit{stored procedures}) di mantenerla sincronizzata con il percorso principale.
+\end{enumerate}
+\end{tip}
+
+\subsection{Analisi delle Associazioni Uno a Uno: Fusione vs Separazione}
+
+Durante la progettazione concettuale, due entità legate da un'associazione rigorosamente biunivoca (1..1 $\leftrightarrow$ 1..1) mantengono identità separate per ragioni semantiche. Poiché i loro cicli di vita coincidono (nascono e muoiono insieme), nella fase di ristrutturazione logica si presenta l'opportunità di \textbf{fondere le due classi in un unico schema relazionale}, consolidando i loro attributi ed eliminando la necessità di una chiave esterna.
+
+Questa decisione architetturale comporta un delicato trade-off tra la velocità di lettura (assenza di \texttt{JOIN}) e l'occupazione di memoria (pesantezza della tabella), oltre a sollevare questioni di sicurezza dei dati.
+
+\begin{example}[Fusione vs Separazione: Paziente e Cartella Clinica]
+Si consideri l'associazione obbligatoria (1..1 $\leftrightarrow$ 1..1) tra un \texttt{Paziente} e la sua \texttt{CartellaClinica}. Ogni paziente ha una sola cartella clinica, e ogni cartella appartiene a un solo paziente.
+
+\textbf{Scenario A: Fusione (Unico Schema)}
+Se fondessimo le due entità, otterremmo un'unica tabella massiccia:
+$$\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono}, \text{gruppoSanguigno}, \text{anamnesiCompleta})$$
+\begin{itemize}
+    \item \textit{Vantaggio:} Nessun \texttt{JOIN} necessario per leggere i dati completi.
+    \item \textit{Svantaggio:} L'attributo \texttt{anamnesiCompleta} potrebbe essere un testo lunghissimo (BLOB o TEXT). Ogni volta che un impiegato dell'accettazione interroga il database solo per cercare il numero di \texttt{telefono} del paziente, il motore del database è costretto a caricare in memoria dal disco fisso anche i megabyte di testo dell'anamnesi, sprecando enormi risorse di I/O. Inoltre, si espongono dati sensibili a personale non medico.
+\end{itemize}
+
+\medskip
+
+\textbf{Scenario B: Separazione (Due Schemi)}
+Mantenendo gli schemi separati, applichiamo un \textit{partizionamento verticale} logico:
+\begin{itemize}
+    \item $\texttt{PAZIENTE}(\underline{\text{codiceFiscale}}, \text{nome}, \text{telefono})$
+    \item $\texttt{CARTELLA\_CLINICA}(\underline{\text{codiceCartella}}, \text{gruppoSanguigno}, \text{anamnesi}, \underline{\underline{\text{cfPaziente}}})$
+\end{itemize}
+
+\medskip
+
+\textit{Vantaggi:} 
+\begin{enumerate}
+    \item \textbf{Performance:} La tabella \texttt{PAZIENTE} è "leggera" e stretta. Le query anagrafiche quotidiane saranno fulminee e il database potrà tenere l'intera tabella nella cache RAM.
+    \item \textbf{Sicurezza:} Si possono impostare permessi di accesso (GRANT) a livello di tabella, permettendo alla segreteria di leggere \texttt{PAZIENTE} e impedendo l'accesso a \texttt{CARTELLA\_CLINICA}, riservato ai soli medici.
+\end{enumerate}
+
+\medskip
+
+\textit{Svantaggio:} Quando un medico avrà bisogno del nome del paziente e della sua anamnesi contemporaneamente, il sistema dovrà pagare il costo computazionale di un \texttt{JOIN}.
+\end{example}
+
+\begin{tip}[La Regola Pratica]
+La fusione in un unico schema è raccomandata quando gli attributi della seconda classe sono pochi, di piccole dimensioni (es. interi, date, stringhe brevi) e vengono interrogati quasi sempre insieme a quelli della classe principale (alta coesione). La separazione è invece mandatoria in presenza di attributi "pesanti" (es. file, immagini, testi lunghi) o sottoposti a stringenti policy di privacy.
+\end{tip}
+
+\subsection{Analisi degli Attributi Strutturati}
+
+Nel diagramma delle classi originario, è frequente l'utilizzo di \textbf{attributi strutturati} (o \textit{composti}), ovvero attributi che raggruppano al loro interno campi di natura eterogenea. L'esempio classico è l'attributo \texttt{residenza} assegnato a una classe \texttt{Persona}, il quale è concettualmente composto da \texttt{via}, \texttt{civico}, \texttt{cap} e \texttt{citta}.
+
+Il Modello Relazionale, tuttavia, impone il rispetto della \textbf{Prima Forma Normale (1NF)}, la quale stabilisce che il dominio di ogni attributo debba essere \textbf{atomico} (indivisibile). I database relazionali puri non supportano l'inserimento di "sotto-strutture" o "oggetti" all'interno di una singola cella. 
+
+Per risolvere questa incompatibilità durante la fase di ristrutturazione, il progettista deve eliminare l'attributo strutturato scegliendo una delle seguenti tre strategie:
+
+\subsubsection*{1. Appiattimento (Flattening) degli attributi}
+L'attributo strutturato viene rimosso e sostituito dall'esplicitazione di tutti i suoi sotto-campi direttamente come colonne della classe principale.
+\begin{itemize}
+    \item \textbf{Schema:} $\texttt{PERSONA}(\underline{\text{cf}}, \text{nome}, \text{via}, \text{civico}, \text{cap}, \text{citta})$
+    \item \textbf{Vantaggi:} Non richiede \texttt{JOIN}. Permette di effettuare ricerche efficienti sui singoli sotto-campi (es. "trova tutte le persone che abitano a Roma").
+    \item \textbf{Svantaggi:} "Allarga" la tabella principale, rischiando di riempirla di valori \texttt{NULL} qualora l'attributo strutturato originario fosse opzionale (0..1).
+\end{itemize}
+
+\subsubsection*{2. Accorpamento in formato Stringa (Concatenazione)}
+I sotto-campi vengono fusi in un'unica stringa testuale, inserita in un solo attributo atomico.
+\begin{itemize}
+    \item \textbf{Schema:} $\texttt{PERSONA}(\underline{\text{cf}}, \text{nome}, \text{indirizzoCompleto})$
+    \item \textbf{Vantaggi:} Estrema semplicità e compattezza dello schema.
+    \item \textbf{Svantaggi:} Rende difficilissime o ineseguibili le query analitiche (es. contare le persone per CAP richiederebbe complesse e lente operazioni di \textit{parsing} testuale tramite \texttt{LIKE} o \textit{Regex}).
+\end{itemize}
+
+\subsubsection*{3. Creazione di un'Entità Autonoma}
+Si estrapola l'attributo strutturato promuovendolo a nuova \textbf{Classe autonoma}, collegata a quella originale tramite un'associazione.
+\begin{itemize}
+    \item \textbf{Schema:} $\texttt{PERSONA}(\dots, \underline{\underline{\text{idResidenza}}}) \rightarrow \texttt{RESIDENZA}(\underline{\text{id}}, \text{via}, \text{civico}, \text{citta})$
+    \item \textbf{Vantaggi:} Massima pulizia formale. Permette di riutilizzare l'entità (es. se cinque membri di una famiglia condividono la stessa residenza, il dato non viene duplicato 5 volte, ma inserito una volta sola e linkato).
+    \item \textbf{Svantaggi:} Introduce un costo computazionale (\texttt{JOIN}) per ogni lettura completa e rende più complessa la fase di inserimento dei dati.
+\end{itemize}
+
+\begin{tip}[Principi Generali di Scelta]
+La decisione tra queste tre soluzioni è dettata dall'utilizzo pratico che l'applicazione farà del dato:
+\begin{enumerate}
+    \item \textbf{Se il dato è un blocco opaco (Preferire l'Accorpamento testuale):} Se l'indirizzo serve esclusivamente per essere stampato su un'etichetta di spedizione e al sistema non interesserà mai fare statistiche per città o per CAP, una stringa formattata è la scelta più leggera e sensata.
+    \item \textbf{Se i campi hanno dignità di interrogazione (Preferire l'Appiattimento):} Se il software prevede filtri di ricerca (es. un menù a tendina per filtrare gli utenti per Provincia), i campi devono essere separati per poter essere indicizzati singolarmente.
+    \item \textbf{Se l'attributo ha vita propria o cardinalità multipla (Preferire l'Entità Autonoma):} Se l'indirizzo deve essere storicizzato (tenere traccia dei vecchi indirizzi), se una persona ha molteplici indirizzi (casa, lavoro, fatturazione), o se lo stesso indirizzo raggruppa logicamente più utenti (come in un'azienda), l'attributo strutturato \textbf{deve} diventare una tabella separata.
+\end{enumerate}
+\end{tip}
+
+\subsection{Analisi degli Attributi a Valore Multiplo}
+
+Nel Class Diagram UML è perfettamente lecito assegnare a un'entità un attributo con cardinalità multipla, ovvero una lista o un array di valori (es. \texttt{telefoni [1..*]} per la classe \texttt{Persona}). 
+Tuttavia, il modello relazionale ammette unicamente \textbf{valori singoli e scalari} per ogni cella. L'inserimento di vettori o array non è nativamente supportato dalle regole dell'algebra relazionale.
+
+Il tentativo di risolvere il problema "appiattendo" l'attributo in una serie di colonne fisse (\texttt{telefono1}, \texttt{telefono2}, \dots) rappresenta una pessima pratica ingegneristica: spreca enormi quantità di memoria (generando celle \texttt{NULL} per gli utenti con un solo recapito), limita la scalabilità (non permette l'inserimento di un numero di recapiti superiore alle colonne predisposte) e rende le query di ricerca estremamente inefficienti.
+
+Per normalizzare lo schema, il progettista deve eliminare l'attributo multivalore ricorrendo a una delle seguenti soluzioni:
+
+\subsubsection*{1. Accorpamento testuale (Formattazione Custom)}
+Tutti i valori dell'array vengono concatenati e salvati in un'unica stringa di testo, separati da un carattere speciale (es. virgola o punto e virgola).
+\begin{itemize}
+    \item \textbf{Schema:} $\texttt{PERSONA}(\underline{\text{cf}}, \text{nome}, \text{listaTelefoni})$ 
+    \item \textit{Valore di esempio:} \texttt{"3331234567; 069876543"}
+    \item \textbf{Vantaggi:} Non modifica la struttura del database e non richiede tabelle aggiuntive.
+    \item \textbf{Svantaggi:} Impedisce al database di effettuare controlli sui singoli valori (es. non si può usare un vincolo \texttt{UNIQUE} per impedire che due utenti inseriscano lo stesso numero). Rendere aggiornabile o ricercabile un singolo numero richiede complesse operazioni di manipolazione delle stringhe.
+\end{itemize}
+
+\subsubsection*{2. Creazione di una Classe Esterna (Associazione 1:N)}
+Si estrapola l'attributo trasformandolo in un'entità autonoma debole, legata all'entità principale da un'associazione uno a molti. È la soluzione relazionale per eccellenza.
+\begin{itemize}
+    \item \textbf{Schema:} 
+    \begin{itemize}
+        \item $\texttt{PERSONA}(\underline{\text{cf}}, \text{nome})$
+        \item $\texttt{TELEFONO}(\underline{\text{numero}}, \underline{\underline{\text{cfPersona}}})$
+    \end{itemize}
+    \item \textbf{Vantaggi:} Scalabilità infinita (una persona può avere da zero a mille telefoni senza sprecare byte). Le query sono pulite e veloci, e si possono imporre vincoli di integrità sui singoli numeri.
+    \item \textbf{Svantaggi:} Richiede un'operazione di \texttt{JOIN} per estrarre l'elenco completo dei telefoni associati a una persona.
+\end{itemize}
+
+\begin{tip}[Principi Generali di Scelta]
+La scelta della tecnica di risoluzione è quasi sempre a favore dell'entità esterna, tranne in casi specifici di puro logging:
+\begin{enumerate}
+    \item \textbf{Dati operativi e ricercabili (Regola Aurea $\rightarrow$ Entità Esterna):} Se il dato ha valore di business, se il sistema dovrà mai cercare "a chi appartiene questo numero", se l'utente deve poter modificare o cancellare un singolo valore dalla sua lista, la creazione di una tabella esterna 1:N è l'unica via ingegneristicamente solida.
+    \item \textbf{Dati descrittivi morti (Eccezione $\rightarrow$ Accorpamento Testuale):} Si opta per la stringa formattata solo per dati passivi, che vengono scritti una volta e letti in blocco unicamente per stamparli a schermo. Ad esempio: un attributo multivalore \texttt{note\_aggiuntive} o \texttt{tag\_ricerca} in sistemi molto semplici. 
+\end{enumerate}
+\end{tip}
+
+\subsection{Codifica delle Gerarchie (Ereditarietà)}
+
+Il modello relazionale è intrinsecamente "piatto" e non supporta nativamente il concetto orientato agli oggetti di ereditarietà (superclasse e sottoclassi). Pertanto, quando nel Class Diagram si incontra una gerarchia di generalizzazione/specializzazione, è necessario "smontarla" trasformandola in tabelle ordinarie. 
+
+L'ingegneria del software offre tre strategie principali per affrontare questa traduzione, ciascuna con precisi impatti su prestazioni, memoria e integrità dei dati.
+
+\subsubsection*{1. Partizionamento Orizzontale (Accorpamento verso il basso)}
+Questa soluzione prevede l'eliminazione della superclasse e la creazione di una tabella per ciascuna sottoclasse. Ogni tabella figlia "eredita" fisicamente copiando al proprio interno tutti gli attributi della generalizzazione.
+
+\begin{itemize}
+    \item \textbf{Schema logico:} $\texttt{PERSONA(nome, cognome)}$ scompare. Si creano \texttt{STUDENTE}(\underline{\texttt{id}}, \texttt{nome}, \texttt{cognome}, \texttt{matricola}) e \texttt{DOCENTE}(\underline{\texttt{id}}, \texttt{nome}, \texttt{cognome}, \texttt{stipendio}).
+    \item \textbf{Vantaggi:} Interrogare una specifica sottoclasse è estremamente veloce (nessun \texttt{JOIN}).
+    \item \textbf{Svantaggi e Limiti:} Questa strada è matematicamente percorribile \textbf{solo se la generalizzazione è totale} (ovvero se non esistono istanze della superclasse che non appartengano a nessuna sottoclasse). Inoltre, se si vuole fare una query su tutte le persone (indipendentemente dal tipo), il database deve eseguire una pesante operazione di \texttt{UNION} tra le tabelle.
+\end{itemize}
+
+\subsubsection*{2. Partizionamento Singolo (Accorpamento verso l'alto)}
+Questa soluzione, all'opposto, prevede l'eliminazione delle sottoclassi. Si crea un'unica, grande tabella (la superclasse) che ingloba tutti gli attributi di tutte le specializzazioni, introducendo un attributo \textbf{discriminante} (un enumeratore) per capire di che "tipo" sia la riga.
+
+\begin{itemize}
+    \item \textbf{Schema logico:} $\texttt{PERSONA}(\underline{\text{id}}, \text{tipoPersona}, \text{nome}, \text{cognome}, \text{matricola}, \text{stipendio})$
+    \item \textbf{Vantaggi:} È sempre applicabile ed è la soluzione più performante in assoluto (niente \texttt{JOIN}, niente \texttt{UNION}). Molto amata nello sviluppo web moderno per la sua velocità in lettura.
+    \item \textbf{Svantaggi (Problema dei vincoli persi):} Genera tabelle "sparse", piene di valori \texttt{NULL} (uno studente avrà lo stipendio \texttt{NULL}). Soprattutto, fa perdere il rigore delle associazioni originarie. 
+\end{itemize}
+
+\begin{example}[Recupero dei vincoli di consistenza]
+Nel Class Diagram, supponiamo che l'associazione \textit{"Insegna"} leghi la classe \texttt{Corso} ESCLUSIVAMENTE alla sottoclasse \texttt{Docente}. 
+Utilizzando l'accorpamento verso l'alto, la tabella \texttt{CORSO} dovrà avere una chiave esterna che punta all'unica tabella rimasta: \texttt{PERSONA}.
+Questo permette a livello strutturale l'assurdità di far insegnare un corso a uno Studente. Per recuperare l'informazione persa, si \textbf{deve} imporre un vincolo applicativo o un \textit{CHECK constraint} SQL che assicuri che la chiave esterna punti solo a righe in cui l'attributo discriminante \texttt{tipoPersona = 'Docente'}.
+\end{example}
+
+\subsubsection*{3. Partizionamento Verticale (Traduzione in Associazioni 1:1)}
+Questa strategia preserva la struttura del diagramma originale. Si crea una tabella per la superclasse (con i soli attributi comuni) e una tabella per ogni sottoclasse (con i soli attributi specifici). Le tabelle figlie vengono legate alla tabella padre tramite un'associazione 1:1 rigorosa, utilizzando la tecnica della \textbf{Chiave Primaria Condivisa}.
+
+\begin{itemize}
+    \item \textbf{Schema logico:} 
+    \begin{itemize}
+        \item $\texttt{PERSONA}(\underline{\text{idPersona}}, \text{nome}, \text{cognome})$
+        \item $\texttt{STUDENTE}(\underline{\underline{\text{idPersona}}}, \text{matricola})$
+        \item $\texttt{DOCENTE}(\underline{\underline{\text{idPersona}}}, \text{stipendio})$
+    \end{itemize}
+    \item \textbf{Vantaggi:} Rispetta la terza forma normale, non spreca spazio con i \texttt{NULL} e mantiene perfettamente validi i vincoli delle associazioni. Nel caso di \textbf{ereditarietà disgiunta}, è necessario aggiungere un \textit{trigger} che impedisca allo stesso \texttt{idPersona} di comparire sia in \texttt{STUDENTE} che in \texttt{DOCENTE}.
+    \item \textbf{Svantaggi:} È la soluzione più costosa a livello computazionale. L'estrazione dei dati completi di un utente richiederà sempre un \texttt{JOIN} tra la tabella specifica e la superclasse.
+\end{itemize}
+
+\begin{tip}[Principi Generali di Scelta dell'Ereditarietà]
+Non esiste una soluzione perfetta a priori, ma la pratica ingegneristica suggerisce queste euristiche:
+\begin{enumerate}
+    \item \textbf{Usa l'accorpamento in alto (Singola Tabella):} Quando le sottoclassi differiscono per pochissimi attributi e non hanno relazioni specifiche pesanti. Il piccolo spreco di spazio dovuto ai \texttt{NULL} è ampiamente ripagato dalla velocità estrema delle query.
+    \item \textbf{Usa l'accorpamento in basso (Tabelle Separate):} Quando la generalizzazione è totale, le query non cercano quasi mai la "superclasse" generica, e le sottoclassi sono entità molto ricche e complesse di per sé.
+    \item \textbf{Usa le associazioni 1:1 (Tabella per Classe):} Quando l'integrità dei dati è la priorità assoluta, le sottoclassi hanno tantissime associazioni specifiche con altre tabelle del database e lo spazio su disco deve essere ottimizzato al massimo.
+\end{enumerate}
+\end{tip}
+
+
+
+
+
+
 
 
 
