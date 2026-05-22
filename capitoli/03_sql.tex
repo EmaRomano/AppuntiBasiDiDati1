@@ -1,0 +1,52 @@
+\chapter{Progettazione Fisica}
+
+\section{Il Livello Fisico: Definizione dei Metadati e Linguaggio SQL}
+
+Conclusa la fase di progettazione logica, l'ingegnere del software ha tra le mani uno schema relazionale formale e matematicamente inattaccabile. Tuttavia, questo schema risiede ancora su carta. Il passo successivo consiste nell'istanziare fisicamente questo modello all'interno di un \textbf{DBMS} (Database Management System, come PostgreSQL, MySQL o Oracle).
+
+Per comunicare con il motore del database si utilizza \textbf{SQL (Structured Query Language)}, il linguaggio standard universale per la gestione dei database relazionali.
+
+\begin{dettagli}[Lo Standard SQL e la Portabilità]
+Sebbene SQL sia il linguaggio standard per i database relazionali (codificato dagli enti internazionali ANSI e ISO), nella realtà commerciale ogni motore DBMS (PostgreSQL, MySQL, Oracle, ecc.) implementa un proprio "dialetto", introducendo estensioni e funzioni proprietarie non previste dallo standard. 
+
+Per questo motivo, il manuale ufficiale di un buon DBMS inizia solitamente dichiarando esplicitamente il proprio livello di aderenza allo standard internazionale. Dal punto di vista dell'ingegneria del software, scrivere codice il più aderente possibile allo standard puro è una \textit{best practice} fondamentale: assicura un'elevata \textbf{portabilità} del sistema, garantendo la possibilità di migrare l'infrastruttura da un DBMS a un altro con sforzi e costi di riscrittura minimi. Nel corso della progettazione si farà riferimento esclusivamente alle direttive dell'SQL standard.
+\end{dettagli}
+
+\subsection*{Il concetto di Metadato e il Catalogo di Sistema}
+
+Prima di poter inserire i dati reali dell'applicazione (es. Mario Rossi, matricola 12345), il DBMS deve conoscere la "forma" che questi dati avranno, le regole a cui devono sottostare e i legami che li uniscono. 
+Queste informazioni strutturali prendono il nome di \textbf{Metadati} (letteralmente: \textit{dati che descrivono altri dati}).
+
+Quando si definiscono gli schemi e i vincoli in SQL, il motore del database non sta ancora salvando informazioni applicative, ma sta popolando il proprio \textbf{Catalogo di Sistema} (o \textit{Data Dictionary}). Il catalogo è un set di tabelle interne, invisibili all'utente finale, che il DBMS usa per ricordare quante tabelle esistono, come si chiamano le colonne, quali sono i tipi di dato ammessi e quali vincoli di chiave primaria o esterna devono essere imposti.
+
+\subsection*{L'Anatomia di SQL: Un Linguaggio Dichiarativo}
+
+A differenza di linguaggi imperativi come Java, C o Python, in cui il programmatore deve descrivere \textit{passo dopo passo} come eseguire un'operazione, SQL è un linguaggio \textbf{dichiarativo}. L'ingegnere si limita a dichiarare \textit{cosa} vuole ottenere o \textit{come} deve essere fatta la struttura; sarà il motore di ottimizzazione interno del DBMS a decidere la strategia algoritmica migliore per allocare la memoria o estrarre i dati.
+
+Per gestire l'intero ciclo di vita del dato, il linguaggio SQL è suddiviso in tre grandi sotto-insiemi funzionali (sub-languages):
+
+\begin{enumerate}
+    \item \textbf{DDL (Data Definition Language):}
+    È il linguaggio di definizione dei metadati. Viene utilizzato esclusivamente per manipolare la struttura del database (il contenitore). I suoi comandi principali sono:
+    \begin{itemize}
+        \item \texttt{CREATE}: per generare nuove tabelle, indici o viste.
+        \item \texttt{ALTER}: per modificare la struttura di una tabella esistente (es. aggiungere una colonna).
+        \item \texttt{DROP}: per distruggere fisicamente una struttura e i suoi dati.
+    \end{itemize}
+
+    \item \textbf{DML (Data Manipulation Language):}
+    È il linguaggio utilizzato per manipolare il contenuto (i dati veri e propri) all'interno delle strutture precedentemente create col DDL. I comandi principali sono:
+    \begin{itemize}
+        \item \texttt{INSERT}: per inserire nuove tuple.
+        \item \texttt{UPDATE}: per aggiornare i valori di tuple esistenti.
+        \item \texttt{DELETE}: per rimuovere tuple.
+    \end{itemize}
+
+    \item \textbf{DQL (Data Query Language):}
+    Spesso considerato parte del DML, è l'istruzione \texttt{SELECT}, il cuore pulsante dei database relazionali, utilizzata per interrogare il motore e filtrare, aggregare o unire (\texttt{JOIN}) i dati.
+\end{enumerate}
+
+\begin{observation}[La Pipeline di Sviluppo]
+In accordo con la divisione appena descritta, il nostro percorso traduttivo riprenderà esattamente dal \textbf{DDL}. Utilizzeremo l'istruzione \texttt{CREATE TABLE} per tradurre ogni singolo schema relazionale prodotto nella fase precedente in un'effettiva tabella fisica, assegnando a ogni attributo un Dominio (tipo di dato) e codificando tutti i vincoli (PK, FK, UNIQUE, NOT NULL) per blindare l'integrità del sistema.
+\end{observation}
+

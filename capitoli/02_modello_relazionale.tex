@@ -596,6 +596,39 @@ Non esiste una soluzione perfetta a priori, ma la pratica ingegneristica suggeri
 \end{enumerate}
 \end{tip}
 
+\section{Riepilogo: Il Ciclo di Vita della Progettazione dei Dati}
+
+Prima di introdurre il linguaggio di interrogazione e definizione dei dati, è utile schematizzare l'intera metodologia di progettazione di basi di dati affrontata finora. Il processo ingegneristico segue un flusso di raffinamento progressivo (dal livello astratto al livello implementativo), suddiviso in fasi distinte e sequenziali. Il quarto punto rappresenta un'anticipazione di quanto vedremo nel prossimo capitolo. 
+
+\begin{enumerate}
+    \item \textbf{Progettazione Concettuale (Modellazione del Dominio)}
+    \begin{itemize}
+        \item \textit{Obiettivo:} Rappresentare la semantica della realtà di interesse in modo puro e indipendente dalla tecnologia.
+        \item \textit{Artefatti prodotti:} \textbf{Class Diagram UML} iniziale.
+        \item \textit{Documentazione a corredo:} \textbf{Dizionari dei Dati} (dizionario delle classi, dizionario delle associazioni e dizionario dei vincoli di business non esprimibili graficamente).
+    \end{itemize}
+
+    \item \textbf{Ristrutturazione dello Schema (Revisione Concettuale)}
+    \begin{itemize}
+        \item \textit{Obiettivo:} Adattare il modello concettuale puro ai limiti e ai requisiti del modello logico di destinazione (es. eliminazione attributi strutturati/multivalore, gestione delle gerarchie, ottimizzazione delle chiavi).
+        \item \textit{Artefatti prodotti:} \textbf{Class Diagram Revisionato}.
+        \item \textit{Documentazione a corredo:} Aggiornamento dei dizionari. In particolare, il \textbf{Dizionario dei Vincoli} subisce un forte arricchimento per recuperare semanticamente tutte le informazioni perse durante gli appiattimenti strutturali (es. vincoli per le ereditarietà accorpate).
+    \end{itemize}
+
+    \item \textbf{Progettazione Logica (Traduzione Relazionale)}
+    \begin{itemize}
+        \item \textit{Obiettivo:} Tradurre gli elementi del diagramma revisionato in strutture dati compatibili con l'algebra relazionale.
+        \item \textit{Artefatti prodotti:} \textbf{Schemi Relazionali} definitivi, con esplicita indicazione degli identificatori (\textit{Chiavi Primarie - PK}) e dei legami di navigabilità (\textit{Chiavi Esterne - FK}).
+    \end{itemize}
+    
+    \item \textbf{Implementazione e Definizione dei Metadati (Verso il livello Fisico)}
+    \begin{itemize}
+        \item \textit{Obiettivo:} Istruire materialmente il motore del database (DBMS) a creare le strutture logiche appena progettate.
+        \item \textit{Strumento:} Utilizzo del linguaggio \textbf{SQL} (in particolare il sotto-insieme DDL, \textit{Data Definition Language}), attraverso il quale gli schemi relazionali e i vincoli vengono codificati nei metadati del sistema.
+    \end{itemize}
+\end{enumerate}
+
+
 
 
 
