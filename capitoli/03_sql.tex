@@ -46,7 +46,244 @@ Per gestire l'intero ciclo di vita del dato, il linguaggio SQL è suddiviso in t
     Spesso considerato parte del DML, è l'istruzione \texttt{SELECT}, il cuore pulsante dei database relazionali, utilizzata per interrogare il motore e filtrare, aggregare o unire (\texttt{JOIN}) i dati.
 \end{enumerate}
 
-\begin{observation}[La Pipeline di Sviluppo]
-In accordo con la divisione appena descritta, il nostro percorso traduttivo riprenderà esattamente dal \textbf{DDL}. Utilizzeremo l'istruzione \texttt{CREATE TABLE} per tradurre ogni singolo schema relazionale prodotto nella fase precedente in un'effettiva tabella fisica, assegnando a ogni attributo un Dominio (tipo di dato) e codificando tutti i vincoli (PK, FK, UNIQUE, NOT NULL) per blindare l'integrità del sistema.
+\section{I Domini di Base (Tipi di Dato) nello Standard SQL}
+
+Nella creazione di una tabella tramite DDL, ogni attributo deve essere obbligatoriamente associato a un \textbf{Dominio} (tipo di dato). Il dominio definisce lo spazio dei valori ammissibili per quella colonna, lo spazio fisico occupato su disco e le operazioni matematiche o logiche consentite.
+
+Lo Standard SQL classifica i tipi di dato in grandi famiglie. Di seguito vengono presentati i domini fondamentali e maggiormente utilizzati.
+
+\subsubsection{1. Dati di tipo Stringa (Caratteri)}
+Servono per memorizzare testo, codici alfanumerici o numeri su cui non si devono effettuare operazioni matematiche (es. numeri di telefono, CAP, codici fiscali).
+
+\begin{itemize}
+    \item \texttt{\textbf{CHAR(n)}}: Stringa a lunghezza \textbf{fissa} pari a $n$ caratteri. Se si inserisce una stringa più corta, il DBMS la "riempie" (padding) con spazi vuoti fino a raggiungere $n$.
+    \begin{itemize}
+        \item \textit{Uso ingegneristico:} Estremamente veloce per la ricerca. Si usa \textbf{solo} quando il dato ha lunghezza rigidamente costante (es. \texttt{CHAR(16)} per il Codice Fiscale, \texttt{CHAR(2)} per la sigla della Provincia).
+    \end{itemize}
+    
+    \item \texttt{\textbf{VARCHAR(n)}}: Stringa a lunghezza \textbf{variabile} con limite massimo di $n$ caratteri. Se si inserisce una stringa più corta, occupa su disco solo lo spazio effettivo più un marcatore di fine stringa.
+    \begin{itemize}
+        \item \textit{Uso ingegneristico:} Lo standard \textit{de facto} per quasi tutto il testo (es. \texttt{VARCHAR(50)} per il Nome, \texttt{VARCHAR(255)} per l'Email). Fa risparmiare enorme spazio su disco, a costo di una microscopica latenza in più durante l'allocazione della memoria.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{2. Dati di tipo Numerico}
+SQL distingue rigorosamente tra numeri esatti (dove 1.1 + 1.1 fa esattamente 2.2) e numeri approssimati (soggetti a virgola mobile e possibili errori di precisione).
+
+\begin{itemize}
+    \item \textbf{Numerici Esatti Interi:}
+    \begin{itemize}
+        \item \texttt{\textbf{INT}} o \texttt{\textbf{INTEGER}}: Numero intero standard con segno (solitamente a 32 bit, range da circa -2 a +2 miliardi). È il re indiscusso delle chiavi primarie surrogate e dei contatori.
+        \item \texttt{\textbf{SMALLINT}}: Numero intero "piccolo" (solitamente a 16 bit). Utile per risparmiare RAM se il range di valori è sicuramente ridotto (es. l'anno di immatricolazione, o valori da 1 a 100).
+    \end{itemize}
+    
+    \item \textbf{Numerici Decimali Esatti:}
+    \begin{itemize}
+        \item \texttt{\textbf{NUMERIC(p, s)}} o \texttt{\textbf{DECIMAL(p, s)}}: Numeri a virgola fissa. Il parametro $p$ (\textit{precision}) indica il numero totale di cifre, mentre $s$ (\textit{scale}) indica quante di queste cifre stanno dopo la virgola. 
+        \item \textit{Esempio:} \texttt{NUMERIC(5, 2)} può memorizzare valori da -999.99 a 999.99.
+        \item \textit{Uso ingegneristico:} Obbligatorio per i dati \textbf{finanziari e monetari} (stipendi, prezzi, bilanci). Garantisce che non ci siano mai arrotondamenti imprevisti.
+    \end{itemize}
+    
+    \item \textbf{Numerici Approssimati:}
+    \begin{itemize}
+        \item \texttt{\textbf{REAL}}, \texttt{\textbf{DOUBLE PRECISION}}, \texttt{\textbf{FLOAT}}: Numeri a virgola mobile (standard IEEE 754).
+        \item \textit{Uso ingegneristico:} Si usano \textbf{solo} per calcoli scientifici, coordinate GPS o misurazioni fisiche dove la scala è immensa e una micro-approssimazione (es. 1.9999999 al posto di 2) è tollerabile. Da evitare assolutamente per la valuta.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{3. Dati di tipo Temporale}
+\begin{itemize}
+    \item \texttt{\textbf{DATE}}: Memorizza solo la data (Anno, Mese, Giorno). Formato: \texttt{'YYYY-MM-GG'}. Ottimo per date di nascita o date di assunzione.
+    \item \texttt{\textbf{TIME}}: Memorizza solo l'orario (Ore, Minuti, Secondi). Formato: \texttt{'HH-MI-SS'}.
+    \item \texttt{\textbf{TIMESTAMP}} o \texttt{\textbf{DATETIME}}: Memorizza data e ora esatte in un unico campo. Formato: \texttt{'YYYY-MM-GG HH-MI-SS'}. Fondamentale per i log di sistema, la data di creazione di un record o per tracciare transazioni.
+\end{itemize}
+
+\begin{dettagli}[La Rappresentazione Fisica dei Tipi Temporali]
+Nonostante in fase di interrogazione e inserimento le date vengano espresse in formato testuale (es. \texttt{'YYYY-MM-DD'}), a livello di immagazzinamento fisico i tipi temporali \textbf{non sono stringhe}. 
+
+Il DBMS analizza la stringa immessa e la converte in un numero (spesso un intero a 32 o 64 bit che rappresenta i giorni o i millisecondi trascorsi da una specifica data di riferimento, detta \textit{Epoch}). 
+Questa astrazione matematica è cruciale per tre motivi:
+\begin{enumerate}
+    \item \textbf{Performance aritmetica:} Permette al DBMS di sommare giorni o calcolare intervalli tramite velocissime operazioni matematiche a livello di CPU, evitando il costoso \textit{parsing} testuale.
+    \item \textbf{Ottimizzazione spaziale:} Un \texttt{DATE} occupa tipicamente 4 byte, contro i 10 byte di un \texttt{CHAR(10)}.
+    \item \textbf{Validazione semantica:} Il DBMS controlla nativamente l'esistenza reale della data (es. impedendo l'inserimento del 30 Febbraio).
+\end{enumerate}
+\end{dettagli}
+
+\subsubsection{4. Dati di tipo Booleano}
+\begin{itemize}
+    \item \texttt{\textbf{BOOLEAN}}: Ammette solo i valori di verità \texttt{TRUE} o \texttt{FALSE} (più il valore \texttt{NULL} se il campo non è obbligatorio). Ottimo per i flag (es. \texttt{is\_attivo}, \texttt{is\_pagato}).
+\end{itemize}
+
+\begin{observation}[Il NULL non è un tipo di dato]
+È fondamentale ricordare che \texttt{NULL} non appartiene a nessun dominio specifico, ma è uno \textbf{stato} universale. \texttt{NULL} in SQL non significa "zero" né "stringa vuota", ma rappresenta "informazione mancante, sconosciuta o inapplicabile". Qualsiasi tipo di dato descritto sopra, in assenza di vincoli, può assumere lo stato \texttt{NULL}.
 \end{observation}
+
+\section{Istruzioni DDL}
+
+Il Data Definition Language (DDL) permette di definire la struttura fisica del database. I due comandi fondamentali per istanziare l'architettura dei dati sono \texttt{CREATE SCHEMA} e \texttt{CREATE TABLE}.
+
+\begin{bestpractice}[Convenzione Stilistica (Case Sensitivity)]
+Lo standard SQL è \textit{case-insensitive} per quanto riguarda le parole chiave del linguaggio. Tuttavia, è convenzione universale nell'ingegneria del software scrivere le keyword in \textbf{MAIUSCOLO} (es. \texttt{CREATE TABLE}, \texttt{VARCHAR}) e gli identificatori definiti dall'utente in \textbf{minuscolo} (es. \texttt{studenti}, \texttt{matricola}). Questo garantisce la massima leggibilità del codice.
+\end{bestpractice}
+
+\subsection{Creazione di uno schema logico}
+\texttt{CREATE SCHEMA} crea quello che in informatica viene chiamato un \textit{namespace} o, più semplicemente, un contenitore logico (un "recinto"). Serve a raggruppare un insieme di tabelle, viste e vincoli che appartengono alla stessa applicazione, separandoli da altri progetti presenti nello stesso server database. È importante notare che una tabella non può fluttuare nel vuoto: deve sempre risiedere all'interno di uno schema. Se non si specifica uno schema personalizzato con \texttt{CREATE SCHEMA}, molti DBMS inseriscono automaticamente le tabelle in uno schema di default chiamato comunemente \texttt{public} o \texttt{dbo}.
+
+La sintassi di base è:
+\begin{lstlisting}[language=SQL]
+CREATE SCHEMA <nome_schema>;
+\end{lstlisting}
+
+\subsection{Creazione di una tabella}
+Il comando \texttt{CREATE TABLE} istanzia fisicamente uno schema relazionale $S(A_1, \dots, A_k)$ associando a ciascun attributo $A_i$ il proprio dominio $dom(A_i)$.
+Il nome assegnato alla tabella deve essere \textbf{unico} all'interno dello schema (o del database, se non si usano schemi espliciti).
+
+La struttura del comando prevede una coppia di parentesi tonde all'interno delle quali si susseguono istruzioni separate da virgole. 
+
+\begin{example}[Creazione tabella senza vincoli espliciti]
+Di seguito si riporta la traduzione in SQL dello schema relazionale relativo agli studenti. In questa prima fase esplorativa, ci limitiamo a definire i nomi degli attributi e i rispettivi domini (tipi di dato), omettendo temporaneamente i vincoli (come la chiave primaria).
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE TABLE studenti (
+    matricola CHAR(9),
+    cf        CHAR(16),
+    nome      VARCHAR(20),
+    cognome   VARCHAR(20),
+    dataN     DATE
+);
+\end{lstlisting}
+
+Logicamente, il corpo del comando si divide in due blocchi sequenziali:
+
+\begin{enumerate}
+    \item \textbf{Definizione degli Attributi:} In questa prima fase si elencano le colonne. Per ogni colonna si deve specificare il nome, il tipo di dato e, opzionalmente, dei vincoli specifici applicabili alla singola cella (vincoli intra-attributo).
+    \item \textbf{Definizione dei Vincoli di Tabella:} In questa seconda fase (che vedremo subito a seguire), si esplicitano i vincoli complessi che coinvolgono più colonne contemporaneamente (come chiavi primarie composte o chiavi esterne).
+\end{enumerate}
+
+\medskip
+
+La sintassi per la definizione di un singolo attributo (la riga base) è la seguente:
+$$ \texttt{<nome\_attributo> <tipo\_attributo> [vincoli\_attributo]} $$
+
+
+Si noti come la scelta dei domini rispecchi quanto discusso nel paragrafo precedente:
+\begin{itemize}
+    \item \texttt{matricola} e \texttt{cf} utilizzano \texttt{CHAR} poiché hanno una lunghezza fissa e rigidamente definita (rispettivamente 9 e 16 caratteri).
+    \item \texttt{nome} e \texttt{cognome} utilizzano \texttt{VARCHAR} per ottimizzare lo spazio su disco, dato che la lunghezza reale del testo inserito è variabile.
+    \item \texttt{dataN} (data di nascita) utilizza il tipo nativo \texttt{DATE} per garantire validazione e correttezza semantica.
+\end{itemize}
+\end{example}
+
+\subsection{I Vincoli di Colonna (Intra-attributo)}
+
+I vincoli di colonna sono regole di integrità applicate direttamente alla definizione di un singolo attributo, sulla stessa riga in cui viene dichiarato il tipo di dato. Servono a limitare i valori ammissibili nella singola cella, agendo come prima barriera contro la corruzione dei dati.
+
+Lo Standard SQL prevede quattro vincoli principali a livello di colonna:
+
+\subsubsection*{1. NOT NULL (Obbligatorietà)}
+Indica che il campo non può mai assumere lo stato \texttt{NULL}. All'atto dell'inserimento di una nuova riga, l'utente è obbligato a fornire un valore valido per questa colonna.
+\begin{itemize}
+    \item \textit{Uso:} Si applica a tutti i dati vitali che definiscono l'entità (es. il cognome di una persona, il titolo di un libro).
+\end{itemize}
+
+\subsubsection*{2. UNIQUE (Univocità di colonna)}
+Impone che tutti i valori presenti in quella colonna siano distinti tra loro. Il DBMS rifiuterà qualsiasi tentativo di inserire una riga con un valore già esistente in un'altra riga per quel campo.
+\begin{itemize}
+    \item \textit{Uso:} Si applica alle chiavi naturali candidate (es. il Codice Fiscale, l'Email). Nello standard SQL, a meno di specifiche implementazioni dei singoli DBMS, una colonna \texttt{UNIQUE} consente l'inserimento di molteplici valori \texttt{NULL}, poiché \texttt{NULL} rappresenta una incognita e due incognite non sono considerate uguali tra loro.
+\end{itemize}
+
+\subsubsection*{3. PRIMARY KEY (Chiave Primaria a livello di colonna)}
+Elegge l'attributo a identificatore principale della tabella. Specificare \texttt{PRIMARY KEY} su una colonna equivale ad applicare contemporaneamente i vincoli \texttt{NOT NULL} e \texttt{UNIQUE}. Una tabella può avere \textbf{una sola} chiave primaria.
+\begin{itemize}
+    \item \textit{Uso:} Si usa quando la chiave primaria è composta da un solo attributo (es. una chiave surrogata come \texttt{id} o una chiave naturale singola come \texttt{matricola}).
+\end{itemize}
+
+\subsubsection*{4. DEFAULT (Valore predefinito)}
+Non è un vincolo di integrità in senso stretto, ma una direttiva di assegnazione. Se durante un inserimento (\texttt{INSERT}) l'utente omette il valore per questa colonna, il DBMS vi inserisce automaticamente il valore specificato dopo la keyword \texttt{DEFAULT}.
+\begin{itemize}
+    \item \textit{Uso:} Ottimo per impostare stati iniziali (es. \texttt{is\_attivo BOOLEAN DEFAULT TRUE}) o timestamp di creazione (es. \texttt{data\_inserimento DATE DEFAULT CURRENT\_DATE}).
+\end{itemize}
+
+\begin{example}[Evoluzione dello schema studenti con vincoli di colonna]
+Riprendiamo lo schema della tabella \texttt{studenti} e applichiamo i vincoli intra-attributo per blindarne la coerenza semantica ed evitare anomalie:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE TABLE studenti (
+    matricola CHAR(9) PRIMARY KEY,
+    cf        CHAR(16) UNIQUE NOT NULL,
+    nome      VARCHAR(20) NOT NULL,
+    cognome   VARCHAR(20) NOT NULL,
+    dataN     DATE
+);
+\end{lstlisting}
+
+\textbf{Analisi delle scelte effettuate:}
+\begin{itemize}
+    \item \texttt{matricola}: È l'identificatore principale. Diventa \texttt{PRIMARY KEY}, quindi sarà univoca e obbligatoria per definizione.
+    \item \texttt{cf}: Il codice fiscale deve essere univoco (\texttt{UNIQUE}) per evitare duplicati nella realtà, ma deve anche essere obbligatorio (\texttt{NOT NULL}) per ogni studente registrato.
+    \item \texttt{nome} e \texttt{cognome}: Viene applicato \texttt{NOT NULL} perché un'istanza di studente priva di identità anagrafica non avrebbe alcun significato logico.
+    \item \texttt{dataN}: Rimane priva di vincoli espliciti; questo significa che il sistema accetterà il valore \texttt{NULL} qualora la data di nascita non fosse momentaneamente disponibile al momento della registrazione.
+\end{itemize}
+\end{example}
+
+\subsection{I Vincoli di Tabella (Out-of-line)}
+
+Fino a questo momento abbiamo visto i vincoli applicati direttamente sulla stessa riga della definizione dell'attributo (sintassi \textit{in-line}). Tuttavia, lo standard SQL permette (e in molti casi impone) di dichiarare i vincoli in una sezione dedicata alla fine del comando \texttt{CREATE TABLE}, separata dalla definizione delle colonne. Questa formulazione prende il nome di \textbf{Vincolo di Tabella} (o \textit{out-of-line}).
+
+La sintassi generale per dichiarare un vincolo a livello di tabella è:
+$$ \texttt{CONSTRAINT <nome\_vincolo> <TIPO\_VINCOLO> (colonna1, colonna2, \dots)} $$
+
+Sebbene la clausola \texttt{CONSTRAINT <nome>} sia opzionale (se omessa, il DBMS genera internamente un nome alfanumerico casuale, es. \texttt{SYS\_C00142}), nella pratica si raccomanda di assegnare sempre un nome esplicito e semantico (es. \texttt{pk\_studenti} o \texttt{unq\_cf}). 
+
+Nominare i vincoli è fondamentale per due operazioni architetturali:
+\begin{enumerate}
+    \item \textbf{Leggibilità degli errori:} Se un'applicazione viola una regola, il database genererà un'eccezione specificando il nome del vincolo. Leggere \textit{"Violazione del vincolo unq\_cf"} permette al programmatore di capire istantaneamente che c'è un problema di codici fiscali duplicati, senza dover fare debug alla cieca.
+    \item \textbf{Manipolazione a posteriori (Enable/Disable):} Quando il vincolo viene dichiarato, il DBMS lo crea e lo attiva automaticamente. Tuttavia, conoscendone il nome, l'amministratore del database può manipolarlo in futuro senza distruggere i dati. Tramite istruzioni specifiche (es. \texttt{ALTER TABLE ... DISABLE CONSTRAINT}), un vincolo può essere momentaneamente spento. Questa operazione è comunissima durante l'importazione massiva di milioni di dati (\textit{bulk insert}), dove spegnere i controlli accelera drasticamente la scrittura, per poi riattivarli (\textit{ENABLE}) a importazione finita.
+\end{enumerate}
+
+\subsubsection{Il caso delle Chiavi Primarie Composte}
+La motivazione tecnica principale che rende indispensabile la sintassi a livello di tabella è la gestione dei vincoli multi-colonna. 
+
+Nel nostro esempio precedente, la chiave primaria era formata da un solo attributo (\texttt{matricola}). Ma cosa accade se la progettazione logica produce una \textbf{chiave primaria composta} (es. una tabella che memorizza gli esami superati da uno studente in un determinato corso)?
+In SQL è illegale scrivere \texttt{PRIMARY KEY} su due righe separate, perché il DBMS tenterebbe di creare \textit{due} chiavi primarie distinte per la stessa tabella. In questo scenario, \textbf{l'uso del vincolo di tabella diventa strutturalmente obbligatorio}, poiché permette di racchiudere più colonne sotto un'unica regola.
+
+\begin{example}[Riscrittura e Chiavi Composte]
+Mostriamo la sintassi applicata allo schema \texttt{studenti} e a una nuova tabella associativa \texttt{esami\_sostenuti}.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Esempio 1: Riscrittura con vincoli di tabella nominati
+CREATE TABLE studenti (
+    matricola CHAR(9),
+    cf        CHAR(16) NOT NULL, -- NOT NULL resta solitamente in-line
+    nome      VARCHAR(20) NOT NULL,
+    cognome   VARCHAR(20) NOT NULL,
+    dataN     DATE,
+    
+    -- Sezione Vincoli di Tabella
+    CONSTRAINT pk_studenti PRIMARY KEY (matricola),
+    CONSTRAINT uq_studenti_cf UNIQUE (cf)
+);
+
+-- Esempio 2: Obbligatorieta' del vincolo per PK composta
+CREATE TABLE esami_sostenuti (
+    studente_matr CHAR(9),
+    codice_corso  CHAR(5),
+    voto          INT NOT NULL,
+    
+    -- La PK unisce due attributi e deve essere definita qui
+    CONSTRAINT pk_esami PRIMARY KEY (studente_matr, codice_corso)
+);
+\end{lstlisting}
+\end{example}
+
+\begin{bestpractice}[Convenzione e Best Practice]
+Come regola pratica di sviluppo: il vincolo d'obbligatorietà (\texttt{NOT NULL}) si definisce \textbf{sempre e solo in-line} accanto all'attributo. Al contrario, i vincoli strutturali d'identità (\texttt{PRIMARY KEY}, \texttt{UNIQUE}) e quelli di navigabilità (\texttt{FOREIGN KEY}, che vedremo a breve) vengono quasi sempre traslati a fine tabella e nominati esplicitamente, per favorire l'ordine mentale e la manutenzione del codice.
+\end{bestpractice}
+
+
+
+
+
+
 
