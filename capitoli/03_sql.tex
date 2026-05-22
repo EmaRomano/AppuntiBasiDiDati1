@@ -2,7 +2,7 @@
 
 \section{Il Livello Fisico: Definizione dei Metadati e Linguaggio SQL}
 
-Conclusa la fase di progettazione logica, l'ingegnere del software ha tra le mani uno schema relazionale formale e matematicamente inattaccabile. Tuttavia, questo schema risiede ancora su carta. Il passo successivo consiste nell'istanziare fisicamente questo modello all'interno di un \textbf{DBMS} (Database Management System, come PostgreSQL, MySQL o Oracle).
+Conclusa la fase di progettazione logica, il progettista ha tra le mani uno schema relazionale formale e matematicamente inattaccabile. Tuttavia, questo schema risiede ancora su carta. Il passo successivo consiste nell'istanziare fisicamente questo modello all'interno di un \textbf{DBMS} (Database Management System, come PostgreSQL, MySQL o Oracle).
 
 Per comunicare con il motore del database si utilizza \textbf{SQL (Structured Query Language)}, il linguaggio standard universale per la gestione dei database relazionali.
 
@@ -21,7 +21,7 @@ Quando si definiscono gli schemi e i vincoli in SQL, il motore del database non 
 
 \subsection*{L'Anatomia di SQL: Un Linguaggio Dichiarativo}
 
-A differenza di linguaggi imperativi come Java, C o Python, in cui il programmatore deve descrivere \textit{passo dopo passo} come eseguire un'operazione, SQL è un linguaggio \textbf{dichiarativo}. L'ingegnere si limita a dichiarare \textit{cosa} vuole ottenere o \textit{come} deve essere fatta la struttura; sarà il motore di ottimizzazione interno del DBMS a decidere la strategia algoritmica migliore per allocare la memoria o estrarre i dati.
+A differenza di linguaggi imperativi come Java, C o Python, in cui il programmatore deve descrivere \textit{passo dopo passo} come eseguire un'operazione, SQL è un linguaggio \textbf{dichiarativo}: il progettista si limita a dichiarare \textit{cosa} vuole ottenere o \textit{come} deve essere fatta la struttura; sarà il motore di ottimizzazione interno del DBMS a decidere la strategia algoritmica migliore per allocare la memoria o estrarre i dati.
 
 Per gestire l'intero ciclo di vita del dato, il linguaggio SQL è suddiviso in tre grandi sotto-insiemi funzionali (sub-languages):
 
@@ -52,7 +52,7 @@ Nella creazione di una tabella tramite DDL, ogni attributo deve essere obbligato
 
 Lo Standard SQL classifica i tipi di dato in grandi famiglie. Di seguito vengono presentati i domini fondamentali e maggiormente utilizzati.
 
-\subsubsection{1. Dati di tipo Stringa (Caratteri)}
+\subsubsection*{Dati di tipo Stringa (Caratteri)}
 Servono per memorizzare testo, codici alfanumerici o numeri su cui non si devono effettuare operazioni matematiche (es. numeri di telefono, CAP, codici fiscali).
 
 \begin{itemize}
@@ -67,7 +67,7 @@ Servono per memorizzare testo, codici alfanumerici o numeri su cui non si devono
     \end{itemize}
 \end{itemize}
 
-\subsubsection{2. Dati di tipo Numerico}
+\subsubsection*{Dati di tipo Numerico}
 SQL distingue rigorosamente tra numeri esatti (dove 1.1 + 1.1 fa esattamente 2.2) e numeri approssimati (soggetti a virgola mobile e possibili errori di precisione).
 
 \begin{itemize}
@@ -91,7 +91,7 @@ SQL distingue rigorosamente tra numeri esatti (dove 1.1 + 1.1 fa esattamente 2.2
     \end{itemize}
 \end{itemize}
 
-\subsubsection{3. Dati di tipo Temporale}
+\subsubsection*{Dati di tipo Temporale}
 \begin{itemize}
     \item \texttt{\textbf{DATE}}: Memorizza solo la data (Anno, Mese, Giorno). Formato: \texttt{'YYYY-MM-GG'}. Ottimo per date di nascita o date di assunzione.
     \item \texttt{\textbf{TIME}}: Memorizza solo l'orario (Ore, Minuti, Secondi). Formato: \texttt{'HH-MI-SS'}.
@@ -110,14 +110,73 @@ Questa astrazione matematica è cruciale per tre motivi:
 \end{enumerate}
 \end{dettagli}
 
-\subsubsection{4. Dati di tipo Booleano}
+\subsubsection*{Dati di tipo Booleano}
 \begin{itemize}
     \item \texttt{\textbf{BOOLEAN}}: Ammette solo i valori di verità \texttt{TRUE} o \texttt{FALSE} (più il valore \texttt{NULL} se il campo non è obbligatorio). Ottimo per i flag (es. \texttt{is\_attivo}, \texttt{is\_pagato}).
 \end{itemize}
 
-\begin{observation}[Il NULL non è un tipo di dato]
-È fondamentale ricordare che \texttt{NULL} non appartiene a nessun dominio specifico, ma è uno \textbf{stato} universale. \texttt{NULL} in SQL non significa "zero" né "stringa vuota", ma rappresenta "informazione mancante, sconosciuta o inapplicabile". Qualsiasi tipo di dato descritto sopra, in assenza di vincoli, può assumere lo stato \texttt{NULL}.
-\end{observation}
+\begin{warningbox}[Il NULL non è un tipo di dato]
+È fondamentale ricordare che \texttt{NULL} non appartiene a nessun dominio specifico, ma è uno \textbf{stato} universale. \texttt{NULL} in SQL non significa "zero" né "stringa vuota", ma rappresenta "informazione mancante, sconosciuta o inapplicabile"; intuitivamente, si può pensare come una variabile incognita (come in una equazione matematica). Qualsiasi tipo di dato descritto sopra, in assenza di vincoli, può assumere lo stato \texttt{NULL}.
+\end{warningbox}
+
+\begin{dettagli}[Il supporto al tipo BOOLEAN e l'approccio legacy]
+Sebbene lo standard SQL preveda nativamente il dominio \texttt{BOOLEAN}, nella pratica ingegneristica è necessario tenere conto delle limitazioni specifiche di alcuni DBMS. Il caso storico più celebre è Oracle Database, che non ha supportato il tipo booleano a livello di tabella fino alla versione 23c (2023).
+
+Quando si opera su sistemi legacy o DBMS privi di questo dominio, la \textit{best practice} architetturale consiste nel "simulare" il booleano utilizzando un tipo di dato minimale, come \texttt{CHAR(1)} o \texttt{SMALLINT}/\texttt{NUMBER(1)}, e "blindarlo" tramite un vincolo di colonna personalizzato (il vincolo \texttt{CHECK}, che vedremo a breve) che limiti esplicitamente l'inserimento a due soli valori convenzionali.
+\end{dettagli}
+
+\section{Operatori Logici e di Confronto}
+
+Per imporre regole di business (tramite vincoli \texttt{CHECK}) o per filtrare i dati durante le interrogazioni, SQL utilizza espressioni condizionali. Un'espressione condizionale valuta il contenuto di una cella e restituisce un risultato booleano a tre vie: \texttt{TRUE}, \texttt{FALSE} oppure \texttt{UNKNOWN} (se coinvolge un valore \texttt{NULL}).
+
+Di seguito i principali operatori standard previsti dal linguaggio:
+
+\subsection*{Operatori di Confronto Standard}
+Si applicano a stringhe, numeri e date:
+\begin{itemize}
+    \item \texttt{=} (Uguale)
+    \item \texttt{<>} oppure \texttt{!=} (Diverso)
+    \item \texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (Minore, Maggiore e relativi uguali)
+\end{itemize}
+
+\subsection*{Operatori Logici (Algebra di Boole)}
+Permettono di combinare più condizioni elementari:
+\begin{itemize}
+    \item \texttt{AND}: Restituisce \texttt{TRUE} solo se \textit{tutte} le condizioni combinate sono vere.
+    \item \texttt{OR}: Restituisce \texttt{TRUE} se \textit{almeno una} delle condizioni è vera.
+    \item \texttt{NOT}: Inverte il risultato logico della condizione che lo segue.
+\end{itemize}
+
+\subsection*{Operatori Speciali di SQL}
+Sono costrutti sintattici avanzati che semplificano enormemente la scrittura del codice, ottimizzando le performance del motore di ricerca:
+\begin{itemize}
+    \item \texttt{\textbf{BETWEEN} x \textbf{AND} y}: Verifica se un valore è compreso in un intervallo continuo (inclusi gli estremi \texttt{x} e \texttt{y}). Ottimo per le date o i range numerici.
+    \begin{itemize}
+        \item \textit{Esempio:} \texttt{voto BETWEEN 18 AND 30} equivale a \texttt{voto >= 18 AND voto <= 30}.
+    \end{itemize}
+    
+    \item \texttt{\textbf{IN} (val1, val2, \dots)}: Verifica se un valore appartiene a una lista di elementi discreti.
+    \begin{itemize}
+        \item \textit{Esempio:} \texttt{provincia IN ('RM', 'MI', 'NA')} equivale a \texttt{provincia = 'RM' OR provincia = 'MI' OR provincia = 'NA'}.
+    \end{itemize}
+    
+    \item \texttt{\textbf{LIKE} 'pattern'}: Permette il confronto testuale parziale (pattern matching) sulle stringhe. Utilizza due caratteri jolly (wildcard):
+    \begin{itemize}
+        \item \texttt{\%} (Percentuale): Sostituisce una sequenza di zero o più caratteri.
+        \item \texttt{\_} (Underscore): Sostituisce esattamente un singolo carattere.
+        \item \textit{Esempio:} \texttt{cognome LIKE 'R\%'} (Trova tutti i cognomi che iniziano per R); \texttt{nome LIKE '\_ario'} (Trova Mario, Dario, ma non Ilario).
+    \end{itemize}
+\end{itemize}
+
+\begin{warningbox}[La trappola del NULL: IS NULL vs = NULL]
+Per verificare se una cella è vuota, l'intuito del programmatore suggerirebbe di scrivere \texttt{colonna = NULL}. In SQL, questa sintassi è \textbf{errata} e restituirà sempre \texttt{UNKNOWN}, facendo fallire la condizione. Poiché \texttt{NULL} rappresenta un valore "incognito", è impossibile affermare matematicamente che un'incognita sia "uguale" a un'altra incognita. 
+
+L'unico modo legittimo in SQL per verificare l'assenza o la presenza di un dato è utilizzare gli operatori specifici di stato:
+\begin{itemize}
+    \item \texttt{\textbf{IS NULL}} (Verifica se il campo è vuoto)
+    \item \texttt{\textbf{IS NOT NULL}} (Verifica se il campo contiene un valore)
+\end{itemize}
+\end{warningbox}
 
 \section{Istruzioni DDL}
 
@@ -175,31 +234,31 @@ Si noti come la scelta dei domini rispecchi quanto discusso nel paragrafo preced
 \end{itemize}
 \end{example}
 
-\subsection{I Vincoli di Colonna (Intra-attributo)}
+\subsection{I Vincoli di Colonna (Intra-attributo o in-line)}
 
 I vincoli di colonna sono regole di integrità applicate direttamente alla definizione di un singolo attributo, sulla stessa riga in cui viene dichiarato il tipo di dato. Servono a limitare i valori ammissibili nella singola cella, agendo come prima barriera contro la corruzione dei dati.
 
 Lo Standard SQL prevede quattro vincoli principali a livello di colonna:
 
-\subsubsection*{1. NOT NULL (Obbligatorietà)}
+\subsubsection*{NOT NULL (Obbligatorietà)}
 Indica che il campo non può mai assumere lo stato \texttt{NULL}. All'atto dell'inserimento di una nuova riga, l'utente è obbligato a fornire un valore valido per questa colonna.
 \begin{itemize}
     \item \textit{Uso:} Si applica a tutti i dati vitali che definiscono l'entità (es. il cognome di una persona, il titolo di un libro).
 \end{itemize}
 
-\subsubsection*{2. UNIQUE (Univocità di colonna)}
+\subsubsection*{UNIQUE (Univocità di colonna)}
 Impone che tutti i valori presenti in quella colonna siano distinti tra loro. Il DBMS rifiuterà qualsiasi tentativo di inserire una riga con un valore già esistente in un'altra riga per quel campo.
 \begin{itemize}
     \item \textit{Uso:} Si applica alle chiavi naturali candidate (es. il Codice Fiscale, l'Email). Nello standard SQL, a meno di specifiche implementazioni dei singoli DBMS, una colonna \texttt{UNIQUE} consente l'inserimento di molteplici valori \texttt{NULL}, poiché \texttt{NULL} rappresenta una incognita e due incognite non sono considerate uguali tra loro.
 \end{itemize}
 
-\subsubsection*{3. PRIMARY KEY (Chiave Primaria a livello di colonna)}
-Elegge l'attributo a identificatore principale della tabella. Specificare \texttt{PRIMARY KEY} su una colonna equivale ad applicare contemporaneamente i vincoli \texttt{NOT NULL} e \texttt{UNIQUE}. Una tabella può avere \textbf{una sola} chiave primaria.
+\subsubsection*{PRIMARY KEY (Chiave Primaria a livello di colonna)}
+Elegge l'attributo a identificatore principale della tabella. Specificare \texttt{PRIMARY KEY} su una colonna implica contemporaneamente i vincoli \texttt{NOT NULL} e \texttt{UNIQUE}. Una tabella può avere \textbf{una sola} chiave primaria.
 \begin{itemize}
     \item \textit{Uso:} Si usa quando la chiave primaria è composta da un solo attributo (es. una chiave surrogata come \texttt{id} o una chiave naturale singola come \texttt{matricola}).
 \end{itemize}
 
-\subsubsection*{4. DEFAULT (Valore predefinito)}
+\subsubsection*{DEFAULT (Valore predefinito)}
 Non è un vincolo di integrità in senso stretto, ma una direttiva di assegnazione. Se durante un inserimento (\texttt{INSERT}) l'utente omette il valore per questa colonna, il DBMS vi inserisce automaticamente il valore specificato dopo la keyword \texttt{DEFAULT}.
 \begin{itemize}
     \item \textit{Uso:} Ottimo per impostare stati iniziali (es. \texttt{is\_attivo BOOLEAN DEFAULT TRUE}) o timestamp di creazione (es. \texttt{data\_inserimento DATE DEFAULT CURRENT\_DATE}).
@@ -280,6 +339,52 @@ CREATE TABLE esami_sostenuti (
 \begin{bestpractice}[Convenzione e Best Practice]
 Come regola pratica di sviluppo: il vincolo d'obbligatorietà (\texttt{NOT NULL}) si definisce \textbf{sempre e solo in-line} accanto all'attributo. Al contrario, i vincoli strutturali d'identità (\texttt{PRIMARY KEY}, \texttt{UNIQUE}) e quelli di navigabilità (\texttt{FOREIGN KEY}, che vedremo a breve) vengono quasi sempre traslati a fine tabella e nominati esplicitamente, per favorire l'ordine mentale e la manutenzione del codice.
 \end{bestpractice}
+
+% \subsection{Vincoli Semantici Personalizzati: La clausola CHECK}
+
+% Spesso, i tipi di dato standard (\texttt{INTEGER}, \texttt{VARCHAR}, ecc.) non sono sufficienti per garantire la correttezza della \textit{business logic} dell'applicazione. Per imporre regole di validazione personalizzate (vincoli di dominio) si utilizza la clausola \textbf{\texttt{CHECK}}. Questa direttiva valuta un'espressione booleana: se la riga inserita rende l'espressione \texttt{TRUE}, il dato viene accettato; in caso contrario, la transazione viene rifiutata.
+
+% \begin{example}[Tabella Esami: Applicazione di vincoli multipli]
+% Sulla base dello schema concettuale, definiamo la tabella \texttt{esami}. L'obiettivo è tradurre in codice SQL tre regole di business fondamentali:
+% \begin{enumerate}
+%     \item \textbf{Vincolo Lode:} L'attributo \texttt{lode} è un falso booleano (\texttt{CHAR(1)}). Deve poter valere solo 'Y' (Yes) o 'N' (No).
+%     \item \textbf{Vincolo Voto:} L'attributo \texttt{voto} deve essere rigorosamente compreso tra 0 e 30.
+%     \item \textbf{Chiave Esterna:} La matricola inserita nell'esame deve corrispondere a uno studente realmente esistente nel database.
+% \end{enumerate}
+
+% Ecco la traduzione completa in linguaggio DDL (si assume la preesistenza della tabella \texttt{studenti} con primary key \texttt{matricola}):
+
+% \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+% CREATE TABLE esami (
+%     matr  CHAR(9), -- Deve coincidere con la PK di studenti
+%     corso VARCHAR(20) NOT NULL,
+%     data  DATE NOT NULL,
+%     voto  INTEGER NOT NULL,
+%     -- in questo caso supponiamo che il DBMS non supporti il tipo boolean
+%     lode  CHAR(1) DEFAULT 'N',
+    
+%     -- Definizione della Primary Key composta (studente, corso)
+%     CONSTRAINT pk_esami PRIMARY KEY (matr, corso),
+    
+%     -- 1. Vincolo Lode (Simulazione Booleano)
+%     CONSTRAINT chk_lode CHECK (lode IN ('Y', 'N')),
+    
+%     -- 2. Vincolo Voto (Range di validita')
+%     CONSTRAINT chk_voto CHECK (voto >= 0 AND voto <= 30),
+    
+%     -- 3. Chiave Esterna (Integrita' Referenziale)
+%     CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
+%         REFERENCES studenti(matricola)
+% );
+% \end{lstlisting}
+% \end{example}
+
+% \subsubsection{Analisi del Vincolo CHECK}
+% L'operatore \texttt{CHECK} è estremamente flessibile e supporta i normali operatori logici SQL (\texttt{AND}, \texttt{OR}, \texttt{IN}, \texttt{BETWEEN}, \texttt{LIKE}). 
+% Nel caso del \texttt{voto}, il vincolo poteva essere sintatticamente scritto anche utilizzando l'operatore di inclusione: \texttt{CHECK (voto BETWEEN 0 AND 30)}.
+
+% \subsubsection{Introduzione alla Chiave Esterna (FOREIGN KEY)}
+% L'ultimo vincolo inserito (\texttt{fk\_esami\_studenti}) rappresenta un salto di paradigma: non è più un vincolo "intra-relazionale" (che controlla i dati all'interno della stessa tabella), ma un vincolo \textbf{inter-relazionale}. Esso crea un ponte strutturale tra la tabella \texttt{esami} e la tabella \texttt{studenti}, impedendo l'inserimento di un esame associato a un numero di matricola inesistente.
 
 
 
