@@ -301,7 +301,6 @@ Nominare i vincoli è fondamentale per due operazioni architetturali:
     \item \textbf{Manipolazione a posteriori (Enable/Disable):} Quando il vincolo viene dichiarato, il DBMS lo crea e lo attiva automaticamente. Tuttavia, conoscendone il nome, l'amministratore del database può manipolarlo in futuro senza distruggere i dati. Tramite istruzioni specifiche (es. \texttt{ALTER TABLE ... DISABLE CONSTRAINT}), un vincolo può essere momentaneamente spento. Questa operazione è comunissima durante l'importazione massiva di milioni di dati (\textit{bulk insert}), dove spegnere i controlli accelera drasticamente la scrittura, per poi riattivarli (\textit{ENABLE}) a importazione finita.
 \end{enumerate}
 
-\subsubsection{Il caso delle Chiavi Primarie Composte}
 La motivazione tecnica principale che rende indispensabile la sintassi a livello di tabella è la gestione dei vincoli multi-colonna. 
 
 Nel nostro esempio precedente, la chiave primaria era formata da un solo attributo (\texttt{matricola}). Ma cosa accade se la progettazione logica produce una \textbf{chiave primaria composta} (es. una tabella che memorizza gli esami superati da uno studente in un determinato corso)?
@@ -340,51 +339,153 @@ CREATE TABLE esami_sostenuti (
 Come regola pratica di sviluppo: il vincolo d'obbligatorietà (\texttt{NOT NULL}) si definisce \textbf{sempre e solo in-line} accanto all'attributo. Al contrario, i vincoli strutturali d'identità (\texttt{PRIMARY KEY}, \texttt{UNIQUE}) e quelli di navigabilità (\texttt{FOREIGN KEY}, che vedremo a breve) vengono quasi sempre traslati a fine tabella e nominati esplicitamente, per favorire l'ordine mentale e la manutenzione del codice.
 \end{bestpractice}
 
-% \subsection{Vincoli Semantici Personalizzati: La clausola CHECK}
+\subsection{Classificazione Concettuale dei Vincoli}
 
-% Spesso, i tipi di dato standard (\texttt{INTEGER}, \texttt{VARCHAR}, ecc.) non sono sufficienti per garantire la correttezza della \textit{business logic} dell'applicazione. Per imporre regole di validazione personalizzate (vincoli di dominio) si utilizza la clausola \textbf{\texttt{CHECK}}. Questa direttiva valuta un'espressione booleana: se la riga inserita rende l'espressione \texttt{TRUE}, il dato viene accettato; in caso contrario, la transazione viene rifiutata.
+Nei paragrafi precedenti abbiamo analizzato una classificazione prettamente \textit{sintattica} (vincoli \textit{in-line} vs \textit{out-of-line}), che riguarda esclusivamente la forma e il posizionamento del codice all'interno dell'istruzione \texttt{CREATE TABLE}. 
 
-% \begin{example}[Tabella Esami: Applicazione di vincoli multipli]
-% Sulla base dello schema concettuale, definiamo la tabella \texttt{esami}. L'obiettivo è tradurre in codice SQL tre regole di business fondamentali:
-% \begin{enumerate}
-%     \item \textbf{Vincolo Lode:} L'attributo \texttt{lode} è un falso booleano (\texttt{CHAR(1)}). Deve poter valere solo 'Y' (Yes) o 'N' (No).
-%     \item \textbf{Vincolo Voto:} L'attributo \texttt{voto} deve essere rigorosamente compreso tra 0 e 30.
-%     \item \textbf{Chiave Esterna:} La matricola inserita nell'esame deve corrispondere a uno studente realmente esistente nel database.
-% \end{enumerate}
+Esiste tuttavia una classificazione ben più importante, di natura \textbf{concettuale}, che categorizza i vincoli in base al loro "raggio d'azione", ovvero alla porzione di dati che il DBMS deve leggere per poter verificare se il vincolo è rispettato o violato. 
+Secondo questa logica, i vincoli si dividono in quattro categorie a complessità crescente:
 
-% Ecco la traduzione completa in linguaggio DDL (si assume la preesistenza della tabella \texttt{studenti} con primary key \texttt{matricola}):
+\begin{enumerate}
+    \item \textbf{Vincoli di Dominio (o di Colonna):} 
+    Esprimono condizioni sui valori ammissibili per un singolo attributo, valutando la singola cella isolata dal resto. Sono i vincoli più leggeri da verificare per il motore del database.
+    \begin{itemize}
+        \item \textit{Osservazione sintattica:} Questo è tipicamente l'unico tipo di vincolo che ha senso logico definire \textit{in-line}.
+        \item \textit{Esempi già incontrati:} Il vincolo di obbligatorietà (\texttt{NOT NULL}) e l'assegnazione di un valore predefinito (\texttt{DEFAULT}). Per verificare se un campo è nullo, il DBMS deve guardare solo quella specifica cella.
+    \end{itemize}
 
-% \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-% CREATE TABLE esami (
-%     matr  CHAR(9), -- Deve coincidere con la PK di studenti
-%     corso VARCHAR(20) NOT NULL,
-%     data  DATE NOT NULL,
-%     voto  INTEGER NOT NULL,
-%     -- in questo caso supponiamo che il DBMS non supporti il tipo boolean
-%     lode  CHAR(1) DEFAULT 'N',
+    \item \textbf{Vincoli di n-pla (o di Riga):}
+    Esprimono condizioni logiche che coinvolgono contemporaneamente più attributi appartenenti alla stessa riga (tupla). Per verificare il vincolo, il DBMS deve estrarre l'intera riga, ma non ha bisogno di confrontarla con le altre righe della tabella.
+
+    \item \textbf{Vincoli Intra-relazionali (o di Tabella):}
+    Esprimono condizioni che coinvolgono più record all'interno della stessa tabella. Per validare il nuovo dato, il DBMS è costretto a scansionare o interrogare le altre righe già presenti.
+    \begin{itemize}
+        \item \textit{Esempi già incontrati:} \texttt{UNIQUE} e \texttt{PRIMARY KEY}. Per garantire che un Codice Fiscale sia univoco, non basta guardare la riga appena inserita; il database deve verificare che quel valore non sia già presente in nessun altro record della tabella.
+    \end{itemize}
+
+    \item \textbf{Vincoli Inter-relazionali (o di Schema):}
+    Esprimono condizioni che legano tra loro record appartenenti a due o più tabelle distinte. Sono i vincoli più complessi e costosi computazionalmente, in quanto costringono il DBMS a "navigare" tra relazioni diverse per validare l'integrità strutturale del database.
+\end{enumerate}
+
+\begin{example}[Istanziazione della Tabella Esami e Classificazione dei Vincoli]
+Esemplifichiamo la classificazione concettuale dei vincoli modellando la tabella \texttt{esami}, la quale memorizza la registrazione definitiva degli esami superati dagli studenti. 
+
+Dal punto di vista della \textit{business logic}:
+\begin{itemize}
+    \item La chiave primaria deve essere composta dalla coppia \texttt{(matr, corso)}, garantendo che uno studente possa registrare un determinato esame una sola volta.
+    \item Il voto deve essere unicamente compreso tra 18 e 30 (esame superato).
+    \item La lode (valori 'S'/'N', default 'N') può essere assegnata solo se il voto è pari a 30.
+    \item La matricola deve fare riferimento a uno studente reale.
+\end{itemize}
+
+Ecco il codice SQL DDL definitivo:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE TABLE esami (
+    matr  CHAR(9),
+    corso VARCHAR(20) NOT NULL,
+    data  DATE NOT NULL,
+    voto  INTEGER NOT NULL,
+    lode  CHAR(1) DEFAULT 'N',
     
-%     -- Definizione della Primary Key composta (studente, corso)
-%     CONSTRAINT pk_esami PRIMARY KEY (matr, corso),
+    -- Sezione Vincoli di Tabella
+    CONSTRAINT pk_esami PRIMARY KEY (matr, corso),
     
-%     -- 1. Vincolo Lode (Simulazione Booleano)
-%     CONSTRAINT chk_lode CHECK (lode IN ('Y', 'N')),
+    CONSTRAINT chk_voto_superato CHECK (voto BETWEEN 18 AND 30),
     
-%     -- 2. Vincolo Voto (Range di validita')
-%     CONSTRAINT chk_voto CHECK (voto >= 0 AND voto <= 30),
+    CONSTRAINT chk_lode_coerenza CHECK (lode IN ('S', 'N') AND (lode = 'N' OR voto = 30)),
     
-%     -- 3. Chiave Esterna (Integrita' Referenziale)
-%     CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
-%         REFERENCES studenti(matricola)
-% );
-% \end{lstlisting}
-% \end{example}
+    CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
+        REFERENCES studenti(matricola)
+);
+\end{lstlisting}
 
-% \subsubsection{Analisi del Vincolo CHECK}
-% L'operatore \texttt{CHECK} è estremamente flessibile e supporta i normali operatori logici SQL (\texttt{AND}, \texttt{OR}, \texttt{IN}, \texttt{BETWEEN}, \texttt{LIKE}). 
-% Nel caso del \texttt{voto}, il vincolo poteva essere sintatticamente scritto anche utilizzando l'operatore di inclusione: \texttt{CHECK (voto BETWEEN 0 AND 30)}.
 
-% \subsubsection{Introduzione alla Chiave Esterna (FOREIGN KEY)}
-% L'ultimo vincolo inserito (\texttt{fk\_esami\_studenti}) rappresenta un salto di paradigma: non è più un vincolo "intra-relazionale" (che controlla i dati all'interno della stessa tabella), ma un vincolo \textbf{inter-relazionale}. Esso crea un ponte strutturale tra la tabella \texttt{esami} e la tabella \texttt{studenti}, impedendo l'inserimento di un esame associato a un numero di matricola inesistente.
+
+Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicitando la categoria concettuale di appartenenza in base al suo spettro d'azione:
+
+\begin{enumerate}
+    \item \textbf{Vincoli di Dominio (o di Colonna):}
+    \begin{itemize}
+        \item \texttt{NOT NULL} (su \texttt{corso}, \texttt{data}, \texttt{voto}): Sono vincoli di dominio in-line. Impongono che le singole celle non siano vuote. Il DBMS verifica la singola cella isolata.
+        \item \texttt{DEFAULT 'N'} (su \texttt{lode}): È una direttiva di dominio che interviene sulla singola cella in assenza di dato.
+        \item \texttt{chk\_voto\_superato} (\texttt{CHECK (voto BETWEEN 18 AND 30)}): È un vincolo di dominio out-of-line. Anche se scritto in fondo, analizza \textbf{esclusivamente} i valori dell'attributo \texttt{voto}, isolato dal resto della riga.
+    \end{itemize}
+
+    \item \textbf{Vincoli di n-pla (o di Riga):}
+    \begin{itemize}
+        \item \texttt{chk\_lode\_coerenza}: Questo vincolo impone che il carattere sia 'S' o 'N' e che, qualora sia 'S', il voto sia tassativamente 30. Dal momento che l'espressione logica mette in relazione \textbf{due attributi distinti dello stesso record} (\texttt{lode} e \texttt{voto}), si tratta di un puro vincolo di n-pla. Il DBMS deve leggere l'intera riga per validarlo.
+    \end{itemize}
+
+    \item \textbf{Vincoli Intra-relazionali (o di Tabella):}
+    \begin{itemize}
+        \item \texttt{pk\_esami} (\texttt{PRIMARY KEY (matr, corso)}): Definisce l'identificatore. Per garantire che la coppia matricola-corso sia unica, il DBMS non può limitarsi a guardare la riga corrente, ma deve scansionare l'intera tabella \texttt{esami} per escludere duplicati. Agisce quindi a livello di \textbf{più record della stessa tabella}.
+    \end{itemize}
+
+    \item \textbf{Vincoli Inter-relazionali (o di Schema):}
+    \begin{itemize}
+        \item \texttt{fk\_esami\_studenti} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studenti}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente.
+    \end{itemize}
+\end{enumerate}
+\end{example}
+
+\subsection{Integrità Referenziale e Chiavi Esterne (FOREIGN KEY)}
+
+Il vincolo di \textbf{Chiave Esterna (FOREIGN KEY)} è il più importante tra i vincoli \textbf{inter-relazionali} (o di schema). Esso stabilisce una relazione di dipendenza tra due tabelle, imponendo che i valori presenti in un set di attributi della tabella corrente (\textit{tabella figlia} o referenziante) debbano obbligatoriamente esistere all'interno del set di attributi che costituisce la chiave primaria (o un'altra chiave univoca) di un'altra tabella (\textit{tabella padre} o referenziata).
+
+Matematicamente, garantisce l'\textbf{Integrità Referenziale}: non possono esistere "puntatori orfani" nel database.
+
+Come abbiamo visto nel paragrafo precendente, la sintassi standard a livello di tabella è la seguente:
+\begin{lstlisting}[language=SQL]
+CONSTRAINT <nome_fk> FOREIGN KEY (colonna_locale_1, ...)
+    REFERENCES <tabella_padre> (colonna_padre_1, ...)
+\end{lstlisting}
+
+\subsubsection{Il problema delle modifiche sui dati referenziati}
+Il vero fulcro ingegneristico della chiave esterna emerge quando si tenta di alterare lo stato della tabella padre. Supponiamo che nel nostro database esista uno studente con matricola \texttt{'12345'} e che nella tabella \texttt{esami} vi siano tre record associati a tale matricola. 
+
+Cosa accade se un operatore tenta di \textbf{cancellare} lo studente \texttt{'12345'} dalla tabella \texttt{studenti}, o di \textbf{modificarne} la matricola? 
+Se il DBMS permettesse questa operazione alla leggera, i tre record della tabella \texttt{esami} punterebbero a una matricola inesistente, violando l'integrità referenziale.
+
+Per risolvere questo problema, lo Standard SQL impone al progettista di specificare esplicitamente una \textbf{politica di reazione} sia per la cancellazione (\texttt{ON DELETE}) sia per l'aggiornamento (\texttt{ON UPDATE}).
+
+Il progettista può scegliere tra quattro comportamenti distinti, da dichiarare in coda al vincolo di chiave esterna:
+
+\begin{enumerate}
+    \item \textbf{RESTRICT / NO ACTION (Comportamento di Default):}
+    Il DBMS blocca l'operazione alla radice. Se si tenta di cancellare lo studente padre, il database lancia un'eccezione di violazione di vincolo e rifiuta la query, costringendo l'utente a cancellare manualmente prima tutti gli esami correlati.
+    \begin{itemize}
+        \item \texttt{Sintassi:} \texttt{ON DELETE RESTRICT}
+    \end{itemize}
+
+    \item \textbf{CASCADE (Cancellazione/Modifica a cascata):}
+    L'operazione eseguita sul padre si ripercuote automaticamente sui figli. Se cancello lo studente, il DBMS cancella autonomamente tutte le righe dei suoi esami. Se modifico la matricola del padre, il DBMS aggiorna la matricola in tutti gli esami figli.
+    \begin{itemize}
+        \item \texttt{Sintassi:} \texttt{ON DELETE CASCADE}
+    \end{itemize}
+
+    \item \textbf{SET NULL (Annullamento del puntatore):}
+    Se il padre viene eliminato o modificato, i record figli sopravvivono, ma il valore della loro chiave esterna viene impostato automaticamente a \texttt{NULL}. 
+    \begin{itemize}
+        \item \texttt{Sintassi:} \texttt{ON DELETE SET NULL}
+        \item \textit{Vincolo strutturale:} Questa politica è applicabile \textbf{solo se} le colonne della chiave esterna nella tabella figlia ammettono il valore \texttt{NULL} (ovvero non sono marcate come \texttt{NOT NULL} o non fanno parte della Primary Key).
+    \end{itemize}
+
+    \item \textbf{SET DEFAULT (Ripristino del valore predefinito):}
+    Simile a \texttt{SET NULL}, ma i campi della chiave esterna nei record figli assumono il valore specificato nella clausola \texttt{DEFAULT} di quella colonna.
+    \begin{itemize}
+        \item \texttt{Sintassi:} \texttt{ON DELETE SET DEFAULT}
+    \end{itemize}
+\end{enumerate}
+
+\begin{tip}[Euristiche di scelta delle politiche]
+La selezione della politica referenziale dipende esclusivamente dal significato semantico della relazione:
+\begin{itemize}
+    \item Si usa \textbf{\texttt{CASCADE}} quando la tabella figlia descrive entità deboli che non hanno senso di esistere senza il padre (es. le righe di un ordine d'acquisto: se cancello l'ordine, devo distruggere le sue righe).
+    \item Si usa \textbf{\texttt{RESTRICT}} quando l'eliminazione del padre sarebbe un errore operativo grave (es. non devo poter cancellare un corso di laurea se ci sono ancora studenti iscritti ad esso).
+    \item Si usa \textbf{\texttt{SET NULL}} quando l'entità figlia ha vita propria ma perde il legame con il padre (es. se una scuderia di Formula 1 fallisce e si cancella la scuderia, i piloti rimangono nel database ma con la colonna \texttt{id\_scuderia} impostata a \texttt{NULL}).
+\end{itemize}
+\end{tip}
 
 
 
