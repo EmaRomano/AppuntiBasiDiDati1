@@ -424,14 +424,14 @@ Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicit
 
     \item \textbf{Vincoli Inter-relazionali (o di Schema):}
     \begin{itemize}
-        \item \texttt{fk\_esame\_studente} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studente}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente. Il \textbf{vincolo di integrità referenziale} consiste proprio in questo: quando si inserisce un esame, la chiave esterna deve essere uguale alla matricola di uno studente nella relativa tabella. 
+        \item \texttt{fk\_esame\_studente} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studente}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente. 
     \end{itemize}
 \end{enumerate}
 \end{example}
 
 \subsection{Integrità Referenziale e Chiavi Esterne (FOREIGN KEY)}
 
-Il vincolo di \textbf{Chiave Esterna (FOREIGN KEY)} è il più importante tra i vincoli \textbf{inter-relazionali} (o di schema). Esso stabilisce una relazione di dipendenza tra due tabelle, imponendo che i valori presenti in un set di attributi della tabella corrente (\textit{tabella figlia} o referenziante) debbano obbligatoriamente esistere all'interno del set di attributi che costituisce la chiave primaria (o un'altra chiave univoca) di un'altra tabella (\textit{tabella padre} o referenziata).
+Il vincolo di \textbf{Chiave Esterna (FOREIGN KEY)} è il più importante tra i vincoli \textbf{inter-relazionali} (o di schema). Esso stabilisce una relazione di dipendenza tra due tabelle, imponendo che i valori presenti in un set di attributi della tabella corrente (\textit{tabella figlia} o \textit{referenziante}) debbano obbligatoriamente esistere all'interno del set di attributi che costituisce la chiave primaria (o un'altra chiave univoca) di un'altra tabella (\textit{tabella padre} o \textit{referenziata}).
 
 Matematicamente, garantisce l'\textbf{Integrità Referenziale}: non possono esistere "puntatori orfani" nel database.
 
@@ -507,6 +507,25 @@ CONSTRAINT fk_esami_studenti FOREIGN KEY (matr)
 \end{lstlisting}
 In questo specifico (e comunissimo) scenario, il DBMS impedirà la cancellazione di uno studente che ha già sostenuto esami, ma permetterà alla segreteria di correggerne o aggiornarne la matricola, propagando istantaneamente il nuovo codice in tutte le righe della tabella \texttt{esami}.
 \end{bestpractice}
+
+\begin{bestpractice}[Design Pattern: Il Record Fittizio (Dummy Record)]
+Durante la modellazione fisica, la gestione dei valori \texttt{NULL} nelle chiavi esterne può generare complessità in fase di interrogazione dell'applicativo (necessità di \textit{Outer Join} e gestione delle incognite). 
+
+Per ovviare a questo problema, i progettisti adottano spesso il pattern del \textbf{Record Fittizio}. La tecnica consiste nell'inserire nella tabella padre una tupla convenzionale (es. con Primary Key \texttt{0} o \texttt{-1} e descrizione "Non Assegnato"). 
+Nella tabella figlia, la colonna dedicata alla chiave esterna viene dichiarata \texttt{NOT NULL} (impedendo l'incognita) e le viene assegnato come \texttt{DEFAULT} l'identificatore del record fittizio.
+
+\textit{Vantaggi architettonici:}
+\begin{itemize}
+    \item \textbf{Integrità totale:} Ogni riga figlia punta sempre a un record padre esistente, eliminando il concetto di "puntatore vuoto".
+    \item \textbf{Sinergia con le politiche referenziali:} Questo pattern rende implementabile in modo logico la direttiva \texttt{ON DELETE SET DEFAULT}. Se un'entità padre viene eliminata, i record figli ad essa associati non assumono il valore \texttt{NULL}, ma vengono automaticamente riassegnati al record "Sconosciuto" (valore di default), preservando la continuità strutturale dei dati.
+\end{itemize}
+\end{bestpractice}
+
+\begin{warningbox}[]
+    In alcuni contesti didattici, con \textbf{Vincolo di Integrità Referenziale} si intende che la FK nella tabella figlia debba \textbf{sempre} puntare ad una tupla nella tabella padre, eventualmentente un dummy record (ad esempio, nel caso in cui la FK sia \texttt{NULL}). 
+\end{warningbox}
+
+
 
 
 

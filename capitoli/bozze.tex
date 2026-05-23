@@ -1,1 +1,55 @@
 \chapter{Bozze}
+
+% \section{bozze inizio lezione 12}
+
+% quando dichiaro un vincolo primary key si intende: 
+
+% -- che quella chiave primaria sarà utilizzata per referenziare una chiave esterna. 
+
+% -- esprimo implicitamente un vincolo di unicità (unique)
+
+% -- esprimo implicitamente un vincolo di totalità (not null)
+
+% Per garantire il controllo di unicità in maniera efficiente il DBMS (usualmente) costruisce una struttura dati per agevolare questa operazione. Questa struttura dati si chiama indice (index). Gli indici sono costosi dal punto di vista gestionale. [il professore non ha spiegato in dettaglio di che struttura dati si tratti, si è limitato a dire che basta pensarlo come un indice analitico di un libro. Al limite potremmo accennare brevemente al tipo di struttura dati di cui stiamo parlando]. 
+
+% Si potrebbe pensare che la dichiarazione di chiave primaria debba essere obbligatoria per ogni schema relazionale, ma ciò non è vero: la chiave primaria va inserita solo se necessario. In particolare quando si ha necessità di un vincolo di unicità e quando ho bisogno di referenziare la riga di una tabella mediante una chiave esterna. Quando non è necessaria, la dichiarazione di chiave primaria è inutile e costosa. 
+
+% N.B.: l'indice viene costruito sempre dal dbms per le chiavi primarie, per altri attributi con vincoli di unicità non è detto, molto dipende dallo specifico dbms.
+
+% Per quanto riguarda invece la FK: 
+
+% -- referenzia una PK esterna
+% -- implica un vincolo di integrità referenziale (questo l'ho già spiegato)
+
+% Il trucco della riga fittizia nella tabella padre per evitare valori null sulla fk (questo l'ho già fatto)
+
+% la verifica del vincolo di integrità referenziale viene verificato al momento dell'inserimento di una istanza della tabella figlia. 
+
+
+
+
+
+
+
+% \section{discrepanza}
+
+% per vincolo di integrità referenziale il professore intende che la fk non può mai essere null e deve sempre puntare ad una tupla nella tabella padre (eventualmente usando una tupla fittizia "fantasma"). Io adotterò una impostazione leggermente diversa. La seguente nota chiarisce questa discrepanza. 
+
+% \begin{observation}[Implementazione Stretta dell'Integrità Referenziale]
+% Qualora le specifiche di progetto (o le convenzioni adottate a lezione) richiedano un'applicazione "stretta" del vincolo di integrità referenziale, in cui la chiave esterna non ammette stati incogniti e deve sempre riferirsi a un'istanza valida (eventualmente fittizia) della tabella padre, è necessario combinare due vincoli standard del linguaggio SQL.
+
+% Per ottenere questo comportamento, la semplice direttiva \texttt{FOREIGN KEY} non è sufficiente. Il progettista deve:
+% \begin{enumerate}
+%     \item Imporre il vincolo di dominio \texttt{NOT NULL} (ed eventualmente un \texttt{DEFAULT} per il record fittizio) direttamente in-line sulla colonna che fungerà da chiave esterna.
+%     \item Dichiarare il vincolo inter-relazionale \texttt{FOREIGN KEY} out-of-line per creare il collegamento strutturale.
+% \end{enumerate}
+
+% \textit{Esempio sintattico per un legame stretto e obbligatorio:}
+% \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+% matr_studente CHAR(9) NOT NULL DEFAULT '000000000',
+% -- ... altri attributi ...
+% CONSTRAINT fk_esami_studenti FOREIGN KEY (matr_studente) 
+%     REFERENCES studenti(matricola)
+% \end{lstlisting}
+% In questo modo, la struttura del database rispetta fedelmente la regola secondo cui ogni tupla figlia è indissolubilmente legata a una tupla (reale o fittizia) della tabella padre.
+% \end{observation}
