@@ -1,6 +1,7 @@
 \chapter{Bozze}
-
-% \section{bozze inizio lezione 12}
+% SETACCIA BENE E CERCA COSE CHE NON HAI ANCORA INSERITO. 
+% CI SONO COSE CHE HAI GIÀ FATTO E ALTRE NO. 
+% \section{bozze lezione 12}
 
 % quando dichiaro un vincolo primary key si intende: 
 
@@ -25,31 +26,12 @@
 
 % la verifica del vincolo di integrità referenziale viene verificato al momento dell'inserimento di una istanza della tabella figlia. 
 
+%resto della lezione: cose già fatte. 
 
 
 
+% \section{bozze lezione 13}
 
+%primi 30 minuti circa: richiami e precisazioni significative
 
-
-% \section{discrepanza}
-
-% per vincolo di integrità referenziale il professore intende che la fk non può mai essere null e deve sempre puntare ad una tupla nella tabella padre (eventualmente usando una tupla fittizia "fantasma"). Io adotterò una impostazione leggermente diversa. La seguente nota chiarisce questa discrepanza. 
-
-% \begin{observation}[Implementazione Stretta dell'Integrità Referenziale]
-% Qualora le specifiche di progetto (o le convenzioni adottate a lezione) richiedano un'applicazione "stretta" del vincolo di integrità referenziale, in cui la chiave esterna non ammette stati incogniti e deve sempre riferirsi a un'istanza valida (eventualmente fittizia) della tabella padre, è necessario combinare due vincoli standard del linguaggio SQL.
-
-% Per ottenere questo comportamento, la semplice direttiva \texttt{FOREIGN KEY} non è sufficiente. Il progettista deve:
-% \begin{enumerate}
-%     \item Imporre il vincolo di dominio \texttt{NOT NULL} (ed eventualmente un \texttt{DEFAULT} per il record fittizio) direttamente in-line sulla colonna che fungerà da chiave esterna.
-%     \item Dichiarare il vincolo inter-relazionale \texttt{FOREIGN KEY} out-of-line per creare il collegamento strutturale.
-% \end{enumerate}
-
-% \textit{Esempio sintattico per un legame stretto e obbligatorio:}
-% \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-% matr_studente CHAR(9) NOT NULL DEFAULT '000000000',
-% -- ... altri attributi ...
-% CONSTRAINT fk_esami_studenti FOREIGN KEY (matr_studente) 
-%     REFERENCES studenti(matricola)
-% \end{lstlisting}
-% In questo modo, la struttura del database rispetta fedelmente la regola secondo cui ogni tupla figlia è indissolubilmente legata a una tupla (reale o fittizia) della tabella padre.
-% \end{observation}
+%introduzione al successivo argomento: procederemo in parallelo con sql e algebra relazionale. 
