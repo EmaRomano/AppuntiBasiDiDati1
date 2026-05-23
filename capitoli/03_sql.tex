@@ -234,11 +234,11 @@ Si noti come la scelta dei domini rispecchi quanto discusso nel paragrafo preced
 \end{itemize}
 \end{example}
 
-\subsection{I Vincoli di Colonna (Intra-attributo o in-line)}
+\subsection{I Vincoli Intra-attributo (o in-line)}
 
-I vincoli di colonna sono regole di integrità applicate direttamente alla definizione di un singolo attributo, sulla stessa riga in cui viene dichiarato il tipo di dato. Servono a limitare i valori ammissibili nella singola cella, agendo come prima barriera contro la corruzione dei dati.
+I vincoli in-line sono regole di integrità applicate direttamente alla definizione di un singolo attributo, sulla stessa riga in cui viene dichiarato il tipo di dato. Servono a limitare i valori ammissibili nella singola cella, agendo come prima barriera contro la corruzione dei dati.
 
-Lo Standard SQL prevede quattro vincoli principali a livello di colonna:
+Lo Standard SQL prevede quattro vincoli principali in-line:
 
 \subsubsection*{NOT NULL (Obbligatorietà)}
 Indica che il campo non può mai assumere lo stato \texttt{NULL}. All'atto dell'inserimento di una nuova riga, l'utente è obbligato a fornire un valore valido per questa colonna.
@@ -324,7 +324,7 @@ CREATE TABLE studenti (
 );
 
 -- Esempio 2: Obbligatorieta' del vincolo per PK composta
-CREATE TABLE esami_sostenuti (
+CREATE TABLE esame_sostenuto (
     studente_matr CHAR(9),
     codice_corso  CHAR(5),
     voto          INT NOT NULL,
@@ -381,7 +381,7 @@ Dal punto di vista della \textit{business logic}:
 Ecco il codice SQL DDL definitivo:
 
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-CREATE TABLE esami (
+CREATE TABLE esame (
     matr  CHAR(9),
     corso VARCHAR(20) NOT NULL,
     data  DATE NOT NULL,
@@ -389,14 +389,14 @@ CREATE TABLE esami (
     lode  CHAR(1) DEFAULT 'N',
     
     -- Sezione Vincoli di Tabella
-    CONSTRAINT pk_esami PRIMARY KEY (matr, corso),
+    CONSTRAINT pk_esame PRIMARY KEY (matr, corso),
     
     CONSTRAINT chk_voto_superato CHECK (voto BETWEEN 18 AND 30),
     
     CONSTRAINT chk_lode_coerenza CHECK (lode IN ('S', 'N') AND (lode = 'N' OR voto = 30)),
     
-    CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
-        REFERENCES studenti(matricola)
+    CONSTRAINT fk_esame_studente FOREIGN KEY (matr) 
+        REFERENCES studente(matricola)
 );
 \end{lstlisting}
 
@@ -419,12 +419,12 @@ Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicit
 
     \item \textbf{Vincoli Intra-relazionali (o di Tabella):}
     \begin{itemize}
-        \item \texttt{pk\_esami} (\texttt{PRIMARY KEY (matr, corso)}): Definisce l'identificatore. Per garantire che la coppia matricola-corso sia unica, il DBMS non può limitarsi a guardare la riga corrente, ma deve scansionare l'intera tabella \texttt{esami} per escludere duplicati. Agisce quindi a livello di \textbf{più record della stessa tabella}.
+        \item \texttt{pk\_esame} (\texttt{PRIMARY KEY (matr, corso)}): Definisce l'identificatore. Per garantire che la coppia matricola-corso sia unica, il DBMS non può limitarsi a guardare la riga corrente, ma deve scansionare l'intera tabella \texttt{esame} per escludere duplicati. Agisce quindi a livello di \textbf{più record della stessa tabella}.
     \end{itemize}
 
     \item \textbf{Vincoli Inter-relazionali (o di Schema):}
     \begin{itemize}
-        \item \texttt{fk\_esami\_studenti} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studenti}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente.
+        \item \texttt{fk\_esame\_studente} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studente}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente. Il \textbf{vincolo di integrità referenziale} consiste proprio in questo: quando si inserisce un esame, la chiave esterna deve essere uguale alla matricola di uno studente nella relativa tabella. 
     \end{itemize}
 \end{enumerate}
 \end{example}
@@ -440,6 +440,12 @@ Come abbiamo visto nel paragrafo precendente, la sintassi standard a livello di 
 CONSTRAINT <nome_fk> FOREIGN KEY (colonna_locale_1, ...)
     REFERENCES <tabella_padre> (colonna_padre_1, ...)
 \end{lstlisting}
+
+\begin{warningbox}[Ordine Posizionale degli Attributi Referenziati]
+Nel caso in cui la relazione coinvolga chiavi composte da più attributi (es. una tabella figlia che punta alla nostra tabella \texttt{esami}, la cui Primary Key è la coppia \texttt{matr, corso}), l'\textbf{ordine} in cui le colonne vengono dichiarate all'interno delle parentesi tonde è tassativo.
+
+L'associazione effettuata dal motore SQL \textbf{non avviene per nome, ma è strettamente posizionale} (uno-a-uno): il primo attributo elencato in \texttt{FOREIGN KEY} viene mappato sul primo attributo elencato in \texttt{REFERENCES}, il secondo sul secondo, e così via. Un'inversione accidentale dell'ordine genererà un errore di compilazione (se i domini non corrispondono) o, nel peggiore dei casi, una drammatica corruzione semantica dei dati referenziati.
+\end{warningbox}
 
 \subsubsection{Il problema delle modifiche sui dati referenziati}
 Il vero fulcro ingegneristico della chiave esterna emerge quando si tenta di alterare lo stato della tabella padre. Supponiamo che nel nostro database esista uno studente con matricola \texttt{'12345'} e che nella tabella \texttt{esami} vi siano tre record associati a tale matricola. 
@@ -486,6 +492,21 @@ La selezione della politica referenziale dipende esclusivamente dal significato 
     \item Si usa \textbf{\texttt{SET NULL}} quando l'entità figlia ha vita propria ma perde il legame con il padre (es. se una scuderia di Formula 1 fallisce e si cancella la scuderia, i piloti rimangono nel database ma con la colonna \texttt{id\_scuderia} impostata a \texttt{NULL}).
 \end{itemize}
 \end{tip}
+
+\begin{bestpractice}[Dichiarazione Multipla e Comportamenti Misti]
+È prassi comune assegnare comportamenti logici diversi per la cancellazione e per l'aggiornamento. Sintatticamente, le due clausole si scrivono in sequenza all'interno della dichiarazione del vincolo.
+
+\medskip
+
+\textit{Esempio di combinazione (Best Practice industriale):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
+    REFERENCES studenti(matricola)
+    ON DELETE RESTRICT   -- Protegge dalla perdita accidentale dei dati
+    ON UPDATE CASCADE    -- Garantisce flessibilita' operativa sui codici
+\end{lstlisting}
+In questo specifico (e comunissimo) scenario, il DBMS impedirà la cancellazione di uno studente che ha già sostenuto esami, ma permetterà alla segreteria di correggerne o aggiornarne la matricola, propagando istantaneamente il nuovo codice in tutte le righe della tabella \texttt{esami}.
+\end{bestpractice}
 
 
 

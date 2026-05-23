@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1779521333.48239 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1779521335.60461 0
+["pdflatex"] 1779525701.30368 "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" "main.pdf" "main" 1779525703.5676 0
   "/home/emanuele/latex_workspace/AppuntiBasiDiDati1/main.tex" 1779424945.12428 719 ffb869767389c7e9bde14eb2c75886b1 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free0.enc" 1622837620 3083 a707712f77b073b3833e4b1334a30e99 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free1.enc" 1622837620 3042 0e2b14b9be7d01075a4c4591d5d1781b ""
@@ -262,12 +262,12 @@
   "/usr/share/texlive/texmf-dist/web2c/texmf.cnf" 1775001600 40900 887e0dc8cac988a9e9c574af364cf837 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1776180857.69195 4547344 09b200d6d21f1c0b39cba8696f0a38d2 ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1776180569 7758585 b87c9409558cb9127c55d304fd89c153 ""
-  "capitoli/01_progettazione_concettuale.aux" 1779521334.65691 4190 3cd5df8919b71d0ad8ce32a5096eb9ef "pdflatex"
+  "capitoli/01_progettazione_concettuale.aux" 1779525702.51629 4190 3cd5df8919b71d0ad8ce32a5096eb9ef "pdflatex"
   "capitoli/01_progettazione_concettuale.tex" 1779123575.38279 26820 3cf66a213b701715ee056cdad3dd1e55 ""
-  "capitoli/02_modello_relazionale.aux" 1779521335.12891 3514 bcb6a7c8b2fae404d2b21a9fef9e648e "pdflatex"
+  "capitoli/02_modello_relazionale.aux" 1779525703.03028 3514 bcb6a7c8b2fae404d2b21a9fef9e648e "pdflatex"
   "capitoli/02_modello_relazionale.tex" 1779424691.40627 57378 73531f6967657364faac1d40d410d8d1 ""
-  "capitoli/03_sql.aux" 1779521335.43991 2829 ea6377124fda9e905ddae52d43fc1807 "pdflatex"
-  "capitoli/03_sql.tex" 1779521331.08645 37953 1e77c512027e26cebc02b4a119f57434 ""
+  "capitoli/03_sql.aux" 1779525703.39028 2818 8e187541afb89367d8bcc373b6233547 "pdflatex"
+  "capitoli/03_sql.tex" 1779525701.04077 39972 60bca36d1740855aa180e06ca8943566 ""
   "capitoli/bozze.tex" 1779378099.30995 16 f5d6bf60d0110e57b7e468800d1541a0 ""
   "immagini/cap01_im01.pdf" 1776260351.34033 5718 8ce05015010384b89d5a81872515e4fb ""
   "immagini/cap01_im02.pdf" 1776260892.44951 6626 ae082302345900891d076fbc4c712a9b ""
@@ -277,10 +277,10 @@
   "immagini/cap01_im06.pdf" 1779012535.97109 6166 e446c85139e9161c87c560341404f8ec ""
   "immagini/cap01_im07.pdf" 1779012774.71163 6452 d6af398e1f03846ad4b5fcd3cdb16b1b ""
   "immagini/cap01_im08.pdf" 1779019237.44907 9651 075d0465d2f549768e5ecd5061274b8c ""
-  "main.aux" 1779521335.44291 966 a59bbf3307110a7ac75e4bee7a4d7c2c "pdflatex"
-  "main.out" 1779521335.44571 9177 cd42f183086b01954a19213258e6e61c "pdflatex"
+  "main.aux" 1779525703.39506 966 96a97c76ba093f5159cb5c2a44ccde44 "pdflatex"
+  "main.out" 1779525703.398 9116 80d3249718f53e9ff3c64cf9a78d689b "pdflatex"
   "main.tex" 1779424945.12428 719 ffb869767389c7e9bde14eb2c75886b1 ""
-  "main.toc" 1779521335.44632 4054 0927fd85dfb548be2954af2f17e6d083 "pdflatex"
+  "main.toc" 1779525703.39872 4043 1c787dc90dbeef4fb4ba84b29761a21c "pdflatex"
   "preambolo.tex" 1778823791.121 4529 76fec61e0c3d9e24ba968ac563690627 ""
   (generated)
   "capitoli/01_progettazione_concettuale.aux"
