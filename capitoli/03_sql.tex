@@ -1,6 +1,6 @@
-\chapter{Progettazione Fisica}
+\chapter{Introduzione a SQL e Definizione dei Metadati}
 
-\section{Il Livello Fisico: Definizione dei Metadati e Linguaggio SQL}
+\section{Nozioni introduttive}
 
 Conclusa la fase di progettazione logica, il progettista ha tra le mani uno schema relazionale formale e matematicamente inattaccabile. Tuttavia, questo schema risiede ancora su carta. Il passo successivo consiste nell'istanziare fisicamente questo modello all'interno di un \textbf{DBMS} (Database Management System, come PostgreSQL, MySQL o Oracle).
 
@@ -405,14 +405,14 @@ CREATE TABLE esame (
 Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicitando la categoria concettuale di appartenenza in base al suo spettro d'azione:
 
 \begin{enumerate}
-    \item \textbf{Vincoli di Dominio (o di Colonna):}
+    \item \textbf{Vincoli di Dominio (o di colonna):}
     \begin{itemize}
         \item \texttt{NOT NULL} (su \texttt{corso}, \texttt{data}, \texttt{voto}): Sono vincoli di dominio in-line. Impongono che le singole celle non siano vuote. Il DBMS verifica la singola cella isolata.
         \item \texttt{DEFAULT 'N'} (su \texttt{lode}): È una direttiva di dominio che interviene sulla singola cella in assenza di dato.
         \item \texttt{chk\_voto\_superato} (\texttt{CHECK (voto BETWEEN 18 AND 30)}): È un vincolo di dominio out-of-line. Anche se scritto in fondo, analizza \textbf{esclusivamente} i valori dell'attributo \texttt{voto}, isolato dal resto della riga.
     \end{itemize}
 
-    \item \textbf{Vincoli di n-pla (o di Riga):}
+    \item \textbf{Vincoli di n-pla (o di tupla/riga):}
     \begin{itemize}
         \item \texttt{chk\_lode\_coerenza}: Questo vincolo impone che il carattere sia 'S' o 'N' e che, qualora sia 'S', il voto sia tassativamente 30. Dal momento che l'espressione logica mette in relazione \textbf{due attributi distinti dello stesso record} (\texttt{lode} e \texttt{voto}), si tratta di un puro vincolo di n-pla. Il DBMS deve leggere l'intera riga per validarlo.
     \end{itemize}
