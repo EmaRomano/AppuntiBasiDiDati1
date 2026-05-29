@@ -204,7 +204,7 @@ L'asterisco fornisce la scappatoia formale a questo vincolo sintattico: comunica
     \item \textbf{Nessuna proiezione:} \texttt{SELECT *} preserva lo schema $R(X)$ originale inalterato.
 \end{itemize}
 
-Pertanto, l'espressione algebrica composta esclusivamente da una selezione $\sigma_{Citta = '\text{Roma}'}(\text{Studente})$ si traduce in SQL in:
+Pertanto, l'espressione algebrica composta esclusivamente da una selezione \\ $\sigma_{Citta = '\text{Roma}'}(\text{Studente})$ si traduce in SQL in:
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 SELECT * FROM studente 
 WHERE citta = 'Roma';
@@ -218,6 +218,56 @@ Sebbene l'uso di \texttt{SELECT *} sia estremamente comodo durante l'ispezione m
 \end{enumerate}
 La prassi ingegneristica standard impone di \textbf{elencare sempre esplicitamente} gli attributi desiderati dopo la clausola \texttt{SELECT}, persino nel caso in cui coincidano con l'intero schema relazionale in quel preciso momento.
 \end{warningbox}
+
+\section{Composizione di Proiezioni e Selezioni}
+
+Nell'algebra relazionale, le interrogazioni complesse si costruiscono componendo gli operatori di base. Poiché il risultato di un'operazione relazionale è sempre a sua volta una relazione (proprietà di chiusura algebrica), gli operatori possono essere annidati e applicati in cascata.
+
+L'espressione più comune consiste nell'estrazione di specifiche colonne da un sottoinsieme filtrato di tuple. Matematicamente, questo si modella applicando prima una selezione e successivamente una proiezione sul risultato:
+$$ \pi_Y(\sigma_p(r)) $$
+dove $r$ è la relazione di partenza, $p$ è il predicato logico di selezione e $Y$ è l'insieme degli attributi da proiettare.
+
+A differenza dell'algebra classica o della composizione tra operatori identici (es. due selezioni consecutive commutano sempre), \textbf{la proiezione e la selezione non commutano in generale}:
+$$ \pi_Y(\sigma_p(r)) \neq \sigma_p(\pi_Y(r)) $$
+Questa disuguaglianza diventa un vero e proprio errore di valutazione se la condizione logica $p$ coinvolge attributi della relazione originale che \textit{non} sono inclusi nell'insieme proiettato $Y$. Se la proiezione venisse eseguita per prima, scarterebbe prematuramente le colonne necessarie per valutare la condizione della selezione successiva.
+
+\begin{example}[Controesempio sulla Non-Commutatività]
+    Consideriamo l'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base}) e supponiamo di voler estrarre solo i \textbf{nomi} degli studenti residenti a \textbf{Roma}.
+
+    \textbf{1. Composizione Corretta:} $\pi_{Nome}(\sigma_{Citta = '\text{Roma}'}(\text{Studente}))$
+    \begin{itemize}
+        \item L'operatore più interno ($\sigma$) filtra le tuple tenendo solo quelle che soddisfano \texttt{Citta = 'Roma'}.
+        \item L'operatore esterno ($\pi$) riceve la relazione filtrata e scarta tutte le colonne eccetto il \texttt{Nome}.
+        \item \textbf{Risultato:} Una relazione formalmente corretta contenente le tuple "Mario" e "Giulia".
+    \end{itemize}
+
+    \textbf{2. Composizione Errata (Commutazione):} $\sigma_{Citta = '\text{Roma}'}(\pi_{Nome}(\text{Studente}))$
+    \begin{itemize}
+        \item L'operatore più interno ($\pi$) scarta subito tutte le colonne eccetto \texttt{Nome}. Lo schema risultante diviene $R_{tmp}(Nome)$.
+        \item L'operatore esterno ($\sigma$) tenta di valutare la condizione \texttt{Citta = 'Roma'} sulle tuple di $R_{tmp}$, ma l'attributo \texttt{Citta} \textbf{non esiste più} nello schema corrente.
+        \item \textbf{Risultato:} L'espressione è \textbf{matematicamente indefinita (mal formata)}. Poiché l'attributo \texttt{Citta} non appartiene allo schema di $R_{tmp}$, il predicato non può essere logicamente valutato (non restituisce "Falso" generando un insieme vuoto, ma costituisce una violazione del dominio di definizione). In SQL, questa interrogazione non restituisce un \textit{result set} vuoto, ma genera un errore semantico a tempo di compilazione.
+    \end{itemize}
+\end{example}
+
+\subsection{La Composizione in SQL e l'Ordine Logico di Esecuzione}
+
+Il linguaggio SQL traduce la composizione $\pi_Y(\sigma_p(r))$ avvalendosi simultaneamente delle clausole \texttt{SELECT} (per la proiezione) e \texttt{WHERE} (per la selezione):
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT nome 
+FROM studente 
+WHERE citta = 'Roma';
+\end{lstlisting}
+
+Per evitare a livello architetturale i paradossi della non-commutatività appena dimostrati, lo standard SQL impone al Query Optimizer un rigoroso \textbf{ordine logico di valutazione}, che differisce dall'ordine di scrittura del codice sorgente (dall'alto verso il basso). 
+
+Il DBMS analizza l'interrogazione applicando le operazioni esattamente nella sequenza insiemistica sicura:
+\begin{enumerate}
+    \item \textbf{\texttt{FROM}:} Identifica la relazione (o le relazioni) di partenza.
+    \item \textbf{\texttt{WHERE}:} Applica la condizione di selezione ($\sigma$), filtrando orizzontalmente le righe valide.
+    \item \textbf{\texttt{SELECT}:} Applica la proiezione ($\pi$) sull'insieme filtrato, scartando verticalmente le colonne escluse.
+\end{enumerate}
+Di conseguenza, nella clausola \texttt{WHERE} è sempre possibile e legittimo fare riferimento ad attributi della tabella che non compaiono nella \texttt{SELECT}, poiché la valutazione del filtro avviene \textit{prima} del taglio delle colonne.
 
 \subsubsection{Attributi Parziali e Gestione del Valore NULL}
 
