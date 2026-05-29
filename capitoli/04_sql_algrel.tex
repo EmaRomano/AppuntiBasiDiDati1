@@ -22,3 +22,212 @@ I DBMS relazionali mettono a disposizione dei progettisti istruzioni di basso li
 
 Tuttavia, queste operazioni di \textit{Query Tuning} fisico appartengono a un dominio avanzato (tipico dell'amministrazione di database o di corsi di livello magistrale). L'obiettivo di questo corso si limita al livello logico-dichiarativo: ci concentreremo sulla \textbf{correttezza semantica} delle interrogazioni scritte, delegando completamente l'efficienza procedurale e la gestione algoritmica al motore del DBMS.
 \end{dettagli}
+
+Prima di introdurre le operazioni algebriche, è imperativo distinguere l'aspetto intensionale (la struttura) dall'aspetto estensionale (i dati) di una base di dati:
+\begin{itemize}
+    \item \textbf{Schema Relazionale (Intensione):} Rappresenta la struttura statica della tabella. Definisce il nome della relazione e l'elenco dei suoi attributi con i rispettivi domini. Esempio: $Studente(Matricola, Nome, Cognome, DataN, Citta)$.
+    \item \textbf{Relazione (Estensione):} Corrisponde all'istanza dello schema in un dato istante di tempo, ovvero alle righe della tabella. Dal momento che il modello si fonda sulla teoria degli insiemi, una relazione è rigorosamente un \textbf{insieme di tuple}. 
+\end{itemize}
+
+\begin{table}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{lllll}
+        \toprule
+        \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Città} \\
+        \midrule
+        10001 & Mario  & Rossi   & 1999-05-14 & Roma \\
+        10002 & Luigi  & Verdi   & 2000-11-22 & Milano \\
+        10003 & Giulia & Rossi   & 2001-02-10 & Roma \\
+        10004 & Anna   & Bianchi & 1999-08-30 & Napoli \\
+        10005 & Mario  & Neri    & 2000-01-15 & Milano \\
+        \bottomrule
+    \end{tabular}
+    \caption{Istanza corrente della relazione \texttt{Studente}}
+    \label{tab:studente_base}
+\end{table}
+
+\begin{observation}[Proprietà Insiemistiche della Relazione]
+Trattandosi di un insieme matematico, per definizione:
+\begin{enumerate}
+    \item \textbf{Non ammette duplicati:} Non possono esistere due tuple identiche in ogni loro attributo.
+    \item \textbf{L'ordine è irrilevante:} Cambiando l'ordine fisico delle righe, l'insieme rimane matematicamente lo stesso.
+\end{enumerate}
+\end{observation}
+
+\section{Proiezioni}
+
+La proiezione è un operatore \textbf{unario} (agisce su una singola relazione) che effettua una "decomposizione verticale". In termini pratici, estrae una sottotabella conservando solo gli attributi specificati e scartando gli altri.
+
+Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei suoi attributi. La proiezione della relazione $r$ sull'insieme di attributi $Y$ è una relazione sullo schema $R(Y)$ che si denota con $\pi_Y(r)$.
+
+\begin{itemize}
+    \item \textbf{Schema risultante:} Lo schema della relazione proiettata contiene meno attributi (o al massimo gli stessi) della relazione di partenza. A differenza dell'ordine delle tuple (irrilevante), l'\textbf{ordine degli attributi} specificato nell'operatore definisce la struttura della nuova relazione (es. $\pi_{Nome, Cognome}(r)$ produce uno schema diverso da $\pi_{Cognome, Nome}(r)$).
+    \item \textbf{Riduzione della cardinalità (De-duplicazione):} Poiché il risultato dell'operazione deve essere ancora una relazione (un insieme), il numero di tuple della proiezione può essere inferiore al numero di tuple della relazione originale. Se la rimozione delle colonne genera tuple identiche, l'operatore matematico "collassa" i duplicati in un unico elemento.
+    \item \textbf{Composizione:} Essendo chiusa rispetto all'algebra, è possibile applicare proiezioni in cascata. Risulta banale dimostrare che se $Z \subseteq Y \subseteq X$, allora $\pi_Z(\pi_Y(r)) = \pi_Z(r)$.
+\end{itemize}
+
+\begin{example}
+    Applichiamo l'operatore di proiezione all'istanza della relazione \texttt{Studente} precedentemente definita in tabella \ref{tab:studente_base}:
+    \begin{table}[H]
+        \centering
+        
+        % --- Prima Tabella ---
+        \begin{minipage}{0.32\textwidth}
+            \centering
+            % La formula algebrica come titolo della colonnina
+            $$ \pi_{Nome, Cognome}(\text{Studente}) $$
+            \vspace{0.1cm}
+            \renewcommand{\arraystretch}{1.2}
+            \begin{tabular}{ll}
+                \toprule
+                \textbf{Nome} & \textbf{Cognome} \\
+                \midrule
+                Mario  & Rossi   \\
+                Luigi  & Verdi   \\
+                Giulia & Rossi   \\
+                Anna   & Bianchi \\
+                Mario  & Neri    \\
+                \bottomrule
+            \end{tabular}
+        \end{minipage}\hfill
+        % --- Seconda Tabella ---
+        \begin{minipage}{0.32\textwidth}
+            \centering
+            $$ \pi_{Cognome, Nome}(\text{Studente}) $$
+            \vspace{0.1cm}
+            \renewcommand{\arraystretch}{1.2}
+            \begin{tabular}{ll}
+                \toprule
+                \textbf{Cognome} & \textbf{Nome} \\
+                \midrule
+                Rossi   & Mario  \\
+                Verdi   & Luigi  \\
+                Rossi   & Giulia \\
+                Bianchi & Anna   \\
+                Neri    & Mario  \\
+                \bottomrule
+            \end{tabular}
+        \end{minipage}\hfill
+        % --- Terza Tabella ---
+        \begin{minipage}{0.28\textwidth}
+            \centering
+            $$ \pi_{Cognome}(\text{Studente}) $$
+            \vspace{0.1cm}
+            \renewcommand{\arraystretch}{1.2}
+            \begin{tabular}{l}
+                \toprule
+                \textbf{Cognome} \\
+                \midrule
+                Rossi   \\
+                Verdi   \\
+                Bianchi \\
+                Neri    \\
+                \bottomrule
+            \end{tabular}
+        \end{minipage}
+        
+        \vspace{0.3cm}
+        \caption{Confronto delle proiezioni: l'ultima operazione evidenzia la riduzione della cardinalità (da 5 a 4 tuple) dovuta alla de-duplicazione insiemistica.}
+        \label{tab:esempi_proiezioni}
+    \end{table}
+\end{example}
+
+
+\subsection{La Proiezione in SQL: Il comando SELECT}
+
+Il linguaggio SQL implementa l'operatore di proiezione tramite la clausola \texttt{SELECT}. Il risultato di un'interrogazione non viene salvato fisicamente sul disco (a meno di comandi DDL espliciti), ma costituisce una \textbf{tabella virtuale} (o \textit{Result Set}) che risiede temporaneamente nella memoria di lavoro.
+
+\textit{Sintassi generale della proiezione SQL:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT [ALL | DISTINCT] <elenco_attributi>
+FROM <nome_tabella>;
+\end{lstlisting}
+
+Esiste una divergenza critica tra l'operatore matematico $\pi$ e la clausola \texttt{SELECT}:
+\begin{itemize}
+    \item \textbf{\texttt{SELECT ALL} (Comportamento di default):} SQL, per ottimizzare le prestazioni computazionali, tratta le tabelle come \textit{multinsiemi} (bag). Se calcoliamo \texttt{SELECT cognome FROM studente}, e nel database esistono dieci studenti di nome "Rossi", la tabella virtuale risultante conterrà dieci righe identiche. Questo viola la definizione di insieme.
+    \item \textbf{\texttt{SELECT DISTINCT}:} Per forzare il DBMS a comportarsi in modo rigoroso secondo le regole dell'algebra relazionale, è necessario utilizzare la keyword \texttt{DISTINCT}. Questa impone al motore di ordinare i risultati ed eliminare i duplicati, restituendo un insieme matematico puro (a fronte di un maggiore costo di calcolo).
+\end{itemize}
+
+\section{Selezioni}
+
+La selezione è, come la proiezione,  un operatore \textbf{unario} che estrae un sottoinsieme delle tuple che soddisfano una determinata condizione logica, lasciando inalterata la struttura della tabella (a differenza delle proiezioni).
+
+Sia $R(X)$ uno schema di relazione e sia $p$ un predicato (condizione logica) definito sugli attributi di $X$. La selezione della relazione $r$ rispetto al predicato $p$ è una relazione sullo stesso schema $R(X)$ che si denota con $\sigma_p(r)$.
+
+\begin{itemize}
+    \item \textbf{Schema risultante:} Lo schema della relazione selezionata è identico allo schema della relazione di partenza. Il numero, il nome e l'ordine degli attributi non subiscono variazioni.
+    \item \textbf{Riduzione della cardinalità:} Il risultato è un sottoinsieme insiemistico della relazione originale. Il numero di tuple prodotte è minore o uguale al numero di tuple di partenza.
+    \item \textbf{Composizione:} L'applicazione di selezioni in cascata equivale a una singola selezione il cui predicato è la congiunzione logica (\texttt{AND}) dei singoli predicati. Risulta banale dimostrare che $\sigma_{p_1}(\sigma_{p_2}(r)) = \sigma_{p_1 \land p_2}(r)$.
+\end{itemize}
+
+\begin{example}
+    Applichiamo l'operatore di selezione all'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base}) per estrarre le sole tuple relative agli studenti residenti a Roma:
+    
+    $$ \sigma_{Citta = '\text{Roma}'}(\text{Studente}) $$
+    
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{lllll}
+            \toprule
+            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} \\
+            \midrule
+            10001 & Mario  & Rossi   & 1999-05-14 & Roma \\
+            10003 & Giulia & Rossi   & 2001-02-10 & Roma \\
+            \bottomrule
+        \end{tabular}
+        \caption{Risultato della selezione: lo schema resta inalterato (5 attributi), ma la cardinalità si riduce alle sole tuple che rendono vero il predicato.}
+    \end{table}
+\end{example}
+
+\subsection{La Selezione in SQL: La clausola WHERE}
+
+In SQL, l'operazione logica di selezione si implementa aggiungendo la clausola \texttt{WHERE} al blocco di interrogazione. Il predicato dell'algebra relazionale viene letteralmente tradotto in un'espressione condizionale.
+
+\textit{Sintassi generale della selezione SQL:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT *
+FROM <nome_tabella>
+WHERE <condizione>;
+\end{lstlisting}
+
+Nelle interrogazioni SQL, l'asterisco (\texttt{*}) agisce come un carattere jolly (wildcard) universale che indica \textbf{"tutti gli attributi"}. 
+
+Dal punto di vista dell'algebra relazionale, la clausola \texttt{SELECT} implementa l'operatore di proiezione ($\pi$). Tuttavia, per limiti sintattici storici del linguaggio SQL, un'interrogazione deve \textit{obbligatoriamente} iniziare con il comando \texttt{SELECT}, anche qualora il progettista desideri eseguire unicamente un'estrazione orizzontale (selezione $\sigma$), mantenendo intatta la struttura della tabella.
+
+L'asterisco fornisce la scappatoia formale a questo vincolo sintattico: comunica al motore del DBMS di \textbf{non effettuare alcuna operazione di decomposizione verticale}, restituendo la tupla nella sua interezza.
+
+\begin{itemize}
+    \item \textbf{Proiezione esplicita:} \texttt{SELECT nome, cognome} equivale a $\pi_{Nome, Cognome}(r)$
+    \item \textbf{Nessuna proiezione:} \texttt{SELECT *} preserva lo schema $R(X)$ originale inalterato.
+\end{itemize}
+
+Pertanto, l'espressione algebrica composta esclusivamente da una selezione $\sigma_{Citta = '\text{Roma}'}(\text{Studente})$ si traduce in SQL in:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT * FROM studente 
+WHERE citta = 'Roma';
+\end{lstlisting}
+
+\begin{warningbox}[L'anti-pattern del SELECT *]
+Sebbene l'uso di \texttt{SELECT *} sia estremamente comodo durante l'ispezione manuale dei dati, il suo impiego all'interno del codice sorgente di un'applicazione software (Backend) è universalmente considerato un \textbf{anti-pattern} per due ragioni architetturali:
+\begin{enumerate}
+    \item \textbf{Spreco computazionale (I/O e Rete):} Trasferire colonne non necessarie all'applicativo consuma inutilmente larghezza di banda e memoria RAM.
+    \item \textbf{Fragilità strutturale (Breaking Changes):} Se in futuro lo schema del database dovesse evolvere (\texttt{ALTER TABLE}) con l'aggiunta di nuove colonne pesanti (es. dati binari) o sensibili, la vecchia query inizierebbe silenziosamente a scaricarle, potendo causare saturazione della memoria o vulnerabilità di sicurezza.
+\end{enumerate}
+La prassi ingegneristica standard impone di \textbf{elencare sempre esplicitamente} gli attributi desiderati dopo la clausola \texttt{SELECT}, persino nel caso in cui coincidano con l'intero schema relazionale in quel preciso momento.
+\end{warningbox}
+
+\subsubsection{Attributi Parziali e Gestione del Valore NULL}
+
+Un aspetto teorico e pratico cruciale riguarda la valutazione dei predicati in presenza di attributi parziali (attributi non obbligatori). Si assume per definizione che il valore speciale \textbf{\texttt{NULL} sia sempre incluso nel dominio di qualsiasi attributo}, a meno che la sua presenza non sia esplicitamente vietata da un vincolo strutturale (come \texttt{NOT NULL} o \texttt{PRIMARY KEY}).
+
+Poiché \texttt{NULL} rappresenta l'incognita ("valore sconosciuto" o "inapplicabile"), i normali operatori di confronto falliscono. Valutare matematicamente se un'incognita sia uguale, maggiore o minore di una costante (es. \texttt{DataN = NULL}) non restituisce né \texttt{TRUE} né \texttt{FALSE}, ma lo stato \texttt{UNKNOWN}, determinando l'esclusione della tupla dal risultato.
+
+Per gestire le selezioni su attributi parziali, SQL introduce due operatori dedicati e insostituibili:
+\begin{itemize}
+    \item \texttt{\textbf{IS NULL}}: Valuta a \texttt{TRUE} se la cella è priva di valore.
+    \item \texttt{\textbf{IS NOT NULL}}: Valuta a \texttt{TRUE} se la cella contiene un valore definito e valido per il suo dominio.
+\end{itemize}
+

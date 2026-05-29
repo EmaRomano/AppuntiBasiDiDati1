@@ -26,61 +26,6 @@
 
 % \section{bozze lezione 13}
 
-% Il parallelismo tra algebra relazionale e gli aspetti analoghi in SQL. Noi seguiremo questo parallelo. 
-
-% ogni operazione dell'algebra relazionale corrisponde ad una operazione elementare
-
-% dall'altra parte SELECT mette insieme una sequenza di operazioni elementari. 
-
-% Capire l'algebra relazionale aiuta a capire meglio la sequenzadi operazioni elementari in SQL. Tipicamnete ciò che succede è che quando eseguiamo SELECT questa viene tradotta in una espressione di algebra relazionale. Questa viene poi manipolata, ottimizzata e poi eseguita. SQL è un linguaggio ad alto livello, quindi tutte queste cose ci resteranno invisibili all'atto pratico: di tutto questo si occupa il dbms. 
-
-% Il dbms effettua dunque delle operazioni sotto il cofano. Tecnicamente sarebbe possibile gestire queste operazioni "a mano" (i dbms lo permettono), forzando l'esecuzione di determinati piani di interrogazione diversi, ma non non ci occuperemo di questi aspetti, perché si tratta di un aspetto che riguarda l'amministrazione della base di dati: sarà un argomento affrontato alla magistrale. Il nostro scopo sarà scrivere correttamente le interrogazioni. 
-
-% ------------------------------------------
-
-% richiami con un esempio di schema relazionale studente(matricola, nome, cognome, dataN, città) con relativa tabella esemplificativa
-
-% lo schema relazionale rappresenta la struttura di una tabella. 
-
-% una relazione corrisponde alle righe della tabella. Ricordiamo che è un insieme, quindi non ammette duplicati (non ci possono essere due righe uguali) e l'ordine non è importante (cambiando l'ordine delle righe la tabella è la stessa). 
-
-% ora dobbiamo considerare due tipi di operazioni davvero basilari: proiezione e selezione. 
-
-% proiezione: operazione unaria (lavoro su una singola relazione). Simbolo ed esempi. 
-
-% In pratica una proiezione è una sottotabella che si ottiene da quella originale selezionando solo alcune colonne. Dunque è una relazione, il cui schema relazionale ha meno attributi di quello originale. 
-
-% Attenzione: trattandosi di una relazione non è significativo l'ordine delle righe, ma lo è quello degli attributi che definiscono la proiezione (cambiando l'ordine degli attributi, cambia la tabella di proiezione). 
-
-% Attenzione 2: trattandosi di una relazione, è un insieme, quindi il numero dei suoi elementi potrebbe risdursi rispetto alla relazione di pertenza. 
-
-% Ulteriore esempio: alle proiezioni (che sono relazioni) possiamo dare un nome e poi fare la proiezione di una proiezione. 
-
-% Ora vediamo l'equivalente di questa interrogazione in sql. 
-
-% Consideremo la relazione/tabella studente. 
-
-% SELECT nome cognome
-% FROM studente
-
-% il risultato di questa operazione è la tabella che rappresenta la proiezione precedente; non si tratta però di una tabella memorizzata, ma una vista, una tabella virtuale. 
-
-% Consideriamo invece la proiezione solo su cognome. 
-
-% In questo caso la tabella virtuale CONTIENE I DUPLICATI. 
-
-% Se volessi eliminare i duplicati dovrei fare: 
-% SELECT DISTINCT cognome
-% FROM studente
-
-% in questo caso ottengo la stessa relazione astratta dell'algebra relazionale. 
-
-% sintassi generale (per la proiezione): 
-
-% SELECT ALL|DISTINCT <elenco attributi>
-% FROM schema relazionale
-
-% (ALL è sempre di default?)
 
 % Passiamo all'operazione di selezione. Anche qui abbiamo una relazione unaria, ma stavolta non altera lo schema della relazione di partenza. 
 
