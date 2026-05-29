@@ -29,26 +29,26 @@ Prima di introdurre le operazioni algebriche, è imperativo distinguere l'aspett
     \item \textbf{Relazione (Estensione):} Corrisponde all'istanza dello schema in un dato istante di tempo, ovvero alle righe della tabella. Dal momento che il modello si fonda sulla teoria degli insiemi, una relazione è rigorosamente un \textbf{insieme di tuple}. 
 \end{itemize}
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{lllll}
+    \begin{tabular}{llllll}
         \toprule
-        \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Città} \\
+        \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
         \midrule
-        10001 & Mario  & Rossi   & 1999-05-14 & Roma \\
-        10002 & Luigi  & Verdi   & 2000-11-22 & Milano \\
-        10003 & Giulia & Rossi   & 2001-02-10 & Roma \\
-        10004 & Anna   & Bianchi & 1999-08-30 & Napoli \\
-        10005 & Mario  & Neri    & 2000-01-15 & Milano \\
+        10001 & Mario  & Rossi   & 1999-05-14 & Roma   & \texttt{NULL} \\
+        10002 & Luigi  & Verdi   & 2000-11-22 & Milano & Barista \\
+        10003 & Giulia & Rossi   & 2001-02-10 & Roma   & \texttt{NULL} \\
+        10004 & Anna   & Bianchi & 1999-08-30 & Napoli & Developer \\
+        10005 & Mario  & Neri    & 2000-01-15 & Milano & \texttt{NULL} \\
         \bottomrule
     \end{tabular}
-    \caption{Istanza corrente della relazione \texttt{Studente}}
-    \label{tab:studente_base}
+    \caption{Istanza aggiornata della relazione \texttt{Studente}, con l'attributo parziale \texttt{Lavoro}.}
+    \label{tab:studente_base_null}
 \end{table}
 
 \begin{observation}[Proprietà Insiemistiche della Relazione]
-Trattandosi di un insieme matematico, per definizione:
+Ricordiamo che, trattandosi di un insieme matematico, per definizione:
 \begin{enumerate}
     \item \textbf{Non ammette duplicati:} Non possono esistere due tuple identiche in ogni loro attributo.
     \item \textbf{L'ordine è irrilevante:} Cambiando l'ordine fisico delle righe, l'insieme rimane matematicamente lo stesso.
@@ -68,7 +68,7 @@ Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei su
 \end{itemize}
 
 \begin{example}
-    Applichiamo l'operatore di proiezione all'istanza della relazione \texttt{Studente} precedentemente definita in tabella \ref{tab:studente_base}:
+    Applichiamo l'operatore di proiezione all'istanza della relazione \texttt{Studente} precedentemente definita in tabella \ref{tab:studente_base_null}:
     \begin{table}[H]
         \centering
         
@@ -163,22 +163,22 @@ Sia $R(X)$ uno schema di relazione e sia $p$ un predicato (condizione logica) de
 \end{itemize}
 
 \begin{example}
-    Applichiamo l'operatore di selezione all'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base}) per estrarre le sole tuple relative agli studenti residenti a Roma:
+    Applichiamo l'operatore di selezione all'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base_null}) per estrarre le sole tuple relative agli studenti residenti a Roma:
     
     $$ \sigma_{Citta = '\text{Roma}'}(\text{Studente}) $$
     
     \begin{table}[H]
         \centering
         \renewcommand{\arraystretch}{1.2}
-        \begin{tabular}{lllll}
+        \begin{tabular}{llllll}
             \toprule
-            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} \\
+            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} &\textbf{Lavoro} \\
             \midrule
-            10001 & Mario  & Rossi   & 1999-05-14 & Roma \\
-            10003 & Giulia & Rossi   & 2001-02-10 & Roma \\
+            10001 & Mario  & Rossi   & 1999-05-14 & Roma & NULL \\
+            10003 & Giulia & Rossi   & 2001-02-10 & Roma & NULL\\
             \bottomrule
         \end{tabular}
-        \caption{Risultato della selezione: lo schema resta inalterato (5 attributi), ma la cardinalità si riduce alle sole tuple che rendono vero il predicato.}
+        \caption{Risultato della selezione: lo schema resta inalterato (6 attributi), ma la cardinalità si riduce alle sole tuple che rendono vero il predicato.}
     \end{table}
 \end{example}
 
@@ -219,6 +219,76 @@ Sebbene l'uso di \texttt{SELECT *} sia estremamente comodo durante l'ispezione m
 La prassi ingegneristica standard impone di \textbf{elencare sempre esplicitamente} gli attributi desiderati dopo la clausola \texttt{SELECT}, persino nel caso in cui coincidano con l'intero schema relazionale in quel preciso momento.
 \end{warningbox}
 
+\subsection{Attributi Parziali e Logica Ternaria}
+
+Un aspetto teorico e pratico cruciale riguarda la valutazione dei predicati in presenza di attributi parziali (non obbligatori). Si assume per definizione che il valore speciale \textbf{\texttt{NULL} sia sempre incluso nel dominio di qualsiasi attributo}, a meno che la sua presenza non sia esplicitamente vietata da un vincolo strutturale (es. \texttt{NOT NULL} o \texttt{PRIMARY KEY}).
+
+Poiché \texttt{NULL} rappresenta l'incognita ("valore sconosciuto" o "inapplicabile"), \textbf{qualsiasi tipo di predicato o operazione} (non solo i normali operatori di confronto relazionale come \texttt{=}, \texttt{>}, \texttt{<}, \texttt{<>}, ma anche operatori avanzati come \texttt{LIKE}, \texttt{IN} o \texttt{BETWEEN}) fallisce nel restituire un risultato certo. Valutare matematicamente un'incognita all'interno di una condizione non restituisce necessariamente \texttt{TRUE} o \texttt{FALSE}, ma introduce un terzo stato logico: \textbf{\texttt{UNKNOWN}}.
+
+\paragraph{}
+Nelle espressioni booleane complesse, l'algebra relazionale adotta dunque una logica a tre valori (ternaria). Il principio per risolvere le tabelle di verità senza memorizzarle è puramente intuitivo: \textbf{il risultato globale è \texttt{TRUE} o \texttt{FALSE} solo se l'incognita non è più determinante per l'esito; altrimenti resta \texttt{UNKNOWN}}.
+\begin{itemize}
+    \item \texttt{TRUE AND UNKNOWN} = \texttt{UNKNOWN} (L'esito dipende dall'incognita).
+    \item \texttt{FALSE AND UNKNOWN} = \texttt{FALSE} (Un solo \texttt{FALSE} in un \texttt{AND} è sufficiente per falsificare tutto, l'incognita è irrilevante).
+    \item \texttt{TRUE OR UNKNOWN} = \texttt{TRUE} (Un \texttt{TRUE} in un \texttt{OR} è sufficiente per verificare tutto).
+    \item \texttt{FALSE OR UNKNOWN} = \texttt{UNKNOWN} (L'esito dipende dall'incognita).
+\end{itemize}
+
+\begin{warningbox}[Criterio di Ammissione della Tupla]
+Affinché l'operatore di selezione $\sigma$ includa una tupla nel risultato finale, il predicato complessivo deve valutarsi \textbf{strettamente a \texttt{TRUE}}. Qualsiasi tupla che restituisca \texttt{FALSE} o \texttt{UNKNOWN} viene inesorabilmente scartata.
+\end{warningbox}
+
+\paragraph{Operatori per l'identificazione delle incognite}
+Per poter filtrare deliberatamente le tuple in base all'assenza di dati, SQL introduce due operatori dedicati che restituiscono sempre \texttt{TRUE} o \texttt{FALSE}, bypassando lo stato \texttt{UNKNOWN}:
+\begin{itemize}
+    \item \texttt{\textbf{IS NULL}}: Valuta a \texttt{TRUE} se la cella è priva di valore.
+    \item \texttt{\textbf{IS NOT NULL}}: Valuta a \texttt{TRUE} se la cella contiene un valore definito e valido.
+\end{itemize}
+
+\begin{example}[Filtrare tramite operatori dedicati: Studenti non lavoratori]
+    Per selezionare gli studenti che non hanno un impiego registrato, è necessario intercettare il valore \texttt{NULL} usando l'operatore specifico, non l'uguaglianza.
+    $$ \sigma_{Lavoro \text{ IS NULL}}(\text{Studente}) $$
+    \begin{lstlisting}[language=SQL]
+    SELECT * FROM studente WHERE lavoro IS NULL;
+    \end{lstlisting}
+    
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{llllll}
+            \toprule
+            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
+            \midrule
+            10001 & Mario  & Rossi   & 1999-05-14 & Roma   & \texttt{NULL} \\
+            10003 & Giulia & Rossi   & 2001-02-10 & Roma   & \texttt{NULL} \\
+            10005 & Mario  & Neri    & 2000-01-15 & Milano & \texttt{NULL} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+\end{example}
+
+\begin{example}[Insidia degli operatori standard con il valore NULL]
+    Si voglia estrarre l'elenco degli studenti il cui lavoro è \textbf{diverso} da 'Developer'. 
+    $$ \sigma_{Lavoro \neq '\text{Developer}'}(\text{Studente}) $$
+    \begin{lstlisting}[language=SQL]
+    SELECT * FROM studente WHERE lavoro <> 'Developer';
+    \end{lstlisting}
+    È un errore logico comune aspettarsi che gli studenti disoccupati (con \texttt{Lavoro} a \texttt{NULL}) vengano inclusi. In realtà, valutare \texttt{NULL} $\neq$ \texttt{'Developer'} restituisce \texttt{UNKNOWN}. Di conseguenza, la selezione ammette solo chi ha un lavoro esplicitato diverso da quello cercato, scartando i \texttt{NULL}.
+    
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{llllll}
+            \toprule
+            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
+            \midrule
+            10002 & Luigi  & Verdi   & 2000-11-22 & Milano & Barista \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+\end{example}
+
+
 \section{Composizione di Proiezioni e Selezioni}
 
 Nell'algebra relazionale, le interrogazioni complesse si costruiscono componendo gli operatori di base. Poiché il risultato di un'operazione relazionale è sempre a sua volta una relazione (proprietà di chiusura algebrica), gli operatori possono essere annidati e applicati in cascata.
@@ -232,7 +302,7 @@ $$ \pi_Y(\sigma_p(r)) \neq \sigma_p(\pi_Y(r)) $$
 Questa disuguaglianza diventa un vero e proprio errore di valutazione se la condizione logica $p$ coinvolge attributi della relazione originale che \textit{non} sono inclusi nell'insieme proiettato $Y$. Se la proiezione venisse eseguita per prima, scarterebbe prematuramente le colonne necessarie per valutare la condizione della selezione successiva.
 
 \begin{example}[Controesempio sulla Non-Commutatività]
-    Consideriamo l'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base}) e supponiamo di voler estrarre solo i \textbf{nomi} degli studenti residenti a \textbf{Roma}.
+    Consideriamo l'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base_null}) e supponiamo di voler estrarre solo i \textbf{nomi} degli studenti residenti a \textbf{Roma}.
 
     \textbf{1. Composizione Corretta:} $\pi_{Nome}(\sigma_{Citta = '\text{Roma}'}(\text{Studente}))$
     \begin{itemize}
@@ -269,15 +339,51 @@ Il DBMS analizza l'interrogazione applicando le operazioni esattamente nella seq
 \end{enumerate}
 Di conseguenza, nella clausola \texttt{WHERE} è sempre possibile e legittimo fare riferimento ad attributi della tabella che non compaiono nella \texttt{SELECT}, poiché la valutazione del filtro avviene \textit{prima} del taglio delle colonne.
 
-\subsubsection{Attributi Parziali e Gestione del Valore NULL}
+\section{Ridenominazione e Qualificazione degli Attributi}
 
-Un aspetto teorico e pratico cruciale riguarda la valutazione dei predicati in presenza di attributi parziali (attributi non obbligatori). Si assume per definizione che il valore speciale \textbf{\texttt{NULL} sia sempre incluso nel dominio di qualsiasi attributo}, a meno che la sua presenza non sia esplicitamente vietata da un vincolo strutturale (come \texttt{NOT NULL} o \texttt{PRIMARY KEY}).
+Man mano che la complessità delle interrogazioni aumenta, specialmente in previsione di operazioni che coinvolgono più relazioni simultaneamente, emerge la necessità di manipolare esplicitamente i nomi delle tabelle e degli attributi. SQL gestisce questa necessità attraverso l'uso degli \textit{Alias} e della notazione puntata.
 
-Poiché \texttt{NULL} rappresenta l'incognita ("valore sconosciuto" o "inapplicabile"), i normali operatori di confronto falliscono. Valutare matematicamente se un'incognita sia uguale, maggiore o minore di una costante (es. \texttt{DataN = NULL}) non restituisce né \texttt{TRUE} né \texttt{FALSE}, ma lo stato \texttt{UNKNOWN}, determinando l'esclusione della tupla dal risultato.
+\subsection{L'Operatore AS (Alias)}
 
-Per gestire le selezioni su attributi parziali, SQL introduce due operatori dedicati e insostituibili:
+L'uso degli alias (corrispettivo pratico dell'operatore algebrico di ridenominazione $\rho$) permette di assegnare un nome temporaneo a una tabella o a una colonna all'interno del ciclo di vita di una singola interrogazione. La sintassi fa uso della keyword opzionale \textbf{\texttt{AS}}.
+
+\paragraph{Alias di Relazione (nella clausola FROM)}
+Applicare un alias a una tabella ha due scopi ingegneristici distinti:
 \begin{itemize}
-    \item \texttt{\textbf{IS NULL}}: Valuta a \texttt{TRUE} se la cella è priva di valore.
-    \item \texttt{\textbf{IS NOT NULL}}: Valuta a \texttt{TRUE} se la cella contiene un valore definito e valido per il suo dominio.
+    \item \textbf{Sintesi del codice:} Permette di abbreviare nomi di tabelle molto lunghi, rendendo il codice SQL più leggibile e meno prono a errori di battitura.
+    \item \textbf{Istanze multiple (Self-Join):} È l'unico strumento logico che permette di referenziare \textit{più copie indipendenti} della stessa tabella all'interno della medesima interrogazione. Senza l'alias, il motore del database non saprebbe distinguere quale copia della tabella si sta interrogando.
 \end{itemize}
 
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Esempio di alias di tabella (S e' l'alias per Studente)
+SELECT * FROM studente AS S 
+WHERE S.citta = 'Roma';
+\end{lstlisting}
+
+\paragraph{Alias di Attributo (nella clausola SELECT)}Se utilizzato nell'elenco degli attributi proiettati, l'alias effettua una vera e propria \textbf{ridenominazione strutturale}. La tabella virtuale (Result Set) prodotta in output assumerà il nuovo nome specificato per quella colonna. Questo è cruciale quando si estraggono dati derivati da espressioni matematiche o funzioni, che altrimenti risulterebbero privi di un nome di colonna definito.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Ridenominazione dello schema risultante
+SELECT matricola AS id_studente, cognome 
+FROM studente;
+\end{lstlisting}
+
+\subsection{La Qualificazione degli Attributi (Notazione Puntata)}
+
+Finora abbiamo utilizzato una sintassi semplificata per indicare le colonne (es. \texttt{SELECT nome}). Tuttavia, la teoria dei database relazionali impone che il riferimento a un attributo debba essere assoluto e privo di ambiguità. 
+
+La notazione estesa, o \textbf{qualificazione}, si esprime tramite la sintassi:
+$$ \texttt{nome\_tabella.nome\_attributo} \quad \text{oppure} \quad \texttt{alias\_tabella.nome\_attributo} $$
+
+\begin{observation}[Risoluzione delle Ambiguità]
+Quando un'interrogazione agisce su una singola tabella, il DBMS risolve implicitamente l'appartenenza dell'attributo. Tuttavia, quando si lavora su prodotti cartesiani o \textit{Join} tra più tabelle (es. \texttt{Studente} e \texttt{Professore}), è matematicamente frequente che due tabelle possiedano attributi omonimi (es. \texttt{nome} e \texttt{cognome}). 
+
+In questi scenari, omettere la qualificazione genera un errore semantico bloccante (\textit{Ambiguous column name}). Pertanto, è considerata una \textbf{best practice ingegneristica e di stile} adottare sempre la sintassi estesa \texttt{Tabella.Attributo} (spesso in sinergia con un alias di tabella) non appena l'interrogazione coinvolge più di una relazione.
+\end{observation}
+
+\textit{Esempio di sintassi rigorosa qualificata:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT S.matricola, S.nome, S.cognome
+FROM studente AS S
+WHERE S.citta = 'Roma';
+\end{lstlisting}
