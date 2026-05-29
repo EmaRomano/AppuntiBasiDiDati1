@@ -1,0 +1,24 @@
+\chapter{SQL e Algebra Relazionale}
+
+In questo capitolo studieremo in parallelo ulteriori elementi del linguaggio SQL e l'algebra relazionale; non si tratta di un mero esercizio didattico, ma la chiave di volta per comprendere la reale architettura di calcolo di un Database Management System (DBMS). 
+
+Esiste una dicotomia fondamentale tra i due strumenti, che si riflette nella natura stessa dei linguaggi:
+\begin{itemize}
+    \item \textbf{L'Algebra Relazionale è procedurale (o costruttiva):} Definisce rigorosamente la sequenza dei passi (le operazioni elementari come selezioni, proiezioni e join) necessari per manipolare le relazioni e ottenere il risultato.
+    \item \textbf{SQL è un linguaggio di alto livello dichiarativo (o descrittivo):} Il programmatore si limita a definire le proprietà dell'insieme dei dati che desidera ottenere (\textit{cosa}), ignorando del tutto la strategia fisica per reperirli (\textit{come}). Un'unica istruzione \texttt{SELECT} agisce come un costrutto sintattico che incapsula molteplici operazioni algebriche.
+\end{itemize}
+
+\medskip
+
+Comprendere l'algebra relazionale significa avere la visibilità strutturale su ciò che il DBMS esegue "sotto il cofano". Quando il sistema riceve una \texttt{SELECT}, innesca un processo di traduzione e ottimizzazione totalmente trasparente all'utente:
+\begin{enumerate}
+    \item \textbf{Parsing e Traduzione:} L'istruzione SQL viene analizzata e tradotta in un albero sintattico di espressioni di algebra relazionale.
+    \item \textbf{Ottimizzazione Algebrica (Query Optimizer):} È il motore matematico del DBMS. L'ottimizzatore sfrutta le proprietà di equivalenza degli operatori relazionali (es. commutatività, associatività e distributività) per trasformare l'espressione iniziale in un'espressione logicamente equivalente ma con un costo computazionale minimo (ad esempio, eseguendo le selezioni per ridurre la cardinalità degli insiemi prima di effettuare un prodotto cartesiano).
+    \item \textbf{Piano di Esecuzione (Execution Plan):} L'espressione algebrica ottimizzata viene mappata in operazioni fisiche di accesso alla memoria (o al disco) e infine eseguita.
+\end{enumerate}
+
+\begin{dettagli}[Limiti di scopo e Amministrazione della Base di Dati]
+I DBMS relazionali mettono a disposizione dei progettisti istruzioni di basso livello (dette \textit{Hint}) per manipolare e forzare manualmente i piani di esecuzione, esautorando di fatto il Query Optimizer dalle sue scelte automatiche. 
+
+Tuttavia, queste operazioni di \textit{Query Tuning} fisico appartengono a un dominio avanzato (tipico dell'amministrazione di database o di corsi di livello magistrale). L'obiettivo di questo corso si limita al livello logico-dichiarativo: ci concentreremo sulla \textbf{correttezza semantica} delle interrogazioni scritte, delegando completamente l'efficienza procedurale e la gestione algoritmica al motore del DBMS.
+\end{dettagli}
