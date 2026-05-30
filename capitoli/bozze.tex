@@ -24,27 +24,41 @@
 % N.B.: l'indice viene costruito sempre dal dbms per le chiavi primarie, per altri attributi con vincoli di unicità non è detto, molto dipende dallo specifico dbms.
 
 
-% \section{bozze lezione 14}
-% operazioni insiemistiche: unione, intersezione, differenza in algebra relazionale 
-% tutte queste operazioni sono definite solo se gli schemi delle relazioni degli operandi sono compatibili, cioè hanno lo stesso numero di attributi e questi hanno ordinatamente gli stessi domini. 
+% \section{bozze lezione 15}
 
-% esempi di unione, intersezione, complemento in algebra relazionale. 
+% prodotto cartesiano nell'algebra relazionale. 
+% se r1 ha n1 tuple e N1 attributi, r2 ha n2 tuple e N2 attributi, il prodotto cartesiano avrà n1*n2 elementi e N1+N2 attributi (il suo schema relazionale è lo "schema unione" dei due schemi). 
 
-% Per Illustrare l'utilità dell'unione, facciamo un esempio. Prediamo lo schema relazionale partite(data, stadio, squadra1, squadra2, goals1, goals2). Vogliamo ricavare l'elenco delle squadre che hanno vinto allo stadio Maradona (sempre in algebra relazionale).
+% [considerazione mia: si vede che il numero di elementi di un prodotto cartesiano esplode su valori grandi con una certa facilità. Ciò mi fa supporre che il prodotto cartesiano quasi mai sia usato in forma libera, ma serve più che altro ad introdurre il concetto di giunzione che vedremo]
 
-% Per illustrare l'utilità della differenza, ricaviamo le squadre che non hanno mai vinto al Maradona. Dall'esempio di vede quanto sia importante questa operazione: solo con questa operazione posso ricavare il risultato. 
+% vediamo un esempio concreto. 
 
-% Altro esempio simile: troviamo l'elenco delle squadre che non hanno mai vinto in casa  Esempio di soluzione sbagliata: seleziono tutte le tuple dove vince la squadra2 e poi faccio la proiezione sulla squadra1. L'unico modo di procedere è analogo all'esempio precedente. 
+% consideriamo studente(matricola, nome, cognome) e una sua relazione con tre tuple. 
+% poi esame(matr, corso, voto) e una sua relazione con tre tuple.
+% Supponiamo che matricola sia PK di stundente e matr FK di studente. 
 
+% e poi consideriamo il prodotto cartesiano delle due relazioni. 
 
+% Se consideriamo il prodotto cartesiano "libero", notiamo subito dei problemi concettuali: il prodotto cartesiano contiene alcune tuple che associano studenti a esami che non hanno sostenuto loro. Sarebbe ragionevole allora eseguire una selezione con la condizione matricola = matr, così restano solo poche righe coerenti. Questa condizione si chiama condizione di giunzione. Questa giunzione (in questo caso particolare) è realizzata attraverso la corrispondenza di una PK e la corrispondente FK. 
 
+% L'operazione composta sigma_condizione(prodotto) si indica con (prodotto join) [introduci in simbolo con la fafallina con la condizione come pedice]. Dal punto di vista dell'algebra relazionale queste due cose sono, per definizione, esattamente la stessa cosa. 
 
+% La condizione di una join è quasi sempre un'uguaglianza. 
 
+% Nella join che abbiamo visto la condizione si può omettere e si parla in questo caso di giunzione naturale. In questo caso la condizione implicita è che le due relazioni abbiano valori uguali sugli attributi in comune (stesso nome e stesso tipo). Nel caso in cui non ci siano attributi in comune, l'operazione "esplode" in un prodotto cartesiano. Nella giunzione naturale gli attributi in comune vengono fusi (non si duplicano le colonne come nel prodotto cartesiano). Questo avviene solo con la giunzione naturale, con la giunzione con condizione no. [Osservazione: una giunzione naturale equivale a fare una intersezione sui valori sulle colonne in comune]
 
+% Nell'esempio precedente (studente - esame), non posso fare una giunzione naturale, perché gli attributi matricola e matr hanno nomi diversi. Posso però renderla naturale con una operazione di rinomina. Questa operazione non altera la relazione, ma lo schema relativo ad essa. Per cambiare l'attributo matricola in matr, si fa rho_studente(matr, nome, cognome) (r_1) [dove r_1 è il nome della relazione su studente] Esiste anche una notazione abbreviata: rho_(matricola <-- matr)(s)
 
+% L'operazione di rinomina torna utile se voglio fare il prodotto cartesiano o una join di una relazione con sé stessa. Per spiegare perché questa operazione è utile, consideriamo il seguente esempio. 
 
+% PERSONA(cf, nome, cognome, dataN, dataM) (dataM sarebbe data morte, parziale)
 
+% PARENTELA(cf, cfMadre, cfPadre)
 
+% RESIDENZA(cf, dataInizio, dataFine, citta, via) (dataFine è parziale)
 
+% interrogazione: cf, nome e cognome delle persone che hanno fatto un cambio di residenza cambiando città. 
 
+% per questa interrogazione devo vedere se è cambiata la residenza di una persona, quindi mi servono due copie di residenza. Devo fare una join di una relazione di residenza con se stessa. Per farlo, rinomino tutti gli attributi del secondo fattore. Come condizione inseriamo che la persona deve essere la stessa (cf = cf`) e poi eseguiamo una selezione con la condizione che la città sia cambiata. Nel rilsultato così ottenuto non ho però nome e cognome, quindi faccio una proiezione su cf, e poi una join naturale con la relazione su persona. Di questo faccio infine una proiezione su cf, nome e cognome. 
 
+% Abbiamo visto quindi in sostanza due operazioni di prodotto: il prodotto libero e la giunzione (join)

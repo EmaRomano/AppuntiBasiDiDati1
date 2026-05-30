@@ -20,12 +20,12 @@ Comprendere l'algebra relazionale significa avere la visibilità strutturale su 
 \begin{dettagli}[Limiti di scopo e Amministrazione della Base di Dati]
 I DBMS relazionali mettono a disposizione dei progettisti istruzioni di basso livello (dette \textit{Hint}) per manipolare e forzare manualmente i piani di esecuzione, esautorando di fatto il Query Optimizer dalle sue scelte automatiche. 
 
-Tuttavia, queste operazioni di \textit{Query Tuning} fisico appartengono a un dominio avanzato (tipico dell'amministrazione di database o di corsi di livello magistrale). L'obiettivo di questo corso si limita al livello logico-dichiarativo: ci concentreremo sulla \textbf{correttezza semantica} delle interrogazioni scritte, delegando completamente l'efficienza procedurale e la gestione algoritmica al motore del DBMS.
+Tuttavia, queste operazioni di \textit{Query Tuning} fisico appartengono a un dominio avanzato (tipico dell'amministrazione di database o di corsi di livello magistrale). L'obiettivo di questo documento si limita al livello logico-dichiarativo: ci concentreremo sulla \textbf{correttezza semantica} delle interrogazioni scritte, delegando completamente l'efficienza procedurale e la gestione algoritmica al motore del DBMS.
 \end{dettagli}
 
 Prima di introdurre le operazioni algebriche, è imperativo distinguere l'aspetto intensionale (la struttura) dall'aspetto estensionale (i dati) di una base di dati:
 \begin{itemize}
-    \item \textbf{Schema Relazionale (Intensione):} Rappresenta la struttura statica della tabella. Definisce il nome della relazione e l'elenco dei suoi attributi con i rispettivi domini. Esempio: $Studente(Matricola, Nome, Cognome, DataN, Citta)$.
+    \item \textbf{Schema Relazionale (Intensione):} Rappresenta la struttura statica della tabella. Definisce il nome della relazione e l'elenco dei suoi attributi con i rispettivi domini. Esempio: $STUDENTE(matricola, nome, cognome, dataN, citta)$.
     \item \textbf{Relazione (Estensione):} Corrisponde all'istanza dello schema in un dato istante di tempo, ovvero alle righe della tabella. Dal momento che il modello si fonda sulla teoria degli insiemi, una relazione è rigorosamente un \textbf{insieme di tuple}. 
 \end{itemize}
 
@@ -34,7 +34,7 @@ Prima di introdurre le operazioni algebriche, è imperativo distinguere l'aspett
     \renewcommand{\arraystretch}{1.2}
     \begin{tabular}{llllll}
         \toprule
-        \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
+        \textbf{matricola} & \textbf{nome} & \textbf{cognome} & \textbf{dataN} & \textbf{citta} & \textbf{lavoro} \\
         \midrule
         10001 & Mario  & Rossi   & 1999-05-14 & Roma   & \texttt{NULL} \\
         10002 & Luigi  & Verdi   & 2000-11-22 & Milano & Barista \\
@@ -62,7 +62,7 @@ La proiezione è un operatore \textbf{unario} (agisce su una singola relazione) 
 Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei suoi attributi. La proiezione della relazione $r$ sull'insieme di attributi $Y$ è una relazione sullo schema $R(Y)$ che si denota con $\pi_Y(r)$.
 
 \begin{itemize}
-    \item \textbf{Schema risultante:} Lo schema della relazione proiettata contiene meno attributi (o al massimo gli stessi) della relazione di partenza. A differenza dell'ordine delle tuple (irrilevante), l'\textbf{ordine degli attributi} specificato nell'operatore definisce la struttura della nuova relazione (es. $\pi_{Nome, Cognome}(r)$ produce uno schema diverso da $\pi_{Cognome, Nome}(r)$).
+    \item \textbf{Schema risultante:} Lo schema della relazione proiettata contiene meno attributi (o al massimo gli stessi) della relazione di partenza. A differenza dell'ordine delle tuple (irrilevante), l'\textbf{ordine degli attributi} specificato nell'operatore definisce la struttura della nuova relazione (es. $\pi_{nome, cognome}(r)$ produce uno schema diverso da $\pi_{cognome, nome}(r)$).
     \item \textbf{Riduzione della cardinalità (De-duplicazione):} Poiché il risultato dell'operazione deve essere ancora una relazione (un insieme), il numero di tuple della proiezione può essere inferiore al numero di tuple della relazione originale. Se la rimozione delle colonne genera tuple identiche, l'operatore matematico "collassa" i duplicati in un unico elemento.
     \item \textbf{Composizione:} Essendo chiusa rispetto all'algebra, è possibile applicare proiezioni in cascata. Risulta banale dimostrare che se $Z \subseteq Y \subseteq X$, allora $\pi_Z(\pi_Y(r)) = \pi_Z(r)$.
 \end{itemize}
@@ -76,12 +76,12 @@ Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei su
         \begin{minipage}{0.32\textwidth}
             \centering
             % La formula algebrica come titolo della colonnina
-            $$ \pi_{Nome, Cognome}(\text{Studente}) $$
+            $$ \pi_{nome, cognome}(\text{studente}) $$
             \vspace{0.1cm}
             \renewcommand{\arraystretch}{1.2}
             \begin{tabular}{ll}
                 \toprule
-                \textbf{Nome} & \textbf{Cognome} \\
+                \textbf{nome} & \textbf{cognome} \\
                 \midrule
                 Mario  & Rossi   \\
                 Luigi  & Verdi   \\
@@ -94,12 +94,12 @@ Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei su
         % --- Seconda Tabella ---
         \begin{minipage}{0.32\textwidth}
             \centering
-            $$ \pi_{Cognome, Nome}(\text{Studente}) $$
+            $$ \pi_{cognome, nome}(\text{studente}) $$
             \vspace{0.1cm}
             \renewcommand{\arraystretch}{1.2}
             \begin{tabular}{ll}
                 \toprule
-                \textbf{Cognome} & \textbf{Nome} \\
+                \textbf{cognome} & \textbf{nome} \\
                 \midrule
                 Rossi   & Mario  \\
                 Verdi   & Luigi  \\
@@ -112,12 +112,12 @@ Sia $R(X)$ uno schema di relazione, e sia $Y \subseteq X$ un sottoinsieme dei su
         % --- Terza Tabella ---
         \begin{minipage}{0.28\textwidth}
             \centering
-            $$ \pi_{Cognome}(\text{Studente}) $$
+            $$ \pi_{cognome}(\text{studente}) $$
             \vspace{0.1cm}
             \renewcommand{\arraystretch}{1.2}
             \begin{tabular}{l}
                 \toprule
-                \textbf{Cognome} \\
+                \textbf{cognome} \\
                 \midrule
                 Rossi   \\
                 Verdi   \\
@@ -163,16 +163,16 @@ Sia $R(X)$ uno schema di relazione e sia $p$ un predicato (condizione logica) de
 \end{itemize}
 
 \begin{example}
-    Applichiamo l'operatore di selezione all'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base_null}) per estrarre le sole tuple relative agli studenti residenti a Roma:
+    Applichiamo l'operatore di selezione all'istanza della relazione \texttt{studente} (Tabella \ref{tab:studente_base_null}) per estrarre le sole tuple relative agli studenti residenti a Roma:
     
-    $$ \sigma_{Citta = '\text{Roma}'}(\text{Studente}) $$
+    $$ \sigma_{citta = '\text{Roma}'}(\text{studente}) $$
     
     \begin{table}[H]
         \centering
         \renewcommand{\arraystretch}{1.2}
         \begin{tabular}{llllll}
             \toprule
-            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} &\textbf{Lavoro} \\
+            \textbf{matricola} & \textbf{nome} & \textbf{cognome} & \textbf{dataN} & \textbf{citta} &\textbf{lavoro} \\
             \midrule
             10001 & Mario  & Rossi   & 1999-05-14 & Roma & NULL \\
             10003 & Giulia & Rossi   & 2001-02-10 & Roma & NULL\\
@@ -200,11 +200,11 @@ Dal punto di vista dell'algebra relazionale, la clausola \texttt{SELECT} impleme
 L'asterisco fornisce la scappatoia formale a questo vincolo sintattico: comunica al motore del DBMS di \textbf{non effettuare alcuna operazione di decomposizione verticale}, restituendo la tupla nella sua interezza.
 
 \begin{itemize}
-    \item \textbf{Proiezione esplicita:} \texttt{SELECT nome, cognome} equivale a $\pi_{Nome, Cognome}(r)$
+    \item \textbf{Proiezione esplicita:} \texttt{SELECT nome, cognome} equivale a $\pi_{nome, cognome}(r)$
     \item \textbf{Nessuna proiezione:} \texttt{SELECT *} preserva lo schema $R(X)$ originale inalterato.
 \end{itemize}
 
-Pertanto, l'espressione algebrica composta esclusivamente da una selezione \\ $\sigma_{Citta = '\text{Roma}'}(\text{Studente})$ si traduce in SQL in:
+Pertanto, l'espressione algebrica composta esclusivamente da una selezione \\ $\sigma_{citta = '\text{Roma}'}(\text{studente})$ si traduce in SQL in:
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 SELECT * FROM studente 
 WHERE citta = 'Roma';
@@ -245,9 +245,9 @@ Per poter filtrare deliberatamente le tuple in base all'assenza di dati, SQL int
     \item \texttt{\textbf{IS NOT NULL}}: Valuta a \texttt{TRUE} se la cella contiene un valore definito e valido.
 \end{itemize}
 
-\begin{example}[Filtrare tramite operatori dedicati: Studenti non lavoratori]
+\begin{example}[Filtrare tramite operatori dedicati: studenti non lavoratori]
     Per selezionare gli studenti che non hanno un impiego registrato, è necessario intercettare il valore \texttt{NULL} usando l'operatore specifico, non l'uguaglianza.
-    $$ \sigma_{Lavoro \text{ IS NULL}}(\text{Studente}) $$
+    $$ \sigma_{lavoro \text{ IS NULL}}(\text{studente}) $$
     \begin{lstlisting}[language=SQL]
     SELECT * FROM studente WHERE lavoro IS NULL;
     \end{lstlisting}
@@ -257,7 +257,7 @@ Per poter filtrare deliberatamente le tuple in base all'assenza di dati, SQL int
         \renewcommand{\arraystretch}{1.2}
         \begin{tabular}{llllll}
             \toprule
-            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
+            \textbf{matricola} & \textbf{nome} & \textbf{cognome} & \textbf{dataN} & \textbf{citta} & \textbf{lavoro} \\
             \midrule
             10001 & Mario  & Rossi   & 1999-05-14 & Roma   & \texttt{NULL} \\
             10003 & Giulia & Rossi   & 2001-02-10 & Roma   & \texttt{NULL} \\
@@ -269,18 +269,18 @@ Per poter filtrare deliberatamente le tuple in base all'assenza di dati, SQL int
 
 \begin{example}[Insidia degli operatori standard con il valore NULL]
     Si voglia estrarre l'elenco degli studenti il cui lavoro è \textbf{diverso} da 'Developer'. 
-    $$ \sigma_{Lavoro \neq '\text{Developer}'}(\text{Studente}) $$
+    $$ \sigma_{lavoro \neq '\text{developer}'}(\text{studente}) $$
     \begin{lstlisting}[language=SQL]
     SELECT * FROM studente WHERE lavoro <> 'Developer';
     \end{lstlisting}
-    È un errore logico comune aspettarsi che gli studenti disoccupati (con \texttt{Lavoro} a \texttt{NULL}) vengano inclusi. In realtà, valutare \texttt{NULL} $\neq$ \texttt{'Developer'} restituisce \texttt{UNKNOWN}. Di conseguenza, la selezione ammette solo chi ha un lavoro esplicitato diverso da quello cercato, scartando i \texttt{NULL}.
+    È un errore logico comune aspettarsi che gli studenti disoccupati (con \texttt{lavoro} a \texttt{NULL}) vengano inclusi. In realtà, valutare \texttt{NULL} $\neq$ \texttt{'Developer'} restituisce \texttt{UNKNOWN}. Di conseguenza, la selezione ammette solo chi ha un lavoro esplicitato diverso da quello cercato, scartando i \texttt{NULL}.
     
     \begin{table}[H]
         \centering
         \renewcommand{\arraystretch}{1.2}
         \begin{tabular}{llllll}
             \toprule
-            \textbf{Matricola} & \textbf{Nome} & \textbf{Cognome} & \textbf{DataN} & \textbf{Citta} & \textbf{Lavoro} \\
+            \textbf{matricola} & \textbf{nome} & \textbf{cognome} & \textbf{dataN} & \textbf{citta} & \textbf{lavoro} \\
             \midrule
             10002 & Luigi  & Verdi   & 2000-11-22 & Milano & Barista \\
             \bottomrule
@@ -302,20 +302,20 @@ $$ \pi_Y(\sigma_p(r)) \neq \sigma_p(\pi_Y(r)) $$
 Questa disuguaglianza diventa un vero e proprio errore di valutazione se la condizione logica $p$ coinvolge attributi della relazione originale che \textit{non} sono inclusi nell'insieme proiettato $Y$. Se la proiezione venisse eseguita per prima, scarterebbe prematuramente le colonne necessarie per valutare la condizione della selezione successiva.
 
 \begin{example}[Controesempio sulla Non-Commutatività]
-    Consideriamo l'istanza della relazione \texttt{Studente} (Tabella \ref{tab:studente_base_null}) e supponiamo di voler estrarre solo i \textbf{nomi} degli studenti residenti a \textbf{Roma}.
+    Consideriamo l'istanza della relazione \texttt{studente} (Tabella \ref{tab:studente_base_null}) e supponiamo di voler estrarre solo i \textbf{nomi} degli studenti residenti a \textbf{Roma}.
 
-    \textbf{1. Composizione Corretta:} $\pi_{Nome}(\sigma_{Citta = '\text{Roma}'}(\text{Studente}))$
+    \textbf{1. Composizione Corretta:} $\pi_{nome}(\sigma_{citta = '\text{Roma}'}(\text{studente}))$
     \begin{itemize}
         \item L'operatore più interno ($\sigma$) filtra le tuple tenendo solo quelle che soddisfano \texttt{Citta = 'Roma'}.
-        \item L'operatore esterno ($\pi$) riceve la relazione filtrata e scarta tutte le colonne eccetto il \texttt{Nome}.
+        \item L'operatore esterno ($\pi$) riceve la relazione filtrata e scarta tutte le colonne eccetto il \texttt{nome}.
         \item \textbf{Risultato:} Una relazione formalmente corretta contenente le tuple "Mario" e "Giulia".
     \end{itemize}
 
-    \textbf{2. Composizione Errata (Commutazione):} $\sigma_{Citta = '\text{Roma}'}(\pi_{Nome}(\text{Studente}))$
+    \textbf{2. Composizione Errata (Commutazione):} $\sigma_{citta = '\text{Roma}'}(\pi_{nome}(\text{studente}))$
     \begin{itemize}
-        \item L'operatore più interno ($\pi$) scarta subito tutte le colonne eccetto \texttt{Nome}. Lo schema risultante diviene $R_{tmp}(Nome)$.
-        \item L'operatore esterno ($\sigma$) tenta di valutare la condizione \texttt{Citta = 'Roma'} sulle tuple di $R_{tmp}$, ma l'attributo \texttt{Citta} \textbf{non esiste più} nello schema corrente.
-        \item \textbf{Risultato:} L'espressione è \textbf{matematicamente indefinita (mal formata)}. Poiché l'attributo \texttt{Citta} non appartiene allo schema di $R_{tmp}$, il predicato non può essere logicamente valutato (non restituisce "Falso" generando un insieme vuoto, ma costituisce una violazione del dominio di definizione). In SQL, questa interrogazione non restituisce un \textit{result set} vuoto, ma genera un errore semantico a tempo di compilazione.
+        \item L'operatore più interno ($\pi$) scarta subito tutte le colonne eccetto \texttt{Nome}. Lo schema risultante diviene $R_{tmp}(nome)$.
+        \item L'operatore esterno ($\sigma$) tenta di valutare la condizione \texttt{citta = 'Roma'} sulle tuple di $R_{tmp}$, ma l'attributo \texttt{citta} \textbf{non esiste più} nello schema corrente.
+        \item \textbf{Risultato:} L'espressione è \textbf{matematicamente indefinita (mal formata)}. Poiché l'attributo \texttt{citta} non appartiene allo schema di $R_{tmp}$, il predicato non può essere logicamente valutato (non restituisce "Falso" generando un insieme vuoto, ma costituisce una violazione del dominio di definizione). In SQL, questa interrogazione non restituisce un \textit{result set} vuoto, ma genera un errore semantico a tempo di compilazione.
     \end{itemize}
 \end{example}
 
@@ -339,51 +339,161 @@ Il DBMS analizza l'interrogazione applicando le operazioni esattamente nella seq
 \end{enumerate}
 Di conseguenza, nella clausola \texttt{WHERE} è sempre possibile e legittimo fare riferimento ad attributi della tabella che non compaiono nella \texttt{SELECT}, poiché la valutazione del filtro avviene \textit{prima} del taglio delle colonne.
 
-\section{Ridenominazione e Qualificazione degli Attributi}
+\section{Qualificazione degli Attributi}
 
-Man mano che la complessità delle interrogazioni aumenta, specialmente in previsione di operazioni che coinvolgono più relazioni simultaneamente, emerge la necessità di manipolare esplicitamente i nomi delle tabelle e degli attributi. SQL gestisce questa necessità attraverso l'uso degli \textit{Alias} e della notazione puntata.
+Finora abbiamo utilizzato una sintassi semplificata per indicare le colonne (es. \texttt{SELECT nome}). Tuttavia, la teoria dei database relazionali impone che il riferimento a un attributo debba essere assoluto e privo di ambiguità. 
 
-\subsection{L'Operatore AS (Alias)}
+La notazione estesa, o \textbf{qualificazione}, si esprime tramite la sintassi (vedremo gli alias nel paragrafo a seguire):
+$$ \texttt{nome\_tabella.nome\_attributo} \quad \text{oppure} \quad \texttt{alias\_tabella.nome\_attributo} $$
 
-L'uso degli alias (corrispettivo pratico dell'operatore algebrico di ridenominazione $\rho$) permette di assegnare un nome temporaneo a una tabella o a una colonna all'interno del ciclo di vita di una singola interrogazione. La sintassi fa uso della keyword opzionale \textbf{\texttt{AS}}.
+\begin{observation}[Risoluzione delle Ambiguità]
+Quando un'interrogazione agisce su una singola tabella, il DBMS risolve implicitamente l'appartenenza dell'attributo. Tuttavia, quando si lavora su prodotti cartesiani o \textit{Join} tra più tabelle (es. \texttt{studente} e \texttt{professore}), è matematicamente frequente che due tabelle possiedano attributi omonimi (es. \texttt{nome} e \texttt{cognome}). 
 
-\paragraph{Alias di Relazione (nella clausola FROM)}
-Applicare un alias a una tabella ha due scopi ingegneristici distinti:
+In questi scenari, omettere la qualificazione genera un errore semantico bloccante (\textit{Ambiguous column name}). Pertanto, è considerata una \textbf{best practice ingegneristica e di stile} adottare sempre la sintassi estesa \texttt{tabella.attributo} (spesso in sinergia con un alias di tabella) non appena l'interrogazione coinvolge più di una relazione.
+\end{observation}
+
+\section{Ridenominazione}
+
+La ridenominazione è un operatore \textbf{unario} (agisce su una singola relazione) atipico: a differenza di proiezione e selezione, non filtra né estrae dati, ma agisce esclusivamente sull'intensione (lo schema), lasciando inalterata l'estensione (le tuple). In termini pratici, modifica il nome della tabella o dei suoi attributi.
+
+Sia $R(X)$ uno schema di relazione. L'operatore di ridenominazione si denota tipicamente con la lettera greca rho ($\rho$). Può assumere tre forme:
 \begin{itemize}
-    \item \textbf{Sintesi del codice:} Permette di abbreviare nomi di tabelle molto lunghi, rendendo il codice SQL più leggibile e meno prono a errori di battitura.
-    \item \textbf{Istanze multiple (Self-Join):} È l'unico strumento logico che permette di referenziare \textit{più copie indipendenti} della stessa tabella all'interno della medesima interrogazione. Senza l'alias, il motore del database non saprebbe distinguere quale copia della tabella si sta interrogando.
+    \item \textbf{Ridenominazione di attributi:} $\rho_{nuovo \leftarrow vecchio}(r)$ altera il nome di specifiche colonne.
+    \item \textbf{Ridenominazione di relazione:} $\rho_{s}(r)$ assegna il nuovo nome $s$ all'intera relazione.
+    \item \textbf{Ridenominazione completa (relazione e attributi):} $\rho_{s(a_1, a_2, \dots, a_n)}(r)$ assegna il nuovo nome $s$ all'intera relazione e, simultaneamente, rinomina \textbf{tutti} i suoi attributi in $a_1, a_2, \dots, a_n$. Affinché l'espressione sia matematicamente ben formata, il numero dei nuovi attributi forniti tra parentesi deve corrispondere esattamente al grado (numero di colonne) della relazione di partenza. L'assegnazione avviene per rigoroso ordine posizionale (da sinistra verso destra).
 \end{itemize}
 
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
--- Esempio di alias di tabella (S e' l'alias per Studente)
-SELECT * FROM studente AS S 
-WHERE S.citta = 'Roma';
-\end{lstlisting}
+\medskip
 
-\paragraph{Alias di Attributo (nella clausola SELECT)}Se utilizzato nell'elenco degli attributi proiettati, l'alias effettua una vera e propria \textbf{ridenominazione strutturale}. La tabella virtuale (Result Set) prodotta in output assumerà il nuovo nome specificato per quella colonna. Questo è cruciale quando si estraggono dati derivati da espressioni matematiche o funzioni, che altrimenti risulterebbero privi di un nome di colonna definito.
+Lo schema della relazione prodotta possiede lo stesso grado (numero di attributi) e gli stessi identici domini della relazione di partenza, ma identificatori testuali differenti; anche il numero e il contenuto delle tuple rimane del tutto invariato. 
 
+Sebbene ad una prima occhiata non sembri un operatore di grande utilità, vedremo presto che è fondamentale per la risoluzione di ambiguità. 
+
+\subsection{La Ridenominazione in SQL: L'operatore AS}
+
+Il linguaggio SQL implementa l'operatore algebrico $\rho$ attraverso la parola chiave \textbf{\texttt{AS}} (spesso definita \textit{Alias}). 
+
+Coerentemente con la natura duale dell'operatore matematico (che agisce su attributi o su relazioni), anche in SQL l'alias può essere impiegato in due contesti architetturali distinti:
+
+\paragraph{Ridenominazione degli Attributi (nella clausola SELECT)}
+Applicato all'elenco delle colonne, l'operatore modifica l'intestazione della tabella virtuale (Result Set) prodotta in output. Risulta indispensabile quando si estraggono dati derivati da espressioni matematiche o funzioni, che altrimenti verrebbero restituiti dal motore del database privi di un nome di colonna definito (o con nomi generati automaticamente come \texttt{?column?}).
+
+\textit{Sintassi per attributi:}
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
--- Ridenominazione dello schema risultante
 SELECT matricola AS id_studente, cognome 
 FROM studente;
 \end{lstlisting}
 
-\subsection{La Qualificazione degli Attributi (Notazione Puntata)}
+\paragraph{Ridenominazione delle Relazioni (nella clausola FROM)}
+Applicato alle tabelle di origine, assegna un nome temporaneo all'intera relazione per la durata dell'interrogazione. Questo meccanismo, unito alla notazione puntata, è l'unico modo per risolvere le ambiguità quando si interrogano simultaneamente più tabelle che presentano attributi omonimi, o quando si incrocia una tabella con sé stessa.
 
-Finora abbiamo utilizzato una sintassi semplificata per indicare le colonne (es. \texttt{SELECT nome}). Tuttavia, la teoria dei database relazionali impone che il riferimento a un attributo debba essere assoluto e privo di ambiguità. 
-
-La notazione estesa, o \textbf{qualificazione}, si esprime tramite la sintassi:
-$$ \texttt{nome\_tabella.nome\_attributo} \quad \text{oppure} \quad \texttt{alias\_tabella.nome\_attributo} $$
-
-\begin{observation}[Risoluzione delle Ambiguità]
-Quando un'interrogazione agisce su una singola tabella, il DBMS risolve implicitamente l'appartenenza dell'attributo. Tuttavia, quando si lavora su prodotti cartesiani o \textit{Join} tra più tabelle (es. \texttt{Studente} e \texttt{Professore}), è matematicamente frequente che due tabelle possiedano attributi omonimi (es. \texttt{nome} e \texttt{cognome}). 
-
-In questi scenari, omettere la qualificazione genera un errore semantico bloccante (\textit{Ambiguous column name}). Pertanto, è considerata una \textbf{best practice ingegneristica e di stile} adottare sempre la sintassi estesa \texttt{Tabella.Attributo} (spesso in sinergia con un alias di tabella) non appena l'interrogazione coinvolge più di una relazione.
-\end{observation}
-
-\textit{Esempio di sintassi rigorosa qualificata:}
+\textit{Sintassi per relazioni (con notazione puntata):}
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-SELECT S.matricola, S.nome, S.cognome
-FROM studente AS S
-WHERE S.citta = 'Roma';
+SELECT s.nome, s.cognome
+FROM studente AS s
+WHERE s.citta = 'Roma';
 \end{lstlisting}
+
+\section{Operazioni Insiemistiche}
+
+Essendo il modello relazionale fondato sulla teoria degli insiemi, è possibile combinare due relazioni utilizzando i classici operatori insiemistici: \textbf{Unione ($\cup$)}, \textbf{Intersezione ($\cap$)} e \textbf{Differenza ($-$)}.
+
+Tuttavia, diversamente dalla matematica pura dove è possibile unire insiemi eterogenei (es. un insieme di mele con un insieme di numeri), nell'algebra relazionale le tuple elaborate devono avere una struttura coerente.
+
+\begin{warningbox}[Condizione di Compatibilità degli Schemi]
+Le operazioni insiemistiche tra due relazioni $r_1$ e $r_2$ sono definite \textbf{se e solo se} i loro schemi sono compatibili. Due schemi sono compatibili quando:
+\begin{enumerate}
+    \item Hanno lo stesso numero di attributi (stesso grado).
+    \item Gli attributi corrispondenti (letti da sinistra verso destra) appartengono allo stesso dominio semantico.
+\end{enumerate}
+Se questa condizione è rispettata, lo schema della relazione risultante coinciderà tipicamente con lo schema del primo operando ($r_1$).
+\end{warningbox}
+
+Date due relazioni $r_1$ e $r_2$ compatibili:
+\begin{itemize}
+    \item \textbf{Unione ($r_1 \cup r_2$):} Costruisce una relazione contenente tutte le tuple che appartengono a $r_1$, a $r_2$, o a entrambe. Essendo un insieme, le tuple presenti in entrambe le relazioni compaiono una sola volta nel risultato.
+    \item \textbf{Intersezione ($r_1 \cap r_2$):} Costruisce una relazione contenente esclusivamente le tuple che appartengono contemporaneamente sia a $r_1$ che a $r_2$.
+    \item \textbf{Differenza ($r_1 - r_2$):} Costruisce una relazione contenente le tuple che appartengono a $r_1$ ma \textbf{non} appartengono a $r_2$.
+\end{itemize}
+
+\medskip
+
+Per comprendere l'importanza di questi operatori, consideriamo il seguente schema relazionale che modella gli incontri di un campionato di calcio:
+$$ PARTITE(data, stadio, squadra1, squadra2, goals1, goals2) $$
+\textit{Nota:} Convenzionalmente, \texttt{squadra1} gioca in casa e \texttt{goals1} rappresenta le sue reti.
+
+\begin{example}[L'Unione: squadre vincenti allo stadio Maradona]
+    Vogliamo ricavare l'elenco di tutte le squadre che hanno vinto almeno una partita allo stadio 'Maradona'.
+    
+    Il problema logico risiede nel fatto che una squadra può aver vinto giocando in casa (\texttt{squadra1}) oppure in trasferta (\texttt{squadra2}). Non potendo estrarre due colonne diverse contemporaneamente in una singola proiezione lineare, l'unione risulta essenziale:
+    
+    1. Ricaviamo chi ha vinto in casa: 
+    $$ v_{casa} = \pi_{squadra1}(\sigma_{stadio='Maradona' \land goals1 > goals2}(partite)) $$
+    2. Ricaviamo chi ha vinto in trasferta:
+    $$ v_{trasferta} = \pi_{squadra2}(\sigma_{stadio='Maradona' \land goals2 > goals1}(partite)) $$
+    3. Uniamo i risultati (gli schemi sono compatibili, essendo entrambi domini di squadre):
+    $$ risultato = v_{casa} \cup v_{trasferta} $$
+\end{example}
+
+\begin{example}[La Differenza e la logica del "Mai"]
+    Vogliamo ricavare l'elenco delle squadre che \textbf{non hanno mai vinto} allo stadio 'Maradona'.
+    
+    Questa interrogazione non può essere risolta con una semplice selezione negata. Questo limite logico rende l'operatore di differenza insostituibile ogni volta che un requisito contiene parole come "mai" o "nessuno". L'approccio corretto è sempre per sottrazione: \textbf{Tutti - Chi ha l'attributo negato}.
+    
+    1. Troviamo \textbf{tutte} le squadre del campionato:
+    $$ tutte = \pi_{squadra1}(partite) \cup \pi_{squadra2}(partite) $$
+    2. Troviamo le squadre che \textbf{hanno vinto almeno una volta} al Maradona (espressione $risultato$ dell'esempio precedente, chiamiamola $vincitriciM$).
+    3. Applichiamo la differenza:
+    $$ maiVintoM = tutte - vincitriciM $$
+\end{example}
+
+\begin{example}[Trappola Logica: Squadre che non hanno mai vinto in casa]
+    Un errore classicamente commesso in fase di modellazione è tentare di risolvere i problemi di negazione universale ("mai") utilizzando i normali operatori di confronto. 
+    
+    \textbf{Soluzione Sbagliata:} Si potrebbe essere tentati di scrivere:
+    $$ errata = \pi_{squadra1}(\sigma_{goals1 \leq goals2}(partite)) $$
+    \textit{Perché è sbagliata?} Questa espressione restituisce le squadre che hanno perso o pareggiato \textit{almeno una partita} in casa. Tuttavia, se una squadra ha perso una partita in casa (entrando così nel risultato) ma ne ha vinta un'altra, il requisito "non ha mai vinto" viene violato.
+    
+    \textbf{Soluzione Corretta (tramite Differenza):}
+    1. Troviamo tutte le squadre che hanno giocato in casa: $t_{casa} = \pi_{squadra1}(partite)$
+    2. Troviamo le squadre che hanno vinto almeno una volta in casa: $v_{casa} = \pi_{squadra1}(\sigma_{goals1 > goals2}(partite))$
+    3. Sottraiamo:
+    $$ risultato = t_{casa} - v_{casa} $$
+\end{example}
+
+\subsection{Le Operazioni Insiemistiche in SQL}
+
+Il linguaggio SQL implementa le operazioni insiemistiche dell'algebra relazionale attraverso i costrutti \textbf{\texttt{UNION}} (Unione), \textbf{\texttt{INTERSECT}} (Intersezione) ed \textbf{\texttt{EXCEPT}} (Differenza). Alcuni dialetti commerciali storici (come Oracle) utilizzano la keyword \texttt{MINUS} in luogo di \texttt{EXCEPT}.
+
+Affinché l'interrogazione possa essere compilata ed eseguita dal DBMS senza errori semantici, i due blocchi \texttt{SELECT} coinvolti devono rigorosamente rispettare la condizione di compatibilità degli schemi vista in precedenza: stesso numero di colonne estratte e tipi di dato compatibili, valutati in rigoroso ordine posizionale.
+
+\textit{Sintassi generale delle operazioni insiemistiche:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT <elenco_attributi_A> FROM <tabella_A>
+[ UNION | INTERSECT | EXCEPT ]
+SELECT <elenco_attributi_B> FROM <tabella_B>;
+\end{lstlisting}
+
+Nei paragrafi precedenti abbiamo dimostrato come il comando \texttt{SELECT} base non applichi la de-duplicazione, comportandosi di default come un multinsieme (\texttt{ALL}).
+Con gli operatori insiemistici, lo standard SQL capovolge questa logica:
+
+\begin{itemize}
+    \item \textbf{Comportamento di default (Puro Insieme):} L'uso di \texttt{UNION}, \texttt{INTERSECT} o \texttt{EXCEPT} forza implicitamente il motore del database a comportarsi secondo la matematica pura. Il DBMS ordinerà i risultati intermedi ed \textbf{eliminerà tutti i duplicati} (\texttt{DISTINCT} implicito).
+    \item \textbf{Comportamento Multinsieme (\texttt{ALL}):} Qualora il programmatore desideri mantenere i duplicati (comportamento non relazionale ma spesso necessario a fini statistici o per risparmiare il gravoso costo computazionale dell'ordinamento), è necessario esplicitare la parola chiave \texttt{ALL} subito dopo l'operatore (es. \texttt{UNION ALL}, \texttt{EXCEPT ALL}).
+\end{itemize}
+
+\begin{example}[Traduzione SQL: Squadre vincenti allo stadio Maradona]
+    L'espressione algebrica $v_{casa} \cup v_{trasferta}$ vista nel primo esempio si traduce strutturando due query indipendenti collegate dall'operatore \texttt{UNION}:
+    
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT squadra1 AS squadra_vincente
+FROM partite
+WHERE stadio = 'Maradona' AND goals1 > goals2
+UNION
+SELECT squadra2 
+FROM partite
+WHERE stadio = 'Maradona' AND goals2 > goals1;
+\end{lstlisting}
+
+    \textit{Nota Architetturale:} Lo schema della tabella virtuale risultante eredita sempre i nomi delle colonne dal \textbf{primo} blocco \texttt{SELECT} (valutato top-down). Pertanto, un'eventuale ridenominazione tramite alias (\texttt{AS squadra\_vincente}) ha effetto solo se applicata nella query superiore; eventuali alias nel blocco inferiore verrebbero ignorati dal motore SQL.
+\end{example}
