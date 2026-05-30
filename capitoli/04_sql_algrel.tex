@@ -497,3 +497,102 @@ WHERE stadio = 'Maradona' AND goals2 > goals1;
 
     \textit{Nota Architetturale:} Lo schema della tabella virtuale risultante eredita sempre i nomi delle colonne dal \textbf{primo} blocco \texttt{SELECT} (valutato top-down). Pertanto, un'eventuale ridenominazione tramite alias (\texttt{AS squadra\_vincente}) ha effetto solo se applicata nella query superiore; eventuali alias nel blocco inferiore verrebbero ignorati dal motore SQL.
 \end{example}
+
+\section{Il Prodotto Cartesiano e le Giunzioni (Join)}
+
+Fino a questo momento abbiamo interrogato le relazioni in modo isolato (operazioni unarie) o abbiamo unito tabelle con struttura identica (operazioni insiemistiche). Tuttavia, la vera potenza del modello relazionale consiste nella capacità di combinare informazioni di natura diversa incrociando relazioni eterogenee. L'operatore primitivo che permette questa combinazione orizzontale è il prodotto cartesiano.
+
+\paragraph{Il Prodotto Cartesiano}
+Siano $r_1 \in R_1(X_1)$ e $r_2 \in R_2(X_2)$ due istanze di relazione. Il prodotto cartesiano $r_1 \times r_2$ è un operatore binario che concatena ogni singola tupla della prima relazione con ogni singola tupla della seconda.
+
+\begin{itemize}
+    \item \textbf{Schema risultante (Grado):} Lo schema della nuova relazione è costituito dall'unione degli insiemi di attributi ($X_1 \cup X_2$). Se la prima relazione ha $N_1$ attributi e la seconda ne ha $N_2$, il grado risultante è $N_1 + N_2$.
+    \item \textbf{Impatto sulla cardinalità:} Il numero totale di tuple generate è il prodotto matematico delle cardinalità di partenza: $n_1 \cdot n_2$. 
+\end{itemize}
+
+\begin{observation}[L'esplosione combinatoria e l'assenza di semantica]
+Dal punto di vista ingegneristico, il prodotto cartesiano genera una rapida esplosione dimensionale. Se incrociamo una tabella di 1.000 studenti con una di 100 corsi, generiamo istantaneamente $100.000$ tuple.
+Ancora più grave è il problema semantico: il prodotto cartesiano puro concatena tuple in modo incondizionato, associando (ad esempio) ogni studente a \textbf{tutti} gli esami esistenti, compresi quelli che non ha mai sostenuto. Genera dunque un'enorme quantità di informazioni prive di significato logico. Per questo motivo, l'operatore libero ($\times$) non viene quasi mai utilizzato direttamente, ma funge da base matematica per definire l'operatore di giunzione.
+\end{observation}
+
+\paragraph{L'Operatore di Giunzione (Theta-Join)}
+
+Per estrarre solo le tuple "coerenti" dal prodotto cartesiano, è necessario applicare una selezione che filtri le righe basandosi su un legame logico tra le due tabelle. Poiché questa combinazione è ubiquitaria nei database, l'algebra relazionale la fonde in un unico operatore derivato: la \textbf{Giunzione} (o Join), denotata dal simbolo a farfalla ($\bowtie$).
+
+Per definizione, una giunzione condizionale (o Theta-Join) rispetto a un predicato $p$ equivale a eseguire una selezione su un prodotto cartesiano:
+$$ r_1 \bowtie_p r_2 \equiv \sigma_p(r_1 \times r_2) $$
+
+La condizione di giunzione è \textbf{quasi sempre un'uguaglianza} (Equi-Join) che lega la Primary Key (PK) di una tabella alla corrispondente Foreign Key (FK) dell'altra.
+
+\begin{example}[Equi-Join: Associazione corretta tra Studenti ed Esami]
+    Consideriamo gli schemi $STUDENTE(matricola, nome, cognome)$ ed $ESAME(matr, corso, voto)$, dove $matr$ in $ESAME$ è chiave esterna verso $STUDENTE$.
+    Per visualizzare l'elenco corretto degli esami sostenuti da ciascuno studente, applichiamo un Equi-Join sulla condizione di legame:
+    $$ studente \bowtie_{matricola = matr} esame $$
+    Il risultato restituirà solo le tuple in cui il codice dello studente coincide, eliminando le migliaia di combinazioni errate generate dal prodotto cartesiano sottostante.
+\end{example}
+
+\paragraph{La Giunzione Naturale (Natural Join)}
+
+La giunzione naturale è una variante del Join in cui \textbf{la condizione viene omessa} dal pedice dell'operatore. Il sistema applica automaticamente una condizione implicita e altera lo schema risultante in modo peculiare.
+
+\begin{itemize}
+    \item \textbf{Condizione implicita:} Le due relazioni vengono giunte uguagliando i valori di \textbf{tutti gli attributi con lo stesso nome} (e stesso dominio) presenti in entrambi gli schemi. In termini insiemistici, la giunzione naturale opera un'intersezione sui valori delle colonne in comune.
+    \item \textbf{Fusione delle colonne:} A differenza del Theta-Join (che duplica le colonne messe a confronto), la giunzione naturale \textbf{fonde gli attributi in comune} in un'unica colonna, evitando ridondanze nello schema risultante.
+    \item \textbf{Assenza di attributi in comune:} Se le due tabelle non hanno alcun attributo omonimo, l'operatore non potendo applicare alcuna condizione "degenera" in un prodotto cartesiano incondizionato ($r_1 \bowtie r_2 \equiv r_1 \times r_2$).
+\end{itemize}
+
+\begin{example}[Giunzione Naturale tramite Ridenominazione]
+    Nell'esempio precedente, non possiamo eseguire un Natural Join diretto tra $studente$ ed $esame$ poiché l'attributo identificativo ha nomi diversi ($matricola$ e $matr$). Possiamo però forzare la natura dell'operatore applicando prima una ridenominazione sull'istanza $esame$:
+    $$ studente \bowtie \rho_{esame\_mod(matricola, corso, voto)}(esame) $$
+    Essendo comparso un attributo omonimo ($matricola$), l'operatore eseguirà l'uguaglianza implicita e restituirà uno schema compatto: $R(matricola, nome, cognome, corso, voto)$.
+\end{example}
+
+\paragraph{Self-Join e l'uso strategico della Ridenominazione}
+
+L'operazione di ridenominazione completa ($\rho$) si rivela indispensabile quando occorre confrontare tuple appartenenti alla \textbf{stessa} relazione. In algebra relazionale non è possibile eseguire $r \bowtie r$ senza creare un'insanabile ambiguità sugli attributi. È necessario generare una copia "virtuale" della relazione con un'intestazione diversa.
+
+\begin{example}[Cambiamenti di città]
+    Siano dati gli schemi (dove PK è il primo attributo o la prima coppia):
+    \begin{itemize}
+        \item $PERSONA(cf, nome, cognome, dataN, dataM)$
+        \item $RESIDENZA(cf, dataInizio, dataFine, citta, via)$
+    \end{itemize}
+    \textit{Interrogazione:} Estrarre Codice Fiscale, Nome e Cognome delle persone che hanno cambiato città di residenza nel corso del tempo.
+    
+    Per risolvere l'interrogazione, dobbiamo cercare due tuple di residenza che abbiano lo stesso $cf$ ma attributo $citta$ differente. 
+    \begin{enumerate}
+        \item \textbf{Creazione della copia:} Rinominiamo la tabella residenza per avere due fattori indipendenti: 
+        $$ r_{old} = \rho_{r\_old(cf', dI', dF', citta', via')}(residenza) $$
+        \item \textbf{Self-Join e Filtraggio:} Uniamo l'istanza originale con la copia imponendo che la persona sia la stessa ($cf = cf'$), ed estraiamo con una selezione chi ha cambiato città:
+        $$ cambi = \pi_{cf}(\sigma_{citta \neq citta'}(residenza \bowtie_{cf = cf'} r_{old})) $$
+        \item \textbf{Recupero anagrafica (Natural Join):} L'espressione $cambi$ contiene solo il $cf$. Per ottenere Nome e Cognome, eseguiamo una giunzione naturale con l'anagrafica:
+        $$ risultato = \pi_{cf, nome, cognome}(cambi \bowtie persona) $$
+    \end{enumerate}
+\end{example}
+
+\subsection{I Join in SQL: Le clausole INNER JOIN e ON}
+
+Lo standard SQL moderno (ANSI-92) implementa la giunzione separandola nettamente dalle normali condizioni di filtraggio (clausola \texttt{WHERE}), dedicando costrutti specifici direttamente nella clausola \texttt{FROM}.
+
+\textit{Sintassi generale (Equi-Join):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT <elenco_attributi>
+FROM <tabella_1>
+[INNER] JOIN <tabella_2> ON <condizione_di_giunzione>;
+\end{lstlisting}
+
+La traduzione del nostro esempio originario ($studente \bowtie_{matricola = matr} esame$) si realizza applicando la notazione puntata per esplicitare la condizione tra Primary Key e Foreign Key:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome, s.cognome, e.corso, e.voto
+FROM studente AS s
+JOIN esame AS e ON s.matricola = e.matr;
+\end{lstlisting}
+
+\begin{warningbox}[L'antiquata sintassi implicita (ANSI-89)]
+È possibile incontrare basi di dati o codice legacy in cui la giunzione viene espressa "alla vecchia maniera", eseguendo il prodotto cartesiano separando le tabelle con una virgola e inserendo la condizione di Join nel \texttt{WHERE}:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small]
+-- SINTASSI DEPRECATA (da evitare)
+SELECT * FROM studente s, esame e WHERE s.matricola = e.matr;
+\end{lstlisting}
+Questa prassi è fortemente sconsigliata: mescola pericolosamente la logica di legame strutturale tra tabelle con le normali condizioni di filtraggio (selezione $\sigma$), rendendo il codice prono a omissioni che causano il famigerato \textit{Cartesian Explosion}.
+\end{warningbox}
