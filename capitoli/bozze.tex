@@ -3,7 +3,50 @@
 
 -- esercitazione su class diagrams: prima parte lezione 6.\\
 -- esercitazione su schemi relazionali e ristrutturazione logica del class diagram: seconda parte lezione 12. \\
--- primi 30 minuti lezione 13: riepilogo e precisazioni rilevanti. 
+-- primi 30 minuti lezione 13: riepilogo e precisazioni rilevanti. \\
+-- esercizi assegnati sulle prime query fine lezione 15
+
+\section{La Giunzione Naturale in SQL: NATURAL JOIN e USING (da inserire in appendice)}
+
+A differenza dell'algebra relazionale dove l'omissione della condizione trasforma implicitamente un Theta-Join in un Natural Join ($\bowtie$), il linguaggio SQL richiede l'uso di parole chiave esplicite per attivare questo comportamento ed evitare prodotti cartesiani accidentali.
+
+Esistono due approcci sintattici per implementare la fusione delle colonne omonime tipica della giunzione naturale:
+
+\paragraph{L'operatore puro: NATURAL JOIN}
+Questa è la traduzione letterale dell'operatore matematico $\bowtie$.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT *
+FROM tabella_1
+NATURAL JOIN tabella_2;
+\end{lstlisting}
+
+Quando il motore SQL incontra \texttt{NATURAL JOIN}, esegue autonomamente due operazioni:
+\begin{enumerate}
+    \item \textbf{Ricerca degli attributi:} Ispeziona gli schemi delle due relazioni alla ricerca di tutte le colonne aventi \textbf{esattamente lo stesso nome}.
+    \item \textbf{Condizione e Fusione:} Genera un'uguaglianza implicita su tali colonne (es. \texttt{t1.id = t2.id}) e, nel \textit{Result Set} finale, \textbf{fonde} le colonne omonime in una sola, evitando ridondanze.
+\end{enumerate}
+
+\begin{warningbox}[La fragilità strutturale del NATURAL JOIN]
+Nonostante la sua eleganza matematica, l'uso di \texttt{NATURAL JOIN} in produzione è universalmente considerato un \textbf{anti-pattern ingegneristico}. 
+Il motivo risiede nella sua dipendenza occulta e non controllata dai nomi delle colonne. Se mesi dopo la stesura del codice un amministratore aggiungesse a entrambe le tabelle una colonna di servizio generica (es. \texttt{note} o \texttt{data\_inserimento}), il DBMS modificherebbe silenziosamente la condizione di giunzione pretendendo l'uguaglianza anche su queste nuove colonne (\texttt{AND t1.note = t2.note}). Questo distruggerebbe la logica dell'interrogazione originando risultati errati o insiemi vuoti, senza lanciare alcun errore di compilazione.
+\end{warningbox}
+
+\paragraph{L'alternativa ingegneristica: La clausola USING}
+
+Per ovviare alla pericolosità del \texttt{NATURAL JOIN} preservandone però il vantaggio sintattico (la fusione delle colonne omonime), lo standard SQL ha introdotto la clausola \textbf{\texttt{USING}}.
+
+Questa clausola va a sostituire \texttt{ON} e permette al progettista di dichiarare esplicitamente su quali colonne omonime deve avvenire la giunzione, rendendo il codice immune a future modifiche dello schema.
+
+\textit{Sintassi con USING:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Supponendo che entrambe le tabelle abbiano un attributo 'matricola'
+SELECT *
+FROM studente
+JOIN esame USING (matricola);
+\end{lstlisting}
+
+A differenza della classica clausola \texttt{ON} (che restituirebbe due colonne distinte: \texttt{studente.matricola} ed \texttt{esame.matricola}), la clausola \texttt{USING} istruisce il database a \textbf{fondere} l'attributo in una singola colonna, rispecchiando in totale sicurezza il comportamento algebrico della giunzione naturale.
 
 
 
@@ -24,41 +67,27 @@
 % N.B.: l'indice viene costruito sempre dal dbms per le chiavi primarie, per altri attributi con vincoli di unicità non è detto, molto dipende dallo specifico dbms.
 
 
-% \section{bozze lezione 15}
+% \section{bozze lezione 16}
 
-% prodotto cartesiano nell'algebra relazionale. 
-% se r1 ha n1 tuple e N1 attributi, r2 ha n2 tuple e N2 attributi, il prodotto cartesiano avrà n1*n2 elementi e N1+N2 attributi (il suo schema relazionale è lo "schema unione" dei due schemi). 
 
-% [considerazione mia: si vede che il numero di elementi di un prodotto cartesiano esplode su valori grandi con una certa facilità. Ciò mi fa supporre che il prodotto cartesiano quasi mai sia usato in forma libera, ma serve più che altro ad introdurre il concetto di giunzione che vedremo]
+% \section{bozze esercizi}
+% meglio join con condizione o join naturale con rinomina: sul piano computazionale, per il dbms non fa alcuna differenza, ma nella pratica si preferisce la join con condizione. 
 
-% vediamo un esempio concreto. 
+% Per gli schemi relazionali: 
+% \begin{itemize}
+%     \item Join con condizione (Theta-Join): Lo schema risultante è la concatenazione di tutti gli attributi del primo fattore con tutti gli attributi del secondo fattore. Le eventuali colonne in comune vengono sempre duplicate.
+%     \item Join Naturale (Natural Join): Lo schema risultante è l'unione insiemistica degli attributi dei due fattori (le colonne in comune compaiono una sola volta). Come convenzione di rappresentazione (mutuata dal comportamento SQL dei DBMS), gli attributi vengono ordinati mostrando in testa quelli comuni, seguiti da quelli esclusivi del primo fattore e, in coda, quelli esclusivi del secondo.
+% \end{itemize}
 
-% consideriamo studente(matricola, nome, cognome) e una sua relazione con tre tuple. 
-% poi esame(matr, corso, voto) e una sua relazione con tre tuple.
-% Supponiamo che matricola sia PK di stundente e matr FK di studente. 
 
-% e poi consideriamo il prodotto cartesiano delle due relazioni. 
 
-% Se consideriamo il prodotto cartesiano "libero", notiamo subito dei problemi concettuali: il prodotto cartesiano contiene alcune tuple che associano studenti a esami che non hanno sostenuto loro. Sarebbe ragionevole allora eseguire una selezione con la condizione matricola = matr, così restano solo poche righe coerenti. Questa condizione si chiama condizione di giunzione. La giunzione (in questo caso particolare) è realizzata attraverso la corrispondenza di una PK e la corrispondente FK. 
 
-% L'operazione composta sigma_condizione(prodotto) si indica con (prodotto join) [introduci in simbolo con la fafallina con la condizione come pedice]. Dal punto di vista dell'algebra relazionale queste due cose sono, per definizione, esattamente la stessa cosa. 
+% template per esercizio: 
+% Da questo momento in poi faremo riferimento ai seguenti schemi: 
 
-% La condizione di una join è quasi sempre un'uguaglianza. 
-
-% Nella join la condizione si può omettere e si parla in questo caso di giunzione naturale. In questo caso la condizione implicita è che le due relazioni abbiano valori uguali sugli attributi in comune (stesso nome e stesso tipo). Nel caso in cui non ci siano attributi in comune, l'operazione "esplode" in un prodotto cartesiano. Nella giunzione naturale gli attributi in comune vengono fusi (non si duplicano le colonne come nel prodotto cartesiano). Questo avviene solo con la giunzione naturale, con la giunzione con condizione no. [Osservazione: una giunzione naturale equivale a fare una intersezione sui valori sulle colonne in comune]
-
-% Nell'esempio precedente (studente - esame), non posso fare una giunzione naturale, perché gli attributi matricola e matr hanno nomi diversi. Posso però renderla naturale con una operazione di rinomina.
-
-% L'operazione di rinomina torna utile se voglio fare il prodotto cartesiano o una join di una relazione con sé stessa. Per spiegare perché questa operazione è utile, consideriamo il seguente esempio. 
-
-% PERSONA(cf, nome, cognome, dataN, dataM) (dataM sarebbe data morte, parziale)
-
+% RESIDENZA(cf, dataInizio, dataFine, cittaResidenza, Via)
+% PERSONA(cf, nome, cognome, dataNascita, dataMorte, cittaNascita)
 % PARENTELA(cf, cfMadre, cfPadre)
 
-% RESIDENZA(cf, dataInizio, dataFine, citta, via) (dataFine è parziale)
+% dove cf sta per codice fiscale. 
 
-% interrogazione: cf, nome e cognome delle persone che hanno fatto un cambio di residenza cambiando città. 
-
-% per questa interrogazione devo vedere se è cambiata la residenza di una persona, quindi mi servono due copie di residenza. Devo fare una join di una relazione di residenza con se stessa. Per farlo, rinomino tutti gli attributi del secondo fattore. Come condizione inseriamo che la persona deve essere la stessa (cf = cf`) e poi eseguiamo una selezione con la condizione che la città sia cambiata. Nel rilsultato così ottenuto non ho però nome e cognome, quindi faccio una proiezione su cf, e poi una join naturale con la relazione su persona. Di questo faccio infine una proiezione su cf, nome e cognome. 
-
-% Abbiamo visto quindi in sostanza due operazioni di prodotto: il prodotto libero e la giunzione (join)

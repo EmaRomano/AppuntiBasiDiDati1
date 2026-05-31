@@ -570,7 +570,7 @@ L'operazione di ridenominazione completa ($\rho$) si rivela indispensabile quand
     \end{enumerate}
 \end{example}
 
-\subsection{I Join in SQL: Le clausole INNER JOIN e ON}
+\subsection{I Join in SQL}
 
 Lo standard SQL moderno (ANSI-92) implementa la giunzione separandola nettamente dalle normali condizioni di filtraggio (clausola \texttt{WHERE}), dedicando costrutti specifici direttamente nella clausola \texttt{FROM}.
 
@@ -580,6 +580,12 @@ SELECT <elenco_attributi>
 FROM <tabella_1>
 [INNER] JOIN <tabella_2> ON <condizione_di_giunzione>;
 \end{lstlisting}
+
+\begin{dettagli}[La parola chiave INNER]
+ Scrivere \texttt{JOIN} oppure \texttt{INNER JOIN} ordina al DBMS di eseguire \textbf{esattamente la stessa operazione} (il Theta-Join o Equi-Join dell'algebra relazionale).
+
+Il termine \texttt{INNER} (interno) ribadisce soltanto la natura restrittiva dell'operatore: le tuple che non soddisfano la condizione di giunzione vengono scartate. Poiché questo è il comportamento di default storico di SQL, la parola può essere omessa, ma viene spesso esplicitata nelle basi di codice di produzione per distinguere nettamente l'operazione dalle giunzioni esterne (\texttt{OUTER JOIN}).
+\end{dettagli}
 
 La traduzione del nostro esempio originario ($studente \bowtie_{matricola = matr} esame$) si realizza applicando la notazione puntata per esplicitare la condizione tra Primary Key e Foreign Key:
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
@@ -596,3 +602,15 @@ SELECT * FROM studente s, esame e WHERE s.matricola = e.matr;
 \end{lstlisting}
 Questa prassi è fortemente sconsigliata: mescola pericolosamente la logica di legame strutturale tra tabelle con le normali condizioni di filtraggio (selezione $\sigma$), rendendo il codice prono a omissioni che causano il famigerato \textit{Cartesian Explosion}.
 \end{warningbox}
+
+\begin{bestpractice}[Evitare la Giunzione Naturale in SQL]
+Sebbene la giunzione naturale ($\bowtie$) sia un operatore teorico fondamentale per semplificare le espressioni in algebra relazionale, la sua traduzione diretta in SQL (tramite la parola chiave \texttt{NATURAL JOIN}) è universalmente considerata un \textbf{anti-pattern ingegneristico} e non viene quasi mai utilizzata nel codice di produzione.
+
+La regola d'oro nello sviluppo del software impone che \textbf{l'esplicito sia sempre meglio dell'implicito}. Pertanto, si utilizza pressoché esclusivamente la giunzione con condizione esplicita (\texttt{JOIN ... ON ...}) per tre ragioni architetturali critiche:
+\begin{enumerate}
+    \item \textbf{Prevenzione delle evoluzioni occulte (Schema Evolution):} Se in futuro un amministratore aggiungesse a entrambe le tabelle una colonna di servizio con lo stesso nome (es. \texttt{data\_modifica} o \texttt{stato}), un \texttt{NATURAL JOIN} la ingloberebbe silenziosamente nella condizione di uguaglianza. La query inizierebbe a fallire o a omettere risultati senza mai generare un errore di compilazione.
+    \item \textbf{Prevenzione delle collisioni di naming:} Spesso chiavi primarie di entità diverse condividono lo stesso identificatore generico (es. \texttt{id}). La giunzione naturale le uguaglierebbe in automatico, estraendo dati matematicamente associati ma semanticamente spazzatura.
+    \item \textbf{Leggibilità del codice (Manutenibilità):} Esplicitare la clausola \texttt{ON} permette a chiunque legga la query di comprendere istantaneamente il legame strutturale tra le tabelle, senza essere costretto a interrogare la struttura fisica del database per capire quali colonne omonime il motore SQL abbia deciso di fondere.
+\end{enumerate}
+Per questi motivi, la sintassi e l'uso del \texttt{NATURAL JOIN} vengono qui deliberatamente omessi a favore dell'approccio rigoroso basato sulle condizioni esplicite. Un paragrafo al riguardo è comunque presente in appendice per completezza. 
+\end{bestpractice}
