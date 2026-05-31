@@ -69,12 +69,45 @@ A differenza della classica clausola \texttt{ON} (che restituirebbe due colonne 
 
 % \section{bozze lezione 16}
 
-% raggruppamento
-
-
-
-
 % operazioni di conteggio
+% supponiamo di avere uno schema R(nome, cognome, matricola, corso, voto, lode)
+% (risultato di left outer join studente - esame) (--> scrivi una tabella esemplificativa r)
+% Vogliamo eseguire la seguente interrogazione: trova per ogni studente il numero di esami.
+% Per fare questo ci servono le operazioni di conteggio, e prima ancora ci serve la nozione di raggruppamento. L'idea è partizionare la relazione r dello schema R utilizzando un criterio di raggruppamento. In un secondo passo eseguo le operazioni di conteggio sulle singole partizioni. 
+
+% Il criterio di raggruppamento è determinato da una lista (eventualmente vuota) di attributi. Nel nostro caso un solo attributo, matricola --> corrisponde alla relazione avere la stessa matricola. Più in generale, se gli attributi sono n, la relazione diventa avere la stessa n-pla di valori su quegli attributi. In caso di lista vuota, il raggruppamento è unico. 
+
+
+% operazioni di conteggio: count, sum, min, max, avg. Significato in algebra relazionale. 
+
+% Sintassi delle operazioni di conteggio:
+
+% <lista attributi raggruppamento> <simbolo che sembra una F rovesciata> lista operazioni conteggio (relazione). 
+
+% se la lista di raggruppamento ha n elementi e la lista operazioni ha m elementi, l'output di questa operazione è una tabella a n + m colonne e le righe sono tante quanti sono i raggruppamenti. 
+
+% Nel nostro caso: matricola "simbolo strano" count(corso) (r)
+
+% genera la tabella (-->scrivi tabella)
+
+% Per esemplificare ulteriormente facciamo la query: trova per ogni studente il numero di esami.
+
+% scrivi sintassi in algebra relazionale e poi la relativa tabella
+
+% altro esempio (per lista attributi vuota): il voto più alto tra tutti gli esami. Sintassi in algebra relazionale e tabella. (viene fuori una tabella con una sola riga e una sola colonna, ovvero una relazione di un unico elemento, che non coincide con l'elemento). 
+
+% altro esempio (per lista di due attributi): sullo schema ESAME(matricola, corso, voto, cfu, data, lode), data una certa relazione su di esso (esemplifica tabella), voglio per studente e per anno il numero di esami e il numero di crediti. In questo caso mi conviene fare anche una rinomina per evitare ambiguità su operazioni che si volessero fare successivamente. Sintassi in algebra relazionale e tabella. 
+
+% nella seconda parte della lezione: un esercizio proposto e correzione esercizi
+
+% lezione 17: tutta pratica e sql che aveva lasciato in sospeso. 
+
+% lezione 18: pratica ed sql. 
+
+
+
+
+
 
 
 
