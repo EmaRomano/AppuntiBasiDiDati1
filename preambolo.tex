@@ -137,3 +137,16 @@
     fontupper=\small, fonttitle=\small\bfseries,
     overlay={\node[anchor=north west, xshift=3mm, yshift=-2.5mm] at (frame.north west) {\textcolor{details-color}{\faSearch}};}
 }
+
+
+% --- MACRO PER SIMBOLI OUTER JOIN ---
+\usepackage{amssymb} % Assicurati di avere questo pacchetto (probabilmente lo hai già)
+
+\makeatletter
+\def\ojoin{\setbox0=\hbox{$\bowtie$}%
+  \rule[-.02ex]{.25em}{.4pt}\llap{\rule[\ht0]{.25em}{.4pt}}}
+\def\leftouterjoin{\mathbin{\ojoin\mkern-5.8mu\bowtie}}
+\def\rightouterjoin{\mathbin{\bowtie\mkern-5.8mu\ojoin}}
+\def\fullouterjoin{\mathbin{\ojoin\mkern-5.8mu\bowtie\mkern-5.8mu\ojoin}}
+\makeatother
+% ------------------------------------

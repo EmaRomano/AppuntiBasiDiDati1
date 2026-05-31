@@ -614,3 +614,76 @@ La regola d'oro nello sviluppo del software impone che \textbf{l'esplicito sia s
 \end{enumerate}
 Per questi motivi, la sintassi e l'uso del \texttt{NATURAL JOIN} vengono qui deliberatamente omessi a favore dell'approccio rigoroso basato sulle condizioni esplicite. Un paragrafo al riguardo è comunque presente in appendice per completezza. 
 \end{bestpractice}
+
+\section{Giunzioni Esterne (Outer Join)}
+
+L'operatore di giunzione interna (Inner Join) è intrinsecamente "distruttivo": se una tupla della prima relazione non trova alcuna corrispondenza nella seconda relazione rispetto alla condizione imposta, viene inesorabilmente scartata dal risultato finale.
+
+In molti scenari informativi, tuttavia, è essenziale preservare traccia delle entità "orfane" (es. gli studenti che non hanno ancora sostenuto alcun esame, o i clienti che non hanno effettuato ordini). Per rispondere a questa esigenza, l'algebra relazionale introduce le \textbf{Giunzioni Esterne} (Outer Join).
+
+Le giunzioni esterne estendono il risultato di una normale giunzione recuperando le tuple scartate e "riempiendo" (padding) gli attributi mancanti della relazione opposta con il marcatore di incognita \texttt{NULL}.
+
+Esistono tre varianti di questo operatore (anche per esse vale il divieto architetturale di omettere la condizione a favore della variante "naturale"):
+\begin{itemize}
+    \item \textbf{Left Outer Join ($r_1 \leftouterjoin r_2$):} Preserva \textbf{tutte} le tuple della relazione di sinistra ($r_1$). Se una tupla di $r_1$ non ha corrispondenze in $r_2$, viene inclusa nel risultato assegnando \texttt{NULL} a tutti gli attributi provenienti da $r_2$.
+    \item \textbf{Right Outer Join ($r_1 \rightouterjoin r_2$):} Preserva \textbf{tutte} le tuple della relazione di destra ($r_2$), inserendo \texttt{NULL} negli attributi di $r_1$ per le tuple orfane.
+    \item \textbf{Full Outer Join ($r_1 \fullouterjoin r_2$):} È l'unione dei due comportamenti. Preserva integralmente entrambe le relazioni, inserendo \texttt{NULL} a destra o a sinistra ove manchi la corrispondenza.
+\end{itemize}
+
+\begin{example}[Left Join: Studenti con e senza esami]
+    Siano dati gli schemi: 
+
+    \begin{center}
+        $STUDENTE(matricola, nome)$, $ESAME(matr, corso, voto)$,
+    \end{center}
+    
+    con le seguenti piccole istanze:
+    \begin{itemize}
+        \item $studente$: \{(101, 'Mario'), (102, 'Luigi')\}
+        \item $esame$: \{(101, 'Basi di Dati', 30)\}
+    \end{itemize}
+
+    Eseguendo una giunzione esterna sinistra:
+    $$ studente \leftouterjoin_{matricola = matr} esame $$
+
+    La tupla di Mario trova corrispondenza e si fonde regolarmente. La tupla di Luigi non trova corrispondenza in $esame$, ma viene "salvata" dall'operatore \textit{Left}, generando la riga:
+    \texttt{(102, 'Luigi', NULL, NULL, NULL)}.
+\end{example}
+
+\subsection{Le Giunzioni Esterne in SQL}
+
+Il linguaggio SQL implementa questi operatori estendendo la sintassi della clausola \texttt{JOIN}. Esattamente come per \texttt{INNER}, la parola chiave \texttt{OUTER} è considerata ridondante e facoltativa dallo standard (es. scrivere \texttt{LEFT JOIN} equivale a tutti gli effetti a scrivere \texttt{LEFT OUTER JOIN}).
+
+\textit{Sintassi generale (Left Join):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome, e.corso, e.voto
+FROM studente AS s
+LEFT JOIN esame AS e ON s.matricola = e.matr;
+\end{lstlisting}
+
+\begin{bestpractice}[Realtà di Produzione: Il tramonto del RIGHT JOIN]
+Sebbene il \texttt{RIGHT JOIN} esista e sia formalmente corretto, nel codice di produzione moderno è universalmente evitato. Per convenzione di leggibilità \textit{top-down} (dall'alto verso il basso), gli ingegneri preferiscono posizionare la tabella principale nella clausola \texttt{FROM} ed eseguire \texttt{LEFT JOIN} a cascata, piuttosto che invertire mentalmente l'ordine di lettura usando giunzioni destre. Un \texttt{RIGHT JOIN} può (e deve) sempre essere convertito in un \texttt{LEFT JOIN} semplicemente scambiando l'ordine delle tabelle nel codice.
+\end{bestpractice}
+
+\begin{observation}[La natura della FULL JOIN]
+A causa della scarsa utilità pratica di estrarre orfani bidirezionali in modelli dati strutturati, la \texttt{FULL JOIN} è così rara che molti DBMS commerciali (come MySQL o SQLite) non la implementano nativamente. Per ottenerla, si ricorre all'algebra insiemistica: l'unione (\texttt{UNION}) tra una giunzione sinistra (\texttt{A LEFT JOIN B}) e la sua inversa (\texttt{B LEFT JOIN A}).
+\end{observation}
+
+\subsection{Il pattern "Anti-Join": Isolare le assenze}
+
+L'utilità strategica più importante delle giunzioni esterne non risiede solo nel "mostrare tutto", ma nel fornire uno strumento per \textbf{isolare matematicamente le anomalie o le mancanze}. 
+
+Per rispondere all'interrogazione \textit{"Trovare gli studenti che \textbf{non} hanno sostenuto alcun esame"}, l'approccio più robusto consiste nel combinare un Outer Join con la gestione della logica ternaria dei valori \texttt{NULL} studiata nei capitoli precedenti.
+
+1. Si esegue un \texttt{LEFT JOIN} per estrarre tutti gli studenti, portando a bordo i \texttt{NULL} per chi non ha esami.
+2. Si applica una selezione (\texttt{WHERE}) filtrando deliberatamente \textbf{solo} le righe in cui la Primary Key della tabella agganciata risulta \texttt{NULL}.
+
+Questo costrutto ingegneristico è noto come \textbf{Anti-Join}. È enormemente più efficiente rispetto all'uso di operazioni insiemistiche (\texttt{EXCEPT}) perché evita al motore del database di dover eseguire onerosi ordinamenti per la de-duplicazione.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Estrae solo gli studenti SENZA esami 
+SELECT s.matricola, s.nome
+FROM studente AS s
+LEFT JOIN esame AS e ON s.matricola = e.matr
+WHERE e.matr IS NULL;
+\end{lstlisting}
