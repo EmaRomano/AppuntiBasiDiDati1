@@ -486,17 +486,21 @@ Con gli operatori insiemistici, lo standard SQL capovolge questa logica:
     L'espressione algebrica $v_{casa} \cup v_{trasferta}$ vista nel primo esempio si traduce strutturando due query indipendenti collegate dall'operatore \texttt{UNION}:
     
 \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-SELECT squadra1 AS squadra_vincente
-FROM partite
-WHERE stadio = 'Maradona' AND goals1 > goals2
+(SELECT squadra1 AS squadra_vincente
+ FROM partite
+ WHERE stadio = 'Maradona' AND goals1 > goals2)
 UNION
-SELECT squadra2 
-FROM partite
-WHERE stadio = 'Maradona' AND goals2 > goals1;
+(SELECT squadra2 
+ FROM partite
+ WHERE stadio = 'Maradona' AND goals2 > goals1;)
 \end{lstlisting}
 
     \textit{Nota Architetturale:} Lo schema della tabella virtuale risultante eredita sempre i nomi delle colonne dal \textbf{primo} blocco \texttt{SELECT} (valutato top-down). Pertanto, un'eventuale ridenominazione tramite alias (\texttt{AS squadra\_vincente}) ha effetto solo se applicata nella query superiore; eventuali alias nel blocco inferiore verrebbero ignorati dal motore SQL.
 \end{example}
+
+Quando si concatenano più blocchi \texttt{SELECT} tramite operazioni insiemistiche, lo standard SQL impone una gerarchia matematica rigida: l'operatore \textbf{\texttt{INTERSECT}} ha la priorità massima, mentre \textbf{\texttt{UNION}} ed \textbf{\texttt{EXCEPT}} vengono valutati successivamente, rigorosamente da sinistra verso destra. Di conseguenza, un'espressione come $A \cup B \cap C$ viene implicitamente calcolata dal DBMS come $A \cup (B \cap C)$.
+
+Per ragioni di leggibilità e manutenibilità, la prassi impone di utilizzare sempre le \textbf{parentesi tonde} per esplicitare i blocchi logici, sovrascrivendo l'ordine di default ove necessario (es. $(A \cup B) \cap C$). Nell'esempio di sopra le parentesi erano ridondanti, ma sono state comunque inserite per maggiore leggibilità.
 
 \section{Il Prodotto Cartesiano e le Giunzioni (Join)}
 
@@ -594,15 +598,6 @@ FROM studente AS s
 JOIN esame AS e ON s.matricola = e.matr;
 \end{lstlisting}
 
-\begin{warningbox}[L'antiquata sintassi implicita (ANSI-89)]
-È possibile incontrare basi di dati o codice legacy in cui la giunzione viene espressa "alla vecchia maniera", eseguendo il prodotto cartesiano separando le tabelle con una virgola e inserendo la condizione di Join nel \texttt{WHERE}:
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small]
--- SINTASSI DEPRECATA (da evitare)
-SELECT * FROM studente s, esame e WHERE s.matricola = e.matr;
-\end{lstlisting}
-Questa prassi è fortemente sconsigliata: mescola pericolosamente la logica di legame strutturale tra tabelle con le normali condizioni di filtraggio (selezione $\sigma$), rendendo il codice prono a omissioni che causano il famigerato \textit{Cartesian Explosion}.
-\end{warningbox}
-
 \begin{bestpractice}[Evitare la Giunzione Naturale in SQL]
 Sebbene la giunzione naturale ($\bowtie$) sia un operatore teorico fondamentale per semplificare le espressioni in algebra relazionale, la sua traduzione diretta in SQL (tramite la parola chiave \texttt{NATURAL JOIN}) è universalmente considerata un \textbf{anti-pattern ingegneristico} e non viene quasi mai utilizzata nel codice di produzione.
 
@@ -614,6 +609,36 @@ La regola d'oro nello sviluppo del software impone che \textbf{l'esplicito sia s
 \end{enumerate}
 Per questi motivi, la sintassi e l'uso del \texttt{NATURAL JOIN} vengono qui deliberatamente omessi a favore dell'approccio rigoroso basato sulle condizioni esplicite. Un paragrafo al riguardo è comunque presente in appendice per completezza. 
 \end{bestpractice}
+
+\subsection{Il Prodotto Cartesiano in SQL: CROSS JOIN}
+
+Sebbene il prodotto cartesiano libero ($\times$) sia un'operazione quasi assente nella logica applicativa quotidiana a causa dell'esplosione combinatoria e della carenza di semantica, lo standard SQL fornisce un costrutto esplicito per realizzarlo: \textbf{\texttt{CROSS JOIN}}.
+
+A differenza degli altri tipi di giunzione, il \texttt{CROSS JOIN} non ammette la clausola \texttt{ON}, poiché per definizione matematica non vi è alcuna condizione logica da valutare: ogni singola tupla della prima tabella viene incondizionatamente concatenata con ogni tupla della seconda.
+
+\textit{Sintassi esplicita standard (ANSI-92):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome, e.corso
+FROM studente AS s
+CROSS JOIN esame AS e;
+\end{lstlisting}
+
+\paragraph{La sintassi implicita (Legacy)}
+
+Prima che lo standard ANSI-92 introducesse le keyword esplicite per i \texttt{JOIN}, il prodotto cartesiano veniva generato semplicemente elencando le tabelle all'interno della clausola \texttt{FROM}, separandole con una virgola.
+
+\textit{Sintassi implicita (ANSI-89):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome, e.corso
+FROM studente AS s, esame AS e;
+\end{lstlisting}
+
+\begin{warningbox}[La genesi dei bug silenti]
+La sintassi implicita con la virgola è ancora oggi pienamente supportata da tutti i DBMS commerciali per ragioni di retrocompatibilità. Tuttavia, rappresenta il vettore principale per i disastri prestazionali. 
+
+Se un progettista intende eseguire una normale giunzione interna usando la sintassi legacy, ma dimentica accidentalmente di inserire la condizione di uguaglianza nella clausola \texttt{WHERE}, il motore del database non genererà alcun errore di sintassi. Ripiegherà invece in modo totalmente silente sull'esecuzione di un prodotto cartesiano puro, saturando la memoria del server. 
+L'impiego del costrutto esplicito \texttt{CROSS JOIN}, al contrario, rende inequivocabile l'intento matematico dello sviluppatore, rendendo il codice sicuro e auto-documentato.
+\end{warningbox}
 
 \section{Giunzioni Esterne (Outer Join)}
 
@@ -814,3 +839,12 @@ L'errore sintattico e logico più comune che causa il fallimento di una query ag
 
 Se cercassimo di estrarre \texttt{SELECT matricola, corso, COUNT(voto) ... GROUP BY matricola}, il DBMS rifiuterebbe la query: poiché stiamo comprimendo gli esami per studente in un'unica riga, non avrebbe senso chiedere di stampare il nome del "corso", essendocene molteplici collassati in quella partizione.
 \end{warningbox}
+
+\section{Interrogazioni Nidificate (Subqueries)}
+
+A differenza dell'algebra relazionale, in cui le operazioni vengono concatenate linearmente, il linguaggio SQL permette di inserire un'interrogazione (\texttt{SELECT}) all'interno di un'altra interrogazione. Questo costrutto, noto come \textbf{interrogazione nidificata} o \textit{subquery}, è uno strumento potente che consente di risolvere interrogazioni complesse scomponendole in passi logici successivi.
+
+La query principale viene definita \textbf{esterna} (Outer Query), mentre quella racchiusa tra parentesi tonde viene definita \textbf{interna} (Inner Query). Il risultato della query interna viene calcolato per primo e passato dinamicamente alla query esterna come parametro di filtro.
+
+Le interrogazioni nidificate si classificano in base alla forma del risultato che restituiscono, il quale determina l'operatore logico che la query esterna deve utilizzare per valutarle.
+
