@@ -719,7 +719,13 @@ Dove:
 \textbf{Struttura risultante:} La relazione prodotta in output avrà esattamente $n + m$ colonne (gli attributi di raggruppamento seguiti dai risultati delle funzioni) e un numero di righe esattamente pari al numero di partizioni individuate.
 
 \begin{example}[Raggruppamento su singolo attributo: Numero di esami per studente]
-    Consideriamo l'istanza $r$ basata sullo schema $R(matricola, nome, cognome, corso, voto, lode)$, prodotta in precedenza da un Left Outer Join tra studenti ed esami. La tupla di "Luigi" presenta valori \texttt{NULL} negli attributi degli esami.
+    Consideriamo l'istanza $r$ basata sullo schema 
+    
+    \begin{center}
+        $R(matricola, nome, cognome, corso, voto, lode)$
+    \end{center}
+    
+    prodotta in precedenza da un Left Outer Join tra studenti ed esami. La tupla di "Luigi" presenta valori \texttt{NULL} negli attributi degli esami.
     
     \begin{table}[H]
         \centering
