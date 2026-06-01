@@ -1,52 +1,14 @@
-\chapter{Bozze}
-\section{parti di lezioni da rivedere}
+% \chapter{Bozze}
+% \section{parti di lezioni da rivedere/segnalibri lezioni}
 
--- esercitazione su class diagrams: prima parte lezione 6.\\
--- esercitazione su schemi relazionali e ristrutturazione logica del class diagram: seconda parte lezione 12. \\
--- primi 30 minuti lezione 13: riepilogo e precisazioni rilevanti. \\
--- esercizi assegnati sulle prime query fine lezione 15
+% -- esercitazione su class diagrams: prima parte lezione 6.\\
+% -- esercitazione su schemi relazionali e ristrutturazione logica del class diagram: seconda parte lezione 12. \\
+% -- primi 30 minuti lezione 13: riepilogo e precisazioni rilevanti. \\
+% -- esercizi assegnati sulle prime query fine lezione 15
+% -- esercizi queries di conteggio: seconda parte lezione 16
+% -- esercizi queries: prima ora lezione 17
 
-\section{La Giunzione Naturale in SQL: NATURAL JOIN e USING (da inserire in appendice)}
 
-A differenza dell'algebra relazionale dove l'omissione della condizione trasforma implicitamente un Theta-Join in un Natural Join ($\bowtie$), il linguaggio SQL richiede l'uso di parole chiave esplicite per attivare questo comportamento ed evitare prodotti cartesiani accidentali.
-
-Esistono due approcci sintattici per implementare la fusione delle colonne omonime tipica della giunzione naturale:
-
-\paragraph{L'operatore puro: NATURAL JOIN}
-Questa è la traduzione letterale dell'operatore matematico $\bowtie$.
-
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-SELECT *
-FROM tabella_1
-NATURAL JOIN tabella_2;
-\end{lstlisting}
-
-Quando il motore SQL incontra \texttt{NATURAL JOIN}, esegue autonomamente due operazioni:
-\begin{enumerate}
-    \item \textbf{Ricerca degli attributi:} Ispeziona gli schemi delle due relazioni alla ricerca di tutte le colonne aventi \textbf{esattamente lo stesso nome}.
-    \item \textbf{Condizione e Fusione:} Genera un'uguaglianza implicita su tali colonne (es. \texttt{t1.id = t2.id}) e, nel \textit{Result Set} finale, \textbf{fonde} le colonne omonime in una sola, evitando ridondanze.
-\end{enumerate}
-
-\begin{warningbox}[La fragilità strutturale del NATURAL JOIN]
-Nonostante la sua eleganza matematica, l'uso di \texttt{NATURAL JOIN} in produzione è universalmente considerato un \textbf{anti-pattern ingegneristico}. 
-Il motivo risiede nella sua dipendenza occulta e non controllata dai nomi delle colonne. Se mesi dopo la stesura del codice un amministratore aggiungesse a entrambe le tabelle una colonna di servizio generica (es. \texttt{note} o \texttt{data\_inserimento}), il DBMS modificherebbe silenziosamente la condizione di giunzione pretendendo l'uguaglianza anche su queste nuove colonne (\texttt{AND t1.note = t2.note}). Questo distruggerebbe la logica dell'interrogazione originando risultati errati o insiemi vuoti, senza lanciare alcun errore di compilazione.
-\end{warningbox}
-
-\paragraph{L'alternativa ingegneristica: La clausola USING}
-
-Per ovviare alla pericolosità del \texttt{NATURAL JOIN} preservandone però il vantaggio sintattico (la fusione delle colonne omonime), lo standard SQL ha introdotto la clausola \textbf{\texttt{USING}}.
-
-Questa clausola va a sostituire \texttt{ON} e permette al progettista di dichiarare esplicitamente su quali colonne omonime deve avvenire la giunzione, rendendo il codice immune a future modifiche dello schema.
-
-\textit{Sintassi con USING:}
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
--- Supponendo che entrambe le tabelle abbiano un attributo 'matricola'
-SELECT *
-FROM studente
-JOIN esame USING (matricola);
-\end{lstlisting}
-
-A differenza della classica clausola \texttt{ON} (che restituirebbe due colonne distinte: \texttt{studente.matricola} ed \texttt{esame.matricola}), la clausola \texttt{USING} istruisce il database a \textbf{fondere} l'attributo in una singola colonna, rispecchiando in totale sicurezza il comportamento algebrico della giunzione naturale.
 
 
 
@@ -68,48 +30,6 @@ A differenza della classica clausola \texttt{ON} (che restituirebbe due colonne 
 
 
 % \section{bozze lezione 16}
-
-% operazioni di conteggio
-% supponiamo di avere uno schema R(nome, cognome, matricola, corso, voto, lode)
-% (risultato di left outer join studente - esame) (--> scrivi una tabella esemplificativa r)
-% Vogliamo eseguire la seguente interrogazione: trova per ogni studente il numero di esami.
-% Per fare questo ci servono le operazioni di conteggio, e prima ancora ci serve la nozione di raggruppamento. L'idea è partizionare la relazione r dello schema R utilizzando un criterio di raggruppamento. In un secondo passo eseguo le operazioni di conteggio sulle singole partizioni. 
-
-% Il criterio di raggruppamento è determinato da una lista (eventualmente vuota) di attributi. Nel nostro caso un solo attributo, matricola --> corrisponde alla relazione di equivalenza "avere la stessa matricola". Più in generale, se gli attributi sono n, la relazione diventa avere la stessa n-pla di valori su quegli attributi. In caso di lista vuota, il raggruppamento è unico. 
-
-
-% operazioni di conteggio: count, sum, min, max, avg. Significato in algebra relazionale. 
-
-% Sintassi delle operazioni di conteggio:
-
-% <lista attributi raggruppamento> <simbolo che sembra una F rovesciata> lista operazioni conteggio (relazione). 
-
-% se la lista di raggruppamento ha n elementi e la lista operazioni ha m elementi, l'output di questa operazione è una tabella a n + m colonne e le righe sono tante quanti sono i raggruppamenti. 
-
-% Nel nostro caso: matricola "simbolo strano" count(corso) (r)
-
-% genera la tabella (-->scrivi tabella)
-
-% Per esemplificare ulteriormente facciamo la query: trova per ogni studente il numero di esami.
-
-% scrivi sintassi in algebra relazionale e poi la relativa tabella
-
-% altro esempio (per lista attributi vuota): il voto più alto tra tutti gli esami. Sintassi in algebra relazionale e tabella. (viene fuori una tabella con una sola riga e una sola colonna, ovvero una relazione di un unico elemento, che non coincide con l'elemento). 
-
-% altro esempio (per lista di due attributi): sullo schema ESAME(matricola, corso, voto, cfu, data, lode), data una certa relazione su di esso (esemplifica tabella), voglio per studente e per anno il numero di esami e il numero di crediti. In questo caso mi conviene fare anche una rinomina per evitare ambiguità su operazioni che si volessero fare successivamente. Sintassi in algebra relazionale e tabella. 
-
-% nella seconda parte della lezione: un esercizio proposto e correzione esercizi
-
-% lezione 17: tutta pratica e sql che aveva lasciato in sospeso. 
-
-% lezione 18: pratica ed sql. 
-
-
-
-
-
-
-
 
 
 % ---------------------------------------------------------------------------------

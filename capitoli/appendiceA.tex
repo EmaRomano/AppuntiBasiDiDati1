@@ -1,0 +1,41 @@
+\section{La Giunzione Naturale in SQL: NATURAL JOIN e USING}
+
+A differenza dell'algebra relazionale dove l'omissione della condizione trasforma implicitamente un Theta-Join in un Natural Join ($\bowtie$), il linguaggio SQL richiede l'uso di parole chiave esplicite per attivare questo comportamento ed evitare prodotti cartesiani accidentali.
+
+Esistono due approcci sintattici per implementare la fusione delle colonne omonime tipica della giunzione naturale:
+
+\paragraph{L'operatore puro: NATURAL JOIN}
+Questa è la traduzione letterale dell'operatore matematico $\bowtie$.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT *
+FROM tabella_1
+NATURAL JOIN tabella_2;
+\end{lstlisting}
+
+Quando il motore SQL incontra \texttt{NATURAL JOIN}, esegue autonomamente due operazioni:
+\begin{enumerate}
+    \item \textbf{Ricerca degli attributi:} Ispeziona gli schemi delle due relazioni alla ricerca di tutte le colonne aventi \textbf{esattamente lo stesso nome}.
+    \item \textbf{Condizione e Fusione:} Genera un'uguaglianza implicita su tali colonne (es. \texttt{t1.id = t2.id}) e, nel \textit{Result Set} finale, \textbf{fonde} le colonne omonime in una sola, evitando ridondanze.
+\end{enumerate}
+
+\begin{warningbox}[La fragilità strutturale del NATURAL JOIN]
+Nonostante la sua eleganza matematica, l'uso di \texttt{NATURAL JOIN} in produzione è universalmente considerato un \textbf{anti-pattern ingegneristico}. 
+Il motivo risiede nella sua dipendenza occulta e non controllata dai nomi delle colonne. Se mesi dopo la stesura del codice un amministratore aggiungesse a entrambe le tabelle una colonna di servizio generica (es. \texttt{note} o \texttt{data\_inserimento}), il DBMS modificherebbe silenziosamente la condizione di giunzione pretendendo l'uguaglianza anche su queste nuove colonne (\texttt{AND t1.note = t2.note}). Questo distruggerebbe la logica dell'interrogazione originando risultati errati o insiemi vuoti, senza lanciare alcun errore di compilazione.
+\end{warningbox}
+
+\paragraph{L'alternativa ingegneristica: La clausola USING}
+
+Per ovviare alla pericolosità del \texttt{NATURAL JOIN} preservandone però il vantaggio sintattico (la fusione delle colonne omonime), lo standard SQL ha introdotto la clausola \textbf{\texttt{USING}}.
+
+Questa clausola va a sostituire \texttt{ON} e permette al progettista di dichiarare esplicitamente su quali colonne omonime deve avvenire la giunzione, rendendo il codice immune a future modifiche dello schema.
+
+\textit{Sintassi con USING:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Supponendo che entrambe le tabelle abbiano un attributo 'matricola'
+SELECT *
+FROM studente
+JOIN esame USING (matricola);
+\end{lstlisting}
+
+A differenza della classica clausola \texttt{ON} (che restituirebbe due colonne distinte: \texttt{studente.matricola} ed \texttt{esame.matricola}), la clausola \texttt{USING} istruisce il database a \textbf{fondere} l'attributo in una singola colonna, rispecchiando in totale sicurezza il comportamento algebrico della giunzione naturale.
