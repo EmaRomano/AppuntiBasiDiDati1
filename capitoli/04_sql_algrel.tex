@@ -687,3 +687,124 @@ FROM studente AS s
 LEFT JOIN esame AS e ON s.matricola = e.matr
 WHERE e.matr IS NULL;
 \end{lstlisting}
+
+\section{Raggruppamento e Funzioni di Aggregazione}
+
+L'algebra relazionale di base (selezione, proiezione, join) opera sulle singole tuple in modo isolato. Tuttavia, per rispondere a interrogazioni di natura statistica o riassuntiva (es. "Qual è la media dei voti?", "Quanti esami ha superato ogni studente?"), è necessario estendere l'algebra introducendo l'operatore di \textbf{Raggruppamento e Aggregazione}, denotato tipicamente con la lettera calligrafica $\mathcal{F}$ (oppure $\gamma$).
+
+Il processo logico si divide in due fasi:
+\begin{enumerate}
+    \item \textbf{Partizionamento:} L'istanza della relazione viene suddivisa in sottoinsiemi (partizioni) in base a un \textit{criterio di raggruppamento}. Due tuple appartengono alla stessa partizione se e solo se presentano esattamente la stessa combinazione di valori sugli attributi scelti.
+    \item \textbf{Conteggio/Calcolo:} Su ogni partizione generata vengono applicate una o più funzioni matematiche che "collassano" l'insieme di tuple in un singolo valore scalare.
+\end{enumerate}
+
+Le cinque funzioni di aggregazione standard sono:
+\begin{itemize}
+    \item \textbf{COUNT:} Calcola il numero di tuple (o di valori non nulli) nella partizione.
+    \item \textbf{SUM:} Calcola la somma dei valori di un attributo numerico.
+    \item \textbf{AVG:} Calcola la media aritmetica dei valori di un attributo numerico.
+    \item \textbf{MIN / MAX:} Identifica rispettivamente il valore minimo e massimo.
+\end{itemize}
+
+\paragraph{Definizione e Sintassi in Algebra Relazionale}
+
+Sia $r$ un'istanza di relazione. La sintassi formale dell'operatore è:
+$$ {}_{A_1, \dots, A_n} \mathcal{F}_{f_1(B_1), \dots, f_m(B_m)}(r) $$
+Dove:
+\begin{itemize}
+    \item L'elenco a sinistra a pedice ($A_1, \dots, A_n$) rappresenta gli \textbf{attributi di raggruppamento}.
+    \item L'elenco a destra a pedice ($f_1(B_1), \dots, f_m(B_m)$) rappresenta le \textbf{funzioni di aggregazione} da applicare.
+\end{itemize}
+
+\textbf{Struttura risultante:} La relazione prodotta in output avrà esattamente $n + m$ colonne (gli attributi di raggruppamento seguiti dai risultati delle funzioni) e un numero di righe esattamente pari al numero di partizioni individuate.
+
+\begin{example}[Raggruppamento su singolo attributo: Numero di esami per studente]
+    Consideriamo l'istanza $r$ basata sullo schema $R(matricola, nome, cognome, corso, voto, lode)$, prodotta in precedenza da un Left Outer Join tra studenti ed esami. La tupla di "Luigi" presenta valori \texttt{NULL} negli attributi degli esami.
+    
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{llllll}
+            \toprule
+            \textbf{matricola} & \textbf{nome} & \textbf{cognome} & \textbf{corso} & \textbf{voto} & \textbf{lode} \\
+            \midrule
+            101 & Mario & Rossi & Basi di Dati & 30 & false \\
+            101 & Mario & Rossi & Reti & 28 & false \\
+            102 & Luigi & Verdi & \texttt{NULL} & \texttt{NULL} & \texttt{NULL} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
+    Vogliamo calcolare il numero di esami sostenuti da ciascuno studente:
+    $$ {}_{matricola} \mathcal{F}_{\text{COUNT}(corso)}(r) $$
+
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{ll}
+            \toprule
+            \textbf{matricola} & \textbf{COUNT(corso)} \\
+            \midrule
+            101 & 2 \\
+            102 & 0 \\
+            \bottomrule
+        \end{tabular}
+        \caption{La funzione COUNT applicata all'attributo "corso" ignora matematicamente i valori \texttt{NULL}, restituendo correttamente 0 per lo studente senza esami.}
+    \end{table}
+\end{example}
+
+\begin{example}[Raggruppamento vuoto: Il voto più alto in assoluto]
+    Se la lista degli attributi di raggruppamento a sinistra è \textbf{vuota}, l'intera relazione viene considerata come un'unica partizione.
+    $$ \mathcal{F}_{\text{MAX}(voto)}(r) $$
+
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{l}
+            \toprule
+            \textbf{MAX(voto)} \\
+            \midrule
+            30 \\
+            \bottomrule
+        \end{tabular}
+        \caption{Attenzione teorica: sebbene il risultato sembri un semplice numero (30), per la chiusura dell'algebra relazionale esso è a tutti gli effetti un \textbf{insieme} (una relazione composta da 1 colonna e 1 riga), e come tale non può essere confrontato direttamente con uno scalare in un predicato logico senza opportune conversioni.}
+    \end{table}
+\end{example}
+
+\begin{example}[Raggruppamento multiplo e Ridenominazione]
+    Sia dato lo schema $ESAME(matricola, corso, voto, cfu, anno, lode)$. Vogliamo calcolare, \textbf{per ogni studente e per ogni anno accademico}, il numero di esami superati e il totale dei crediti acquisiti, rinominando le colonne calcolate per futuri utilizzi algebrici.
+    
+    $$ \rho_{stat(matricola, anno, n\_esami, tot\_cfu)}({}_{matricola, anno} \mathcal{F}_{\text{COUNT}(corso), \text{SUM}(cfu)}(esame)) $$
+
+    \begin{table}[H]
+        \centering
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{llll}
+            \toprule
+            \textbf{matricola} & \textbf{anno} & \textbf{n\_esami} & \textbf{tot\_cfu} \\
+            \midrule
+            101 & 2023 & 2 & 15 \\
+            101 & 2024 & 1 & 9 \\
+            102 & 2023 & 1 & 6 \\
+            \bottomrule
+        \end{tabular}
+        \caption{L'elenco di raggruppamento ($matricola, anno$) genera partizioni basate sulla coppia. Il partizionamento spezza il percorso accademico dello studente 101 su due righe distinte, sommandone i crediti separatamente per anno.}
+    \end{table}
+\end{example}
+
+\subsection{Le Funzioni di Aggregazione in SQL: GROUP BY}
+
+In SQL, il concetto algebrico di partizionamento viene implementato rigorosamente attraverso la clausola \textbf{\texttt{GROUP BY}}. Le funzioni di aggregazione (\texttt{COUNT, SUM, AVG, MIN, MAX}) vengono dichiarate direttamente nel blocco \texttt{SELECT}.
+
+\textit{Sintassi generale (traduzione del terzo esempio):}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matricola, anno, COUNT(corso) AS n_esami, SUM(cfu) AS tot_cfu
+FROM esame
+GROUP BY matricola, anno;
+\end{lstlisting}
+
+\begin{warningbox}[La Regola d'Oro del GROUP BY]
+L'errore sintattico e logico più comune che causa il fallimento di una query aggregata è la violazione del partizionamento. In SQL esiste una regola architetturale assoluta: \textbf{se un'interrogazione utilizza una funzione di aggregazione o una clausola GROUP BY, ogni attributo presente nella SELECT che NON sia racchiuso in una funzione di aggregazione deve comparire obbligatoriamente nella clausola GROUP BY}.
+
+Se cercassimo di estrarre \texttt{SELECT matricola, corso, COUNT(voto) ... GROUP BY matricola}, il DBMS rifiuterebbe la query: poiché stiamo comprimendo gli esami per studente in un'unica riga, non avrebbe senso chiedere di stampare il nome del "corso", essendocene molteplici collassati in quella partizione.
+\end{warningbox}
