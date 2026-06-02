@@ -834,10 +834,15 @@ FROM esame
 GROUP BY matricola, anno;
 \end{lstlisting}
 
-\begin{warningbox}[La Regola d'Oro del GROUP BY]
-L'errore sintattico e logico più comune che causa il fallimento di una query aggregata è la violazione del partizionamento. In SQL esiste una regola architetturale assoluta: \textbf{se un'interrogazione utilizza una funzione di aggregazione o una clausola GROUP BY, ogni attributo presente nella SELECT che NON sia racchiuso in una funzione di aggregazione deve comparire obbligatoriamente nella clausola GROUP BY}.
+\begin{warningbox}[La Regola del GROUP BY]
+Per prassi logica gli attributi in \texttt{SELECT} sono quasi sempre gli stessi che compaiono in \texttt{GROUP BY}. Questo potrebbe non essere sempre vero in alcuni casi particolari, ma in ogni caso bisogna sempre rispettare una precisa regola sintattica in SQL. Infatti, se in una query è presente la clausola GROUP BY, ogni singolo attributo menzionato nella SELECT deve obbligatoriamente ricadere in una di queste due categorie:
+\begin{itemize}
+    \item essere esplicitamente elencato nel GROUP BY;
+    \item essere racchiuso in una funzione di aggregazione. 
+\end{itemize}
 
-Se cercassimo di estrarre \texttt{SELECT matricola, corso, COUNT(voto) ... GROUP BY matricola}, il DBMS rifiuterebbe la query: poiché stiamo comprimendo gli esami per studente in un'unica riga, non avrebbe senso chiedere di stampare il nome del "corso", essendocene molteplici collassati in quella partizione.
+
+
 \end{warningbox}
 
 \section{Interrogazioni Nidificate (Subqueries)}
