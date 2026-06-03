@@ -835,16 +835,120 @@ GROUP BY matricola, anno;
 \end{lstlisting}
 
 \begin{warningbox}[La Regola del GROUP BY]
-Per prassi logica gli attributi in \texttt{SELECT} sono quasi sempre gli stessi che compaiono in \texttt{GROUP BY}. Questo potrebbe non essere sempre vero in alcuni casi particolari, ma in ogni caso bisogna sempre rispettare una precisa regola sintattica in SQL. Infatti, se in una query è presente la clausola GROUP BY, ogni singolo attributo menzionato nella SELECT deve obbligatoriamente ricadere in una di queste due categorie:
-\begin{itemize}
-    \item essere esplicitamente elencato nel GROUP BY;
-    \item essere racchiuso in una funzione di aggregazione. 
-\end{itemize}
+Per prassi logica gli attributi in \texttt{SELECT} sono quasi sempre gli stessi che compaiono in \texttt{GROUP BY}. Questo potrebbe non essere sempre vero in alcuni casi particolari, ma in ogni caso bisogna sempre rispettare una precisa regola sintattica in SQL: \textbf{ogni attributo nella SELECT non incluso in una funzione di aggregazione deve essere presente nel GROUP BY}
 
+\medskip
 
+Il motivo di questa regola sarà chiaro quando esamineremo l'ordine di esecuzione delle istruzioni in SQL. 
 
 \end{warningbox}
 
+\subsection{Filtrare i Gruppi: La clausola HAVING}
+
+Come abbiamo visto, la clausola \texttt{WHERE} agisce sulle singole righe di una relazione, scartando le tuple che non soddisfano un determinato predicato logico. Tuttavia, la sintassi SQL impedisce categoricamente l'uso di funzioni di aggregazione all'interno del \texttt{WHERE}, poiché la selezione avviene a livello di singola riga, quando i calcoli statistici non sono ancora stati eseguiti.
+
+Per risolvere l'esigenza di \textbf{filtrare interi gruppi} (anziché singole tuple), lo standard ha introdotto la clausola \textbf{\texttt{HAVING}}. Questa direttiva viene valutata dal motore del database \textit{dopo} l'avvenuta creazione delle partizioni tramite \texttt{GROUP BY}.
+
+La condizione imposta dall'\texttt{HAVING} può basarsi esclusivamente su due tipi di espressioni:
+\begin{enumerate}
+    \item \textbf{Valori di conteggio o aggregazione:} Il risultato di funzioni come \texttt{COUNT()}, \texttt{SUM()}, \texttt{AVG()} applicate alle tuple della singola partizione.
+    \item \textbf{Valori di raggruppamento:} Gli attributi esplicitamente dichiarati nella clausola \texttt{GROUP BY} (sebbene filtrare su questi attributi risulti computazionalmente molto più efficiente se effettuato a monte, all'interno del \texttt{WHERE}).
+\end{enumerate}
+
+\begin{example}[HAVING in combinazione con WHERE]
+Supponiamo di voler estrarre la matricola degli studenti che hanno sostenuto esami nell'anno solare 2023, ma \textbf{solo} se la media dei voti da loro ottenuta in quell'anno è strettamente superiore a 25.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matr, AVG(voto) AS media_voti
+FROM esame
+WHERE anno = 2023
+GROUP BY matr
+HAVING AVG(voto) > 25;
+\end{lstlisting}
+
+\end{example}
+
+
+\section{L'Ordine Logico di Esecuzione in SQL}
+
+Una delle maggiori insidie del linguaggio SQL risiede nella discrepanza tra l'ordine in cui il codice viene scritto (imposto dalla grammatica del linguaggio) e l'ordine in cui il motore del database (DBMS) esegue effettivamente le direttive. 
+
+Nonostante un'interrogazione si apra sempre con la clausola \texttt{SELECT}, essa è di fatto l'ultima operazione logica ad essere elaborata. L'ordine reale di valutazione di una query aggregata è il seguente:
+
+\begin{enumerate}
+    \item \textbf{\texttt{FROM} (e relativi \texttt{JOIN}):} Il motore individua le tabelle sorgente e calcola le giunzioni o i prodotti cartesiani necessari per generare la "tabella di lavoro" di base.
+    \item \textbf{\texttt{WHERE}:} Le singole righe della tabella di lavoro vengono filtrate secondo i predicati logici. Le tuple che non soddisfano la condizione vengono fisicamente scartate.
+    \item \textbf{\texttt{GROUP BY}:} Le righe superstiti vengono partizionate in gruppi sulla base degli attributi specificati.
+    \item \textbf{\texttt{HAVING}:} Il filtro viene applicato ai gruppi appena creati. Le intere partizioni che non soddisfano la condizione vengono eliminate.
+    \item \textbf{\texttt{SELECT}:} Solo in questa fase finale vengono eseguite le proiezioni (estrazione delle colonne richieste), valutate le funzioni di aggregazione e applicate eventuali ridenominazioni (\texttt{AS}).
+\end{enumerate}
+
+\begin{warningbox}[Il limite di visibilità tra Tuple e Gruppi]
+L'ordine di esecuzione spiega perché non si possono mescolare i campi d'azione dei filtri:
+\begin{itemize}
+    \item Non posso inserire una condizione statistica (es. \texttt{COUNT}) nella clausola \texttt{WHERE}, perché in quella fase, cronologicamente, i gruppi non esistono ancora.
+    \item Al termine del passaggio 3 (\texttt{GROUP BY}), le singole righe originali collassano scomparendo definitivamente. Pertanto, è impossibile inserire nell'\texttt{HAVING} una condizione relativa a uno specifico attributo di una singola tupla originale, a meno che tale attributo non faccia parte della chiave di raggruppamento.
+\end{itemize}
+\end{warningbox}
+
+\begin{observation}[L'invisibilità degli Alias nell'HAVING]
+Poiché la clausola \texttt{HAVING} viene valutata al passaggio 4, mentre la ridenominazione delle colonne (tramite l'alias \texttt{AS}) avviene solo nel blocco \texttt{SELECT} al passaggio 5, molti DBMS standard (es. Oracle, SQL Server, PostgreSQL in modalità strict) genereranno un errore se si tenta di utilizzare un alias definito nella \texttt{SELECT} all'interno della clausola \texttt{HAVING}. Il motore relazionale, banalmente, "non conosce ancora" quel nuovo nome.
+\end{observation}
+
+\begin{dettagli}[Conseguenze Architetturali: La Regola del GROUP BY]
+    Questo rigido ordine cronologico fornisce la spiegazione alla regola sintattica fondamentale introdotta nel paragrafo sulle aggregazioni: \textit{"Ogni attributo nella SELECT non incluso in una funzione di aggregazione deve essere presente nel GROUP BY"}.
+
+    \begin{example}[La logica dietro l'errore di sintassi]
+    Consideriamo l'interrogazione errata:
+    \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+    SELECT matricola, corso, COUNT(voto)
+    FROM esame
+    GROUP BY matricola;
+    \end{lstlisting}
+    Seguendo l'ordine di esecuzione, al passaggio 3 il motore comprime tutti gli esami di una \texttt{matricola} in un'unica partizione. Al passaggio 5, la \texttt{SELECT} chiede di stampare il \texttt{corso}. Tuttavia, poiché in una partizione ci sono esami di corsi multipli ormai fusi insieme, il motore si trova di fronte a un'ambiguità irrisolvibile: non sa quale stringa di corso estrarre e blocca l'esecuzione.
+    \end{example}
+
+\end{dettagli}
+
+\section{Le Viste (Views): Tabelle Virtuali}
+
+Una vista (\textit{View}) è un'interrogazione SQL a cui viene associato un nome univoco all'interno del dizionario del database. Le viste vengono impiegate per scopi di astrazione: permettono di incapsulare logiche complesse (come giunzioni o raggruppamenti) per favorirne la leggibilità e il riutilizzo continuo, evitando la duplicazione del codice all'interno degli applicativi.
+
+\begin{observation}[La natura virtuale delle Viste]
+A differenza delle tabelle fisiche (le \textit{Base Tables}), il risultato di una vista standard \textbf{non viene memorizzato in modo permanente} sul disco. Il DBMS si limita a salvare la definizione logica (il codice SQL) della vista stessa. Ogni volta che un utente la interroga, il motore ricalcola i dati al volo basandosi sulle tabelle sottostanti. Si tratta, a tutti gli effetti, di una \textbf{tabella virtuale}.
+\end{observation}
+
+Una volta creata, una vista può essere utilizzata in operazioni di lettura (tramite \texttt{SELECT}) esattamente come se fosse una normale tabella residente nel database. Esistono anche casistiche in cui è possibile utilizzare le viste in scrittura (\texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}) per modificare direttamente i dati delle tabelle fisiche originarie, ma l'aggiornabilità di una vista è soggetta a vincoli strutturali molto stringenti che verranno analizzati in seguito.
+
+\paragraph{Sintassi e Creazione}
+
+La sintassi standard per istanziare una tabella virtuale prevede la dichiarazione del nome e, opzionalmente, la definizione di una lista di parametri per ridenominare le colonne in uscita:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE VIEW nome_vista (attr_1, attr_2, ..., attr_n) AS
+SELECT espressione_1, espressione_2, ..., espressione_n
+FROM ...
+\end{lstlisting}
+
+\textbf{Vincolo di firma:} Se si sceglie di esplicitare la lista dei parametri tra parentesi tonde, è obbligatorio che il numero di questi parametri corrisponda esattamente al numero di attributi generati dalla clausola \texttt{SELECT} sottostante. Inoltre, deve esserci una perfetta corrispondenza ordinata per quanto riguarda il dominio (il tipo di dato) di ciascuna colonna.
+
+\begin{example}[Creazione di una vista statistica]
+Vogliamo creare una vista riutilizzabile che fornisca dinamicamente, per ogni studente, il numero totale di esami sostenuti e la media dei voti. Sfruttiamo i parametri della vista per rinominare in modo pulito le funzioni di aggregazione.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE VIEW statistiche_studenti (matricola, numero_esami, media_voti) AS
+SELECT matr, COUNT(corso), AVG(voto)
+FROM esame
+GROUP BY matr;
+\end{lstlisting}
+
+Da questo momento in poi, è possibile interrogare queste statistiche pre-calcolate in modo estremamente compatto, trattando la vista come una tabella fisica e ignorando la complessità del raggruppamento originario:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matricola, media_voti
+FROM statistiche_studenti
+WHERE media_voti > 27;
+\end{lstlisting}
+\end{example}
 
 \section{Interrogazioni Nidificate (Subqueries)}
 

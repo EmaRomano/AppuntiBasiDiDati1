@@ -31,42 +31,6 @@
 % \section{parti marginali lezione 18}
 % (parentesi sull'efficienza computazionale su una domanda di uno studente. Noi ci stiamo occupando principalmente di scrivere queries corrette e semplici e facili da leggere. L'efficienza computazionale in un DB non è sempre una cosa che è sotto il nostro controllo, perché se ne occupa l'ottimizzatore del dbms, che noi non conosciamo)
 
-% COMPLEMENTO DI GEMINI AL RIGUARDO: 
-% \section*{Ottimizzazione Logica in Algebra Relazionale}
-
-% Il principio cardine dell'ottimizzazione logica (o euristica) \`e \textbf{ridurre la cardinalit\`a e la dimensione dei dati il prima possibile}, ancor prima di eseguire operazioni computazionalmente pesanti come le congiunzioni (join).
-
-% \subsection*{Le Buone Pratiche (Regole d'Oro dell'Algebra)}
-% \begin{itemize}
-%     \item \textbf{Push-down delle selezioni (Anticipare le selezioni):}
-%     Filtrare le righe prima di effettuare un join riduce drasticamente il numero di tuple da combinare e impedisce l'esplosione combinatoria.
-%     \begin{itemize}
-%         \item \textit{Da evitare:} $\sigma_{condizione}(A \bowtie B)$
-%         \item \textit{Ottimizzato:} $(\sigma_{condizione}(A)) \bowtie B$
-%     \end{itemize}
-
-%     \item \textbf{Push-down delle proiezioni (Anticipare le proiezioni):}
-%     Eliminare gli attributi (colonne) inutili prima del join per limitare l'occupazione di memoria, mantenendo strettamente gli attributi di legame e quelli richiesti nell'output finale.
-%     \begin{itemize}
-%         \item \textit{Da evitare:} $\pi_{attributi\_finali}(A \bowtie B)$
-%         \item \textit{Ottimizzato:} $\pi_{attributi\_finali}(\pi_{attributi\_utili}(A) \bowtie \pi_{attributi\_utili}(B))$
-%     \end{itemize}
-
-%     \item \textbf{Privilegiare l'operatore di Join rispetto al Prodotto Cartesiano:}
-%     Il prodotto cartesiano ($\times$) incrocia ciecamente ogni tupla della prima relazione con ogni tupla della seconda. Deve essere sempre sostituito da un join con condizione (Theta-Join) o da un join naturale.
-%     \begin{itemize}
-%         \item \textit{Da evitare:} $\sigma_{A.id = B.id}(A \times B)$
-%         \item \textit{Ottimizzato:} $A \bowtie_{A.id = B.id} B$
-%     \end{itemize}
-% \end{itemize}
-
-% \subsection*{Le Cattive Pratiche (Anti-Pattern pratici in SQL)}
-% \begin{itemize}
-%     \item \textbf{Comma Join (SQL-89):} Dichiarare le tabelle separate da virgola (\texttt{FROM A, B}) e usare il \texttt{WHERE} per l'uguaglianza equivale a un prodotto cartesiano mascherato. Si deve utilizzare sempre lo standard esplicito \texttt{JOIN ... ON}.
-%     \item \textbf{Sub-query correlate non necessarie:} Filtrare una query principale rieseguendo una query annidata per ogni singola riga genera complessit\`a quadratica. Le sub-query devono essere "appiattite" e tradotte in costrutti di Join per permettere al Query Optimizer di sfruttare gli indici.
-%     \item \textbf{Violazione della Sargability (SARGable):} Applicare funzioni direttamente sulle colonne nel database (es. \texttt{YEAR(dataNascita) = 1990}) "acceca" il DBMS, impedendogli di usare gli indici e forzando una scansione completa della tabella (Table Scan). Si devono confrontare gli attributi grezzi con intervalli di valori (es. \texttt{dataNascita >= '1990-01-01' AND dataNascita <= '1990-12-31'}).
-% \end{itemize}
-
 
 % (quando eseguo un qualsiasi tipo di select il risultato è una tabella che non ha nome e non viene memorizzata. Questa tabella o viene usata subito, oppure si perde: il risultato di una interrogazione è volatile. Se voglio dare un nome al risultato devo eseguire ciò che si chiama VISTA. Le viste però non vengono comunque memorizzate. Se voglio dare un nome alla tabella per salvarla e riutilizzarla devo creare ciò che si chiama una VISTA MATERIALIZZATA. Quest'ultima sembra ovviamente più vantaggiosa, ma presenta degli svantaggi. Infatti i dati in essa contenuti dipendono in generale da altre tabelle. Quindi deve essere aggiornata, e questo ha un costo. Questo tipo di vista può essere aggiornata in base a criteri temporali o criteri condizionali)
 
@@ -76,26 +40,12 @@
 % confronti scalari. attributo =<> (subquery che restituisce un unico valore: una riga e una colonna)
 % questo fatto si può generalizzare nel caso in cui la subquery restituisca più di un valore. ANY, SOME , ALL. Esempi. 
 
-% (poi tratta la traduzione in sql delle operazioni di raggruppamento e funzioni di aggregazione, che noi abbiamo già trattato)
+% \section{bozze lezione 20 e 21}
+% ORDER BY. La clausola ASC è di default. Si può utilizzare ripetutamente nella stessa istruzione su attributi diversi e ordinandoli con criteri diversi (spiega bene questo concetto anche con un esempio ben calibrato). Sintatticamente si presenta sempre per ultima, mentre l'ordine di esecuzione è subito prima di select (che è sempre ultima)
 
-La clausola HAVING <condizione>. Se la clausola where filtra le righe in base ad una condizione, questa filtra i gruppi in base ad una condizione. Tale condizione può essere per valori di raggruppamento o per valori di conteggio 
+% [fine lezione 20 - grossa parte lezione 21: da aggiustare e definire meglio]espressioni al posto degli attributi. Questo è un trucco che trova vasta applicazione. Uso di espressioni costanti. Funzioni predefinite dello standard sql per definire espressioni. Queste finzioni possono essere estese con funzioni personalizzate(a questo punto io inserirei tutti i tipi di espressioni utilizzabili, indicando quelle di uso più comune). Esempi. 
 
-% (a questa parte sull'ordine di esecuzione dedicheremo un paragrafo a parte, per ora trascurala)
-% L'ordine di esecuzione in sql è diverso dall'ordine in cui si scrivono. L'ordine di esecuzione è: 
-% FROM, con eventuale calcolo di prodotti e giunzioni
-% WHERE filtro le righe
-% GROUP BY creo i gruppi sulle righe filtrate nello step con where
-% HAVING filtro i gruppi che godono di una certa proprietà
-% SELECT proiezioni e funzioni di aggregazione
-
-% Buona pratica: scrivere per ultima la clausola select
-
-% Attenzione: il group by crea una riga per ogni raggruppamento e le righe selezionate con il where non esistono più
-
-% Osservazione: la regola sintattica che abbiamo visto in raggruppamento e aggregazione è una conseguenza di questo ordine di esecuzione. Spiegalo con un esempio. 
-
-
-
+% Asserzioni e la clausola check
 
 
 % template per esercizio: 
