@@ -72,6 +72,28 @@
 
 
 % \section{bozze lezione 19}
+% continuiamo ancora con subqueries in WHERE
+% confronti scalari. attributo =<> (subquery che restituisce un unico valore: una riga e una colonna)
+% questo fatto si può generalizzare nel caso in cui la subquery restituisca più di un valore. ANY, SOME , ALL. Esempi. 
+
+% (poi tratta la traduzione in sql delle operazioni di raggruppamento e funzioni di aggregazione, che noi abbiamo già trattato)
+
+La clausola HAVING <condizione>. Se la clausola where filtra le righe in base ad una condizione, questa filtra i gruppi in base ad una condizione. Tale condizione può essere per valori di raggruppamento o per valori di conteggio 
+
+% (a questa parte sull'ordine di esecuzione dedicheremo un paragrafo a parte, per ora trascurala)
+% L'ordine di esecuzione in sql è diverso dall'ordine in cui si scrivono. L'ordine di esecuzione è: 
+% FROM, con eventuale calcolo di prodotti e giunzioni
+% WHERE filtro le righe
+% GROUP BY creo i gruppi sulle righe filtrate nello step con where
+% HAVING filtro i gruppi che godono di una certa proprietà
+% SELECT proiezioni e funzioni di aggregazione
+
+% Buona pratica: scrivere per ultima la clausola select
+
+% Attenzione: il group by crea una riga per ogni raggruppamento e le righe selezionate con il where non esistono più
+
+% Osservazione: la regola sintattica che abbiamo visto in raggruppamento e aggregazione è una conseguenza di questo ordine di esecuzione. Spiegalo con un esempio. 
+
 
 
 
