@@ -845,11 +845,88 @@ Per prassi logica gli attributi in \texttt{SELECT} sono quasi sempre gli stessi 
 
 \end{warningbox}
 
+
 \section{Interrogazioni Nidificate (Subqueries)}
 
-A differenza dell'algebra relazionale, in cui le operazioni vengono concatenate linearmente, il linguaggio SQL permette di inserire un'interrogazione (\texttt{SELECT}) all'interno di un'altra interrogazione. Questo costrutto, noto come \textbf{interrogazione nidificata} o \textit{subquery}, è uno strumento potente che consente di risolvere interrogazioni complesse scomponendole in passi logici successivi.
+Nel linguaggio SQL, un'interrogazione (\texttt{SELECT}) può essere innestata all'interno di un'altra in diversi punti della struttura sintattica.
 
-La query principale viene definita \textbf{esterna} (Outer Query), mentre quella racchiusa tra parentesi tonde viene definita \textbf{interna} (Inner Query). Il risultato della query interna viene calcolato per primo e passato dinamicamente alla query esterna come parametro di filtro.
+\subsection{Subqueries in WHERE}
 
-Le interrogazioni nidificate si classificano in base alla forma del risultato che restituiscono, il quale determina l'operatore logico che la query esterna deve utilizzare per valutarle.
+\paragraph{L'operatore [NOT] EXISTS e le Subquery Correlate}
+
+La clausola \texttt{EXISTS} valuta esclusivamente se l'insieme restituito dalla subquery è vuoto o meno. Restituisce \texttt{TRUE} se la sotto-interrogazione produce almeno una riga, \texttt{FALSE} in caso contrario.
+
+\begin{example}[Studenti senza esami tramite NOT EXISTS]
+Per isolare gli studenti privi di esami registrati:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome
+FROM studente AS s
+WHERE NOT EXISTS (
+    SELECT *
+    FROM esame AS e
+    WHERE e.matr = s.matricola
+);
+\end{lstlisting}
+\end{example}
+
+\begin{observation}[Scope dei Nomi e Interrogazioni Correlate]
+Nell'esempio precedente, la query interna utilizza nella clausola \texttt{WHERE} l'alias \texttt{s.matricola}, che appartiene allo \textit{scope} (visibilità) della query esterna. In SQL, una subquery può "vedere" gli attributi definiti nei blocchi superiori, ma non viceversa.
+
+Quando una sotto-interrogazione referenzia uno o più attributi della query esterna, viene definita \textbf{correlata}. Una subquery correlata è totalmente dipendente dal contesto esterno e \textbf{non} può essere eseguita in modo isolato. Di conseguenza, \textit{il motore del database è costretto a rieseguire la query interna per ogni singola riga analizzata dalla query esterna}.
+\end{observation}
+
+\paragraph{L'operatore [NOT] IN e le Subquery Scorrelate}
+
+L'operatore \texttt{IN} viene impiegato per verificare se un determinato attributo (o gruppo di attributi) è presente all'interno dell'elenco di valori generato dalla subquery.
+
+\medskip
+
+\begin{example}[Uso di IN con Subquery Scorrelata]
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matricola, nome
+FROM studente
+WHERE matricola IN (
+    SELECT matr
+    FROM esame
+    WHERE corso = 'Basi di Dati'
+);
+\end{lstlisting}
+\end{example}
+
+\begin{warningbox}[Analisi Prestazionale: Correlata vs Scorrelata]
+Nell'esempio soprastante, la subquery non fa alcun riferimento agli attributi della query esterna. Viene pertanto definita \textbf{scorrelata} (o indipendente).
+
+Il vantaggio principale di una subquery scorrelata è che può essere eseguita \textbf{una sola volta} in modo del tutto autonomo. Il DBMS calcola il risultato, lo immagazzina in memoria e lo utilizza per valutare tutte le righe della tabella principale. 
+Tuttavia, non bisogna commettere l'errore di credere che le interrogazioni scorrelate siano sempre prestazionalmente superiori a quelle correlate. Se la tabella virtuale generata dalla subquery scorrelata dovesse risultare enorme (es. milioni di record), il costo computazionale di dover scansionare ripetutamente quell'immensa lista per ogni riga esterna diventerebbe insostenibile. La natura scorrelata garantisce un vantaggio significativo \textbf{se e solo se} la tabella risultante è di dimensioni sufficientemente ridotte da poter essere interrogata rapidamente.
+\end{warningbox}
+
+\paragraph{Sintassi Generale e Confronto Multi-Attributo}
+
+L'uso degli operatori come \texttt{IN} o gli operatori di confronto standard non è limitato alla singola colonna. È possibile valutare intere $n$-uple di attributi contemporaneamente, purché venga rispettato un vincolo strutturale: \textbf{il numero e il dominio degli attributi a sinistra dell'operatore deve corrispondere ordinatamente a quelli degli attributi presenti nella \texttt{SELECT} innestata}. In caso di più attributi, l'uso delle parentesi è obbligatorio. 
+
+\textit{Sintassi generale:}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT <elenco_attributi_esterni>
+FROM <tabella_esterna>
+WHERE (attr_1, attr_2, ..., attr_n) [OPERATORE] (
+    SELECT espressione_1, espressione_2, ..., espressione_n
+    FROM <tabella_interna>
+    WHERE <condizione>
+);
+\end{lstlisting}
+
+\begin{example}[Confronto simultaneo su tuple multiple]
+Supponiamo di voler estrarre gli studenti che hanno conseguito esattamente lo stesso voto, nello stesso corso, di un determinato studente target (es. la matricola 101).
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matr, corso, voto
+FROM esame
+WHERE matr <> 101 AND (corso, voto) IN (
+    SELECT corso, voto
+    FROM esame
+    WHERE matr = 101
+);
+\end{lstlisting}
+Il DBMS valuterà in blocco la tupla \texttt{(corso, voto)} della query esterna verificandone la presenza tra le tuple \texttt{(corso, voto)} restituite dalla query interna.
+\end{example}
 
