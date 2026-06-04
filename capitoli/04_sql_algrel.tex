@@ -954,7 +954,7 @@ WHERE media_voti > 27;
 
 Nel linguaggio SQL, un'interrogazione (\texttt{SELECT}) può essere innestata all'interno di un'altra in diversi punti della struttura sintattica.
 
-\subsection{Subqueries in WHERE}
+\subsection{Subqueries in WHERE (filtri dinamici)}
 
 \paragraph{L'operatore [NOT] EXISTS e le Subquery Correlate}
 
@@ -1033,4 +1033,210 @@ WHERE matr <> 101 AND (corso, voto) IN (
 \end{lstlisting}
 Il DBMS valuterà in blocco la tupla \texttt{(corso, voto)} della query esterna verificandone la presenza tra le tuple \texttt{(corso, voto)} restituite dalla query interna.
 \end{example}
+
+\paragraph{Confronti Scalari}
+
+Quando la logica dell'interrogazione garantisce che la subquery restituirà \textbf{esattamente un unico valore} (una sola riga e una sola colonna), essa prende il nome di subquery scalare. In questo scenario, la query interna può essere utilizzata sul lato destro dei tradizionali operatori di confronto relazionale (\texttt{=, <>, >, <, >=, <=}).
+
+Questo costrutto è tipicamente impiegato quando la subquery utilizza una funzione di aggregazione globale (senza clausola \texttt{GROUP BY}), la quale per definizione matematica collassa l'intera relazione in uno scalare.
+
+\begin{example}[Subquery scalare: Voti sopra la media]
+Vogliamo estrarre le matricole degli studenti che hanno superato l'esame di "Basi di Dati" con un voto strettamente superiore alla media generale di quello specifico corso.
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matr, voto
+FROM esame
+WHERE corso = 'Basi di Dati' 
+  AND voto > (
+      SELECT AVG(voto)
+      FROM esame
+      WHERE corso = 'Basi di Dati'
+  );
+\end{lstlisting}
+Se, a tempo di esecuzione, una subquery concepita come scalare dovesse inaspettatamente restituire più di una riga, il DBMS solleverebbe un errore critico bloccando l'esecuzione.
+\end{example}
+
+\paragraph{Quantificatori: ANY, SOME e ALL}
+
+Per generalizzare il concetto dei confronti qualora la subquery restituisca \textbf{una colonna con molteplici righe}, lo standard SQL estende i normali operatori relazionali combinandoli con i quantificatori logici \texttt{ANY} (il cui sinonimo perfettamente equivalente è \texttt{SOME}) e \texttt{ALL}.
+
+\begin{itemize}
+    \item \textbf{\texttt{> ANY} (o \texttt{< ANY}, \texttt{= ANY}, ecc.):} Il predicato risulta \texttt{TRUE} se la condizione è soddisfatta per \textbf{almeno uno} dei valori restituiti dalla subquery. (Nota: \texttt{= ANY} è logicamente e sintatticamente identico all'operatore \texttt{IN}).
+    \item \textbf{\texttt{> ALL} (o \texttt{< ALL}, \texttt{<> ALL}, ecc.):} Il predicato risulta \texttt{TRUE} se la condizione è soddisfatta per \textbf{tutti} i valori restituiti dalla subquery. (Nota: \texttt{<> ALL} è logicamente e sintatticamente identico all'operatore \texttt{NOT IN}).
+\end{itemize}
+
+\begin{example}[Uso di ANY e ALL]
+Supponiamo di voler trovare gli studenti che hanno preso un voto in "Basi di Dati" superiore a \textit{qualsiasi} voto mai registrato nel corso di "Reti". 
+
+Se vogliamo assicurarci che il voto sia maggiore del più alto voto in assoluto preso in "Reti" (deve batterli \textbf{tutti}):
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matr
+FROM esame
+WHERE corso = 'Basi di Dati' 
+  AND voto > ALL (
+      SELECT voto
+      FROM esame
+      WHERE corso = 'Reti'
+  );
+\end{lstlisting}
+
+Se invece ci basta che il voto sia superiore ad \textbf{almeno uno} dei voti presi in "Reti" (ovvero, basta che sia maggiore del voto minimo registrato in quel corso):
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matr
+FROM esame
+WHERE corso = 'Basi di Dati' 
+  AND voto > ANY (
+      SELECT voto
+      FROM esame
+      WHERE corso = 'Reti'
+  );
+\end{lstlisting}
+\end{example}
+
+\begin{bestpractice}[La realtà ingegneristica: MAX e MIN vs ANY e ALL]
+Sebbene \texttt{ANY} e \texttt{ALL} appartengano allo standard SQL fin dalle origini per pura aderenza alla teoria degli insiemi, nella pratica industriale moderna sono operatori considerati obsoleti e raramente utilizzati dagli sviluppatori. 
+
+Il motivo è duplice: sono controintuitivi da leggere per un umano e, spesso, meno ottimizzati dai DBMS. Scrivere \texttt{voto > ALL (...)} è funzionalmente identico a scrivere \texttt{voto > (SELECT MAX(voto) ...)}, ma la seconda versione (con la subquery scalare e la funzione \texttt{MAX}) risulta semanticamente molto più esplicita e permette al motore di estrarre il valore massimo in modo estremamente più rapido ed efficiente rispetto a un controllo logico riga per riga richiesto da \texttt{ALL}.
+\end{bestpractice}
+
+\subsection{Subqueries in FROM (Tabelle Derivate o Inline Views)}
+
+Oltre ad essere utilizzate come filtri dinamici nella clausola \texttt{WHERE}, le interrogazioni nidificate possono essere posizionate direttamente all'interno della clausola \texttt{FROM}. In questo contesto, il risultato della subquery viene trattato dal motore relazionale come se fosse una vera e propria tabella fisica temporanea, sulla quale è possibile effettuare proiezioni, selezioni e giunzioni (\texttt{JOIN}).
+
+Questa struttura prende il nome tecnico di \textbf{Tabella Derivata} (\textit{Derived Table}) o \textbf{Inline View} (vista in linea). Il concetto logico è identico a quello di una vista permanente (\texttt{VIEW}), con la differenza fondamentale che una tabella derivata è effimera: esiste esclusivamente nella memoria del server per la durata di esecuzione della singola interrogazione principale, senza inquinare il dizionario del database.
+
+\paragraph{Il Vincolo dell'Alias Obbligatorio}
+A differenza delle normali tabelle fisiche in cui la ridenominazione è opzionale, lo standard SQL impone una regola sintattica ferrea per le tabelle derivate: \textbf{ogni subquery posizionata nel \texttt{FROM} deve obbligatoriamente essere seguita da un alias} (es. \texttt{AS nome\_alias}). Senza questo identificativo, la query esterna non avrebbe alcun modo per referenziare le colonne prodotte dalla subquery, e il DBMS bloccherebbe la compilazione sollevando un errore di sintassi.
+
+\begin{example}[Pre-aggregazione tramite Tabella Derivata]
+Supponiamo di voler estrarre l'anagrafica degli studenti affiancando a ciascuno il proprio voto massimo, ma prendendo in considerazione esclusivamente coloro che hanno conseguito almeno un 30.
+
+Invece di raggruppare l'intera unione di studenti ed esami, possiamo creare una tabella temporanea già raggruppata e pre-filtrata, per poi congiungerla con i dati anagrafici tramite un \texttt{INNER JOIN}:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT s.matricola, s.nome, eccellenze.voto_max
+FROM studente AS s
+JOIN (
+    SELECT matr, MAX(voto) AS voto_max
+    FROM esame
+    GROUP BY matr
+    HAVING MAX(voto) = 30
+) AS eccellenze ON s.matricola = eccellenze.matr;
+\end{lstlisting}
+
+In questo scenario, l'ordine di esecuzione prevede che il DBMS calcoli prima la subquery isolata, costruendo in memoria la tabella virtuale \texttt{eccellenze}. Solo successivamente elaborerà il \texttt{JOIN} tra la tabella fisica \texttt{studente} e la neonata tabella derivata.
+\end{example}
+
+\begin{bestpractice}[Vantaggio Architetturale: Sostituire le Correlate]
+Nell'ingegneria dei dati reale, l'uso delle subquery nel \texttt{FROM} rappresenta la soluzione d'elezione per ottimizzare le prestazioni. Molte interrogazioni che verrebbero intuitivamente scritte utilizzando lente \textit{subquery correlate} nel \texttt{WHERE} (le quali costringono il motore a riavviare il calcolo riga per riga), possono essere "srotolate" calcolando preventivamente il dato in blocco all'interno di una tabella derivata nel \texttt{FROM}, unendolo poi con un normale \texttt{JOIN}. 
+
+Questo approccio sposta il carico di lavoro dai lenti cicli iterativi ai velocissimi algoritmi di giunzione massiva del DBMS, abbattendo drasticamente la complessità computazionale e i tempi di esecuzione.
+\end{bestpractice}
+
+\subsection{Subqueries in SELECT (Colonne Calcolate)}
+
+L'ultimo posizionamento strutturale consentito dallo standard SQL per un'interrogazione nidificata è all'interno della clausola \texttt{SELECT}. In questo scenario, la subquery non filtra le tuple né genera tabelle di base, ma agisce a tutti gli effetti come un'espressione che calcola dinamicamente il valore di una singola colonna per ogni riga restituita dall'interrogazione esterna.
+
+\paragraph{Il Vincolo Scalare Assoluto}
+La regola matematica per le subquery nella clausola \texttt{SELECT} è la più rigida in assoluto: \textbf{l'interrogazione interna deve essere strettamente scalare}. Deve cioè restituire, in ogni circostanza possibile, \textbf{esattamente una sola riga e una sola colonna}. Se a tempo di esecuzione la subquery producesse due colonne o due righe, il DBMS non saprebbe come incastrare quell'insieme bidimensionale all'interno di una singola cella della tabella risultante e solleverebbe un'eccezione bloccante (errore di cardinalità).
+
+\begin{example}[Affiancare aggregazioni globali a dati di riga]
+Un classico caso d'uso ingegneristico è la necessità di confrontare un dato specifico con una statistica globale, evitando di alterare la granularità dell'interrogazione esterna con un complesso \texttt{GROUP BY}.
+Vogliamo estrarre il nome degli studenti e affiancare a ciascuno la media generale di tutto l'ateneo, per poterne successivamente calcolare lo scostamento:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    matricola, 
+    nome, 
+    (SELECT AVG(voto) FROM esame) AS media_ateneo
+FROM studente;
+\end{lstlisting}
+Poiché la subquery è scorrelata, il motore calcolerà la media globale una sola volta (es. 26.5) e replicherà quel valore scalare identico in ogni riga prodotta dalla tabella \texttt{studente}.
+\end{example}
+
+\begin{warningbox}[Il collasso prestazionale: Subquery Correlate nella SELECT]
+È possibile, e sintatticamente lecito, inserire subquery \textbf{correlate} all'interno della \texttt{SELECT}. Ad esempio, per stampare per ogni studente il numero dei suoi esami sostenuti:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    s.matricola,
+    s.nome,
+    (SELECT COUNT(*) FROM esame AS e WHERE e.matr = s.matricola) AS num_esami
+FROM studente AS s;
+\end{lstlisting}
+
+Sebbene il codice risulti compatto e molto leggibile, dal punto di vista ingegneristico questa pratica è considerata un \textbf{anti-pattern gravissimo} se applicata a tabelle di grandi dimensioni. Poiché la subquery è correlata, il motore del database è fisicamente costretto a lanciare l'interrogazione di conteggio \textit{ex novo} per ogni singola riga della tabella principale. Su una tabella di un milione di studenti, il DBMS eseguirà un milione e una interrogazioni separate. 
+
+Nel codice di produzione, questa logica deve quasi sempre essere riscritta utilizzando un \texttt{LEFT OUTER JOIN} abbinato a un \texttt{GROUP BY}, oppure sfruttando una Tabella Derivata nel \texttt{FROM}, delegando così il calcolo ai velocissimi algoritmi insiemistici del motore relazionale anziché a un ciclo iterativo riga per riga.
+\end{warningbox}
+
+\section{Viste vs Interrogazioni Nidificate}
+
+Dal punto di vista puramente logico e algebrico, una Vista e una sotto-interrogazione (in particolare una \textit{Inline View} nella clausola \texttt{FROM}) svolgono la medesima funzione: incapsulano una logica di calcolo per generare una "tabella virtuale". Poiché le viste offrono un grado di modularità, astrazione e leggibilità nettamente superiore, è lecito domandarsi per quale motivo lo standard SQL e l'industria del software continuino a fare un uso massiccio delle subquery.
+
+La risposta risiede in tre limiti strutturali e ingegneristici che rendono le interrogazioni nidificate uno strumento insostituibile nel codice di produzione.
+
+\paragraph{L'Inquinamento dello Schema (Schema Bloat)}
+Una vista non è una semplice stringa di codice temporanea, ma un \textbf{oggetto di database permanente} che viene registrato formalmente nel \textit{Data Dictionary} del sistema. 
+Nello sviluppo di applicazioni aziendali, un'interrogazione complessa può richiedere molteplici filtraggi o raggruppamenti intermedi usa-e-getta. Se gli sviluppatori dovessero creare una vista permanente per ogni singolo calcolo intermedio, il database accumulerebbe in breve tempo decine di migliaia di viste inutili, rendendo la manutenzione del sistema un incubo. 
+Le subquery, al contrario, sono \textbf{effimere}: nascono, elaborano i dati e vengono distrutte dalla memoria non appena la query principale termina l'esecuzione, mantenendo l'architettura del database pulita.
+
+\paragraph{Il Limite: L'impossibilità della Correlazione}
+Questo rappresenta l'ostacolo teorico invalicabile per la sostituzione totale. Come analizzato nei capitoli precedenti, una subquery \textbf{correlata} riceve e utilizza un parametro dinamico passato riga per riga dalla query esterna.
+Una vista, al contrario, è per definizione un oggetto \textbf{statico} e precompilato, privo di argomenti in ingresso. È quindi impossibile trasformare una subquery correlata (es. \texttt{WHERE e.matr = s.matricola}) in una vista autonoma, poiché al di fuori di quell'esatto ciclo di esecuzione la vista ignorerebbe totalmente il significato dell'alias \texttt{s.matricola}.
+
+\paragraph{Permessi di Sicurezza e Amministrazione (DML vs DDL)}
+Nei sistemi informativi reali, l'accesso ai database è governato dal principio del privilegio minimo.
+\begin{itemize}
+    \item Scrivere ed eseguire una subquery è un'operazione di interrogazione dati (\textbf{DML} - \textit{Data Manipulation Language}). Richiede unicamente il permesso di lettura (\texttt{SELECT}) sulle tabelle di base coinvolte.
+    \item Creare una vista è un'operazione di definizione strutturale (\textbf{DDL} - \textit{Data Definition Language}). Richiede permessi di amministrazione avanzati (es. \texttt{CREATE VIEW}) che gli sviluppatori standard o gli analisti dati non possiedono mai negli ambienti di produzione per ragioni di sicurezza.
+\end{itemize}
+Senza la possibilità di formulare subquery al volo, gli utenti non privilegiati sarebbero di fatto impossibilitati a scrivere interrogazioni complesse.
+
+\begin{bestpractice}[Best Practice: Views vs Subqueries]
+La separazione dei ruoli nell'ingegneria del software è netta:
+\begin{itemize}
+    \item Si implementa una \textbf{Vista} quando una specifica logica di calcolo (es. "calcolo del fatturato trimestrale per dipartimento") deve essere interrogata quotidianamente da molteplici utenti, query o applicazioni diverse, massimizzandone il riutilizzo.
+    \item Si utilizza una \textbf{Subquery} quando si necessita di un "tavolo di lavoro temporaneo" per isolare e risolvere un problema specifico all'interno di un'unica e isolata interrogazione.
+\end{itemize}
+\end{bestpractice}
+
+\section{Ordinamento dei Risultati: La clausola ORDER BY}
+
+Nel modello relazionale puro, le tabelle sono insiemi matematici non ordinati. Il DBMS restituisce le righe nell'ordine in cui le legge fisicamente dal disco o dalla memoria, che è del tutto imprevedibile. Per imporre un ordinamento logico e deterministico al \textit{Result Set} finale, lo standard SQL mette a disposizione la clausola \texttt{ORDER BY}.
+
+Dal punto di vista della sintassi, \texttt{ORDER BY} deve essere \textbf{rigorosamente l'ultima clausola} dell'intera interrogazione.
+
+\paragraph{Direzione di Ordinamento e Criteri Multipli}
+La clausola accetta uno o più attributi, a ciascuno dei quali può essere associato un modificatore di direzione:
+\begin{itemize}
+    \item \textbf{\texttt{ASC}} (Ascendente): Ordina dal minore al maggiore (A-Z, 0-9). È il comportamento \textbf{di default} assoluto e può essere omesso.
+    \item \textbf{\texttt{DESC}} (Discendente): Ordina dal maggiore al minore (Z-A, 9-0).
+\end{itemize}
+
+Una delle caratteristiche architetturali più potenti dell'\texttt{ORDER BY} è la possibilità di applicare l'ordinamento su \textbf{molteplici attributi} in cascata, ciascuno con il proprio criterio indipendente. Il motore elabora la lista da sinistra verso destra: il primo attributo definisce l'ordinamento primario; solo in caso di "pareggio" (valori identici nel primo attributo), il motore utilizza il secondo attributo per risolvere il conflitto, e così via.
+
+\begin{example}[Ordinamento combinato: ASC e DESC]
+Vogliamo visualizzare un elenco di esami superati, raggruppandoli visivamente per corso (in ordine alfabetico). A parità di corso, vogliamo vedere i voti dal più alto al più basso.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT corso, matr, voto
+FROM esame
+WHERE voto >= 18
+ORDER BY corso ASC, voto DESC;
+\end{lstlisting}
+Il DBMS creerà blocchi alfabetici per i corsi (es. prima "Analisi", poi "Basi di Dati"). All'interno del blocco "Basi di Dati", le righe saranno ordinate internamente partendo dal 30 a scendere.
+\end{example}
+
+\begin{warningbox}[Ordine di esecuzione e gestione dei NULL]
+A differenza di quanto si possa intuire, la clausola \texttt{ORDER BY} è l'unica istruzione del linguaggio SQL ad essere eseguita \textbf{DOPO} la \texttt{SELECT}. 
+
+La sequenza di esecuzione definitiva del motore è:
+\texttt{FROM} $\rightarrow$ \texttt{WHERE} $\rightarrow$ \texttt{GROUP BY} $\rightarrow$ \texttt{HAVING} $\rightarrow$ \textbf{\texttt{SELECT}} $\rightarrow$ \textbf{\texttt{ORDER BY}}.
+
+Questa è una necessità matematica: operando per ultima, la clausola di ordinamento ha piena visibilità su tutto ciò che è stato calcolato o ridenominato dalla \texttt{SELECT}, permettendo di ordinare i risultati in base a colonne generate al volo o ai loro alias.
+
+Un altro dettaglio strutturale vitale nello sviluppo reale riguarda la gestione dei valori \texttt{NULL}. Come si posiziona un "dato mancante" in una lista ordinata? Non essendo quantificabile, il DBMS lo tratta come un'entità a sé stante. A seconda del motore utilizzato (Oracle, PostgreSQL, SQL Server), durante un ordinamento tutti i valori \texttt{NULL} verranno spinti in blocco all'inizio o alla fine del \textit{Result Set}. Se non si gestisce esplicitamente questa casistica, si rischia di avere interfacce applicative in cui le prime cento righe visualizzate da un utente risultano completamente vuote.
+\end{warningbox}
+
+
 

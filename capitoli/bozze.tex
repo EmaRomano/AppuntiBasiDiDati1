@@ -35,13 +35,8 @@
 % (quando eseguo un qualsiasi tipo di select il risultato è una tabella che non ha nome e non viene memorizzata. Questa tabella o viene usata subito, oppure si perde: il risultato di una interrogazione è volatile. Se voglio dare un nome al risultato devo eseguire ciò che si chiama VISTA. Le viste però non vengono comunque memorizzate. Se voglio dare un nome alla tabella per salvarla e riutilizzarla devo creare ciò che si chiama una VISTA MATERIALIZZATA. Quest'ultima sembra ovviamente più vantaggiosa, ma presenta degli svantaggi. Infatti i dati in essa contenuti dipendono in generale da altre tabelle. Quindi deve essere aggiornata, e questo ha un costo. Questo tipo di vista può essere aggiornata in base a criteri temporali o criteri condizionali)
 
 
-% \section{bozze lezione 19}
-% continuiamo ancora con subqueries in WHERE
-% confronti scalari. attributo =<> (subquery che restituisce un unico valore: una riga e una colonna)
-% questo fatto si può generalizzare nel caso in cui la subquery restituisca più di un valore. ANY, SOME , ALL. Esempi. 
 
 % \section{bozze lezione 20 e 21}
-% ORDER BY. La clausola ASC è di default. Si può utilizzare ripetutamente nella stessa istruzione su attributi diversi e ordinandoli con criteri diversi (spiega bene questo concetto anche con un esempio ben calibrato). Sintatticamente si presenta sempre per ultima, mentre l'ordine di esecuzione è subito prima di select (che è sempre ultima)
 
 % [fine lezione 20 - grossa parte lezione 21: da aggiustare e definire meglio]espressioni al posto degli attributi. Questo è un trucco che trova vasta applicazione. Uso di espressioni costanti. Funzioni predefinite dello standard sql per definire espressioni. Queste finzioni possono essere estese con funzioni personalizzate(a questo punto io inserirei tutti i tipi di espressioni utilizzabili, indicando quelle di uso più comune). Esempi. 
 
