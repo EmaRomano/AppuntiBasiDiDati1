@@ -1238,5 +1238,71 @@ Questa è una necessità matematica: operando per ultima, la clausola di ordinam
 Un altro dettaglio strutturale vitale nello sviluppo reale riguarda la gestione dei valori \texttt{NULL}. Come si posiziona un "dato mancante" in una lista ordinata? Non essendo quantificabile, il DBMS lo tratta come un'entità a sé stante. A seconda del motore utilizzato (Oracle, PostgreSQL, SQL Server), durante un ordinamento tutti i valori \texttt{NULL} verranno spinti in blocco all'inizio o alla fine del \textit{Result Set}. Se non si gestisce esplicitamente questa casistica, si rischia di avere interfacce applicative in cui le prime cento righe visualizzate da un utente risultano completamente vuote.
 \end{warningbox}
 
+\section{Espressioni e Funzioni Predefinite nella SELECT}
+
+Finora abbiamo utilizzato la clausola \texttt{SELECT} per estrarre il valore puro degli attributi fisici presenti nelle tabelle. Tuttavia, lo standard SQL permette di sostituire o affiancare i nomi delle colonne con \textbf{espressioni calcolate} al volo. Un'espressione può essere una costante, un'operazione matematica o il risultato di una funzione predefinita.
+
+\subsection{Uso di Espressioni Costanti}
+Inserire una costante nella \texttt{SELECT} impone al DBMS di proiettare quel valore letterale identico per ogni singola riga del \textit{Result Set}. 
+Questa tecnica trova vastissima applicazione ingegneristica per "taggare" i risultati, specialmente quando si uniscono dati da tabelle diverse tramite \texttt{UNION}, o per generare flag di controllo.
+
+\begin{example}[Etichettatura tramite costanti]
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT matricola, nome, 'Studente Attivo' AS stato_iscrizione, 2024 AS anno_riferimento
+FROM studente;
+\end{lstlisting}
+Il DBMS creerà due nuove colonne virtuali: \texttt{stato\_iscrizione} conterrà la stringa "Studente Attivo" e \texttt{anno\_riferimento} conterrà il numero 2024 per tutte le tuple estratte.
+\end{example}
+
+\subsection{Panoramica delle Funzioni Predefinite Standard}
+Lo standard SQL fornisce una libreria di funzioni scalari (\textit{Built-in Functions}) per manipolare i dati riga per riga. A differenza delle funzioni di aggregazione (\texttt{SUM}, \texttt{MAX}) che operano su interi gruppi, le funzioni scalari prendono in input i valori di una singola tupla e restituiscono un singolo valore trasformato.
+
+\paragraph{1. Funzioni Matematiche}
+Consentono di eseguire calcoli algebrici direttamente sul server database, evitando di sovraccaricare la memoria del codice applicativo (Java, Python, ecc.).
+\begin{itemize}
+    \item \texttt{ROUND(valore, decimali)}: Arrotonda un numero alla precisione specificata.
+    \item \texttt{ABS(valore)}: Calcola il valore assoluto.
+    \item Operatori aritmetici standard: \texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}
+\end{itemize}
+
+\paragraph{2. Funzioni per le Stringhe}
+Permettono di manipolare campi testuali (es. formattazione, estrazione di sottostringhe).
+\begin{itemize}
+    \item \texttt{UPPER(stringa)} e \texttt{LOWER(stringa)}: Convertono rispettivamente in maiuscolo e minuscolo. Utili per effettuare confronti \textit{case-insensitive} nella clausola \texttt{WHERE}.
+    \item \texttt{SUBSTRING(stringa FROM inizio FOR lunghezza)}: Estrae una porzione di testo.
+    \item \textbf{Concatenazione}: Lo standard ANSI utilizza l'operatore \texttt{||} per unire due stringhe (es. \texttt{nome || ' ' || cognome}).
+\end{itemize}
+
+\paragraph{3. Funzioni per le Date (Temporali)}
+La gestione del tempo è fondamentale nei database relazionali. Lo standard ANSI SQL definisce funzioni specifiche per l'estrazione e la manipolazione temporale.
+\begin{itemize}
+    \item \texttt{CURRENT\_DATE} e \texttt{CURRENT\_TIMESTAMP}: Restituiscono rispettivamente la data odierna e la data comprensiva di orario al momento dell'esecuzione della query. (Non richiedono parentesi).
+    \item \texttt{EXTRACT(elemento FROM data)}: Estrae una componente specifica (es. \texttt{YEAR}, \texttt{MONTH}, \texttt{DAY}) da un attributo temporale.
+\end{itemize}
+
+\begin{example}[Manipolazione di Date e Stringhe]
+Vogliamo estrarre un report formattato con i cognomi in maiuscolo e l'anno esatto in cui è stato sostenuto un esame.
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    UPPER(s.cognome) AS cognome_formattato,
+    EXTRACT(YEAR FROM e.data_esame) AS anno_conseguimento,
+    ROUND(e.voto, 0) AS voto_intero
+FROM studente AS s
+JOIN esame AS e ON s.matricola = e.matr;
+\end{lstlisting}
+\end{example}
+
+\begin{warningbox}[La verità sul campo: La frammentazione dei dialetti SQL]
+Dal punto di vista ingegneristico, è vitale sapere che le funzioni scalari, e in particolar modo \textbf{le funzioni sulle date e la concatenazione delle stringhe}, rappresentano l'area in cui i vari produttori di DBMS si discostano maggiormente dallo standard ANSI. 
+
+Se \texttt{EXTRACT} è parte dello standard, nel mondo reale:
+\begin{itemize}
+    \item \textbf{SQL Server (Microsoft)} utilizza \texttt{DATEPART()} o \texttt{YEAR()} e concatena le stringhe col segno \texttt{+}.
+    \item \textbf{Oracle} utilizza \texttt{TO\_CHAR()} per estrarre parti di date.
+    \item \textbf{MySQL} utilizza \texttt{DATE\_FORMAT()} o funzioni dirette come \texttt{MONTH()} e concatena con la funzione \texttt{CONCAT()}.
+\end{itemize}
+In contesti didattici si usa la sintassi standard ANSI (\texttt{EXTRACT} e \texttt{||}), ma in ambiente lavorativo le interrogazioni contenenti funzioni sulle date raramente sono "portabili" da un database all'altro senza un'attenta riscrittura del codice.
+\end{warningbox}
+
 
 
