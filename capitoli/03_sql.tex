@@ -234,31 +234,31 @@ Si noti come la scelta dei domini rispecchi quanto discusso nel paragrafo preced
 \end{itemize}
 \end{example}
 
-\subsection{I Vincoli Intra-attributo (o in-line)}
+\subsection{paragraph}{I Vincoli Intra-attributo (o in-line)}
 
 I vincoli in-line sono regole di integrità applicate direttamente alla definizione di un singolo attributo, sulla stessa riga in cui viene dichiarato il tipo di dato. Servono a limitare i valori ammissibili nella singola cella, agendo come prima barriera contro la corruzione dei dati.
 
 Lo Standard SQL prevede quattro vincoli principali in-line:
 
-\subsubsection*{NOT NULL (Obbligatorietà)}
+\paragraph{NOT NULL (Obbligatorietà)}
 Indica che il campo non può mai assumere lo stato \texttt{NULL}. All'atto dell'inserimento di una nuova riga, l'utente è obbligato a fornire un valore valido per questa colonna.
 \begin{itemize}
     \item \textit{Uso:} Si applica a tutti i dati vitali che definiscono l'entità (es. il cognome di una persona, il titolo di un libro).
 \end{itemize}
 
-\subsubsection*{UNIQUE (Univocità di colonna)}
+\paragraph{UNIQUE (Univocità di colonna)}
 Impone che tutti i valori presenti in quella colonna siano distinti tra loro. Il DBMS rifiuterà qualsiasi tentativo di inserire una riga con un valore già esistente in un'altra riga per quel campo.
 \begin{itemize}
     \item \textit{Uso:} Si applica alle chiavi naturali candidate (es. il Codice Fiscale, l'Email). Nello standard SQL, a meno di specifiche implementazioni dei singoli DBMS, una colonna \texttt{UNIQUE} consente l'inserimento di molteplici valori \texttt{NULL}, poiché \texttt{NULL} rappresenta una incognita e due incognite non sono considerate uguali tra loro.
 \end{itemize}
 
-\subsubsection*{PRIMARY KEY (Chiave Primaria a livello di colonna)}
+\paragraph{PRIMARY KEY (Chiave Primaria a livello di colonna)}
 Elegge l'attributo a identificatore principale della tabella. Specificare \texttt{PRIMARY KEY} su una colonna implica contemporaneamente i vincoli \texttt{NOT NULL} e \texttt{UNIQUE}. Una tabella può avere \textbf{una sola} chiave primaria.
 \begin{itemize}
     \item \textit{Uso:} Si usa quando la chiave primaria è composta da un solo attributo (es. una chiave surrogata come \texttt{id} o una chiave naturale singola come \texttt{matricola}).
 \end{itemize}
 
-\subsubsection*{DEFAULT (Valore predefinito)}
+\paragraph{DEFAULT (Valore predefinito)}
 Non è un vincolo di integrità in senso stretto, ma una direttiva di assegnazione. Se durante un inserimento (\texttt{INSERT}) l'utente omette il valore per questa colonna, il DBMS vi inserisce automaticamente il valore specificato dopo la keyword \texttt{DEFAULT}.
 \begin{itemize}
     \item \textit{Uso:} Ottimo per impostare stati iniziali (es. \texttt{is\_attivo BOOLEAN DEFAULT TRUE}) o timestamp di creazione (es. \texttt{data\_inserimento DATE DEFAULT CURRENT\_DATE}).
@@ -293,7 +293,7 @@ Fino a questo momento abbiamo visto i vincoli applicati direttamente sulla stess
 La sintassi generale per dichiarare un vincolo a livello di tabella è:
 $$ \texttt{CONSTRAINT <nome\_vincolo> <TIPO\_VINCOLO> (colonna1, colonna2, \dots)} $$
 
-Sebbene la clausola \texttt{CONSTRAINT <nome>} sia opzionale (se omessa, il DBMS genera internamente un nome alfanumerico casuale, es. \texttt{SYS\_C00142}), nella pratica si raccomanda di assegnare sempre un nome esplicito e semantico (es. \texttt{pk\_studenti} o \texttt{unq\_cf}). 
+Sebbene l'indicazione del nome del vincolo sia opzionale (se omessa, il DBMS genera internamente un nome alfanumerico casuale, es. \texttt{SYS\_C00142}), nella pratica si raccomanda di assegnare sempre un nome esplicito e semantico (es. \texttt{pk\_studenti} o \texttt{unq\_cf}). 
 
 Nominare i vincoli è fondamentale per due operazioni architetturali:
 \begin{enumerate}
@@ -347,17 +347,17 @@ Esiste tuttavia una classificazione ben più importante, di natura \textbf{conce
 Secondo questa logica, i vincoli si dividono in quattro categorie a complessità crescente:
 
 \begin{enumerate}
-    \item \textbf{Vincoli di Dominio (o di Colonna):} 
+    \item \textbf{Vincoli di Dominio (o di colonna):} 
     Esprimono condizioni sui valori ammissibili per un singolo attributo, valutando la singola cella isolata dal resto. Sono i vincoli più leggeri da verificare per il motore del database.
     \begin{itemize}
         \item \textit{Osservazione sintattica:} Questo è tipicamente l'unico tipo di vincolo che ha senso logico definire \textit{in-line}.
         \item \textit{Esempi già incontrati:} Il vincolo di obbligatorietà (\texttt{NOT NULL}) e l'assegnazione di un valore predefinito (\texttt{DEFAULT}). Per verificare se un campo è nullo, il DBMS deve guardare solo quella specifica cella.
     \end{itemize}
 
-    \item \textbf{Vincoli di n-pla (o di Riga):}
+    \item \textbf{Vincoli di tupla (o di riga):}
     Esprimono condizioni logiche che coinvolgono contemporaneamente più attributi appartenenti alla stessa riga (tupla). Per verificare il vincolo, il DBMS deve estrarre l'intera riga, ma non ha bisogno di confrontarla con le altre righe della tabella.
 
-    \item \textbf{Vincoli Intra-relazionali (o di Tabella):}
+    \item \textbf{Vincoli Intra-relazionali (o di tabella):}
     Esprimono condizioni che coinvolgono più record all'interno della stessa tabella. Per validare il nuovo dato, il DBMS è costretto a scansionare o interrogare le altre righe già presenti.
     \begin{itemize}
         \item \textit{Esempi già incontrati:} \texttt{UNIQUE} e \texttt{PRIMARY KEY}. Per garantire che un Codice Fiscale sia univoco, non basta guardare la riga appena inserita; il database deve verificare che quel valore non sia già presente in nessun altro record della tabella.
@@ -424,7 +424,7 @@ Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicit
 
     \item \textbf{Vincoli Inter-relazionali (o di Schema):}
     \begin{itemize}
-        \item \texttt{fk\_esame\_studente} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studente}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente. 
+        \item \texttt{fk\_esame\_studente} (\texttt{FOREIGN KEY}): È il vincolo che garantisce l'integrità referenziale. Stabilisce un legame tra la tabella corrente (\texttt{esami}) e una tabella esterna (\texttt{studente}). Il database, per accettare la riga, è costretto a saltare fuori dalla tabella corrente e verificare la presenza della matricola nello schema dello studente. \textbf{Questo è l'unico tipo di vincolo inter-relazionale che si può inserire in una tabella}.
     \end{itemize}
 \end{enumerate}
 \end{example}
@@ -433,7 +433,7 @@ Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicit
 
 Il vincolo di \textbf{Chiave Esterna (FOREIGN KEY)} è il più importante tra i vincoli \textbf{inter-relazionali} (o di schema). Esso stabilisce una relazione di dipendenza tra due tabelle, imponendo che i valori presenti in un set di attributi della tabella corrente (\textit{tabella figlia} o \textit{referenziante}) debbano obbligatoriamente esistere all'interno del set di attributi che costituisce la chiave primaria (o un'altra chiave univoca) di un'altra tabella (\textit{tabella padre} o \textit{referenziata}).
 
-Matematicamente, garantisce l'\textbf{Integrità Referenziale}: non possono esistere "puntatori orfani" nel database.
+% Garantisce l'\textbf{Integrità Referenziale}: non possono esistere "puntatori orfani" nel database.
 
 Come abbiamo visto nel paragrafo precendente, la sintassi standard a livello di tabella è la seguente:
 \begin{lstlisting}[language=SQL]
@@ -451,7 +451,7 @@ L'associazione effettuata dal motore SQL \textbf{non avviene per nome, ma è str
 Il vero fulcro ingegneristico della chiave esterna emerge quando si tenta di alterare lo stato della tabella padre. Supponiamo che nel nostro database esista uno studente con matricola \texttt{'12345'} e che nella tabella \texttt{esami} vi siano tre record associati a tale matricola. 
 
 Cosa accade se un operatore tenta di \textbf{cancellare} lo studente \texttt{'12345'} dalla tabella \texttt{studenti}, o di \textbf{modificarne} la matricola? 
-Se il DBMS permettesse questa operazione alla leggera, i tre record della tabella \texttt{esami} punterebbero a una matricola inesistente, violando l'integrità referenziale.
+Se il DBMS permettesse questa operazione alla leggera, i tre record della tabella \texttt{esami} punterebbero a una matricola inesistente.
 
 Per risolvere questo problema, lo Standard SQL impone al progettista di specificare esplicitamente una \textbf{politica di reazione} sia per la cancellazione (\texttt{ON DELETE}) sia per l'aggiornamento (\texttt{ON UPDATE}).
 
@@ -459,7 +459,7 @@ Il progettista può scegliere tra quattro comportamenti distinti, da dichiarare 
 
 \begin{enumerate}
     \item \textbf{RESTRICT / NO ACTION (Comportamento di Default):}
-    Il DBMS blocca l'operazione alla radice. Se si tenta di cancellare lo studente padre, il database lancia un'eccezione di violazione di vincolo e rifiuta la query, costringendo l'utente a cancellare manualmente prima tutti gli esami correlati.
+    Il DBMS blocca l'operazione alla radice. Se si tenta di cancellare lo studente padre, il database lancia un'eccezione di violazione di vincolo e rifiuta l'operazione, costringendo l'utente a cancellare manualmente prima tutti gli esami correlati.
     \begin{itemize}
         \item \texttt{Sintassi:} \texttt{ON DELETE RESTRICT}
     \end{itemize}

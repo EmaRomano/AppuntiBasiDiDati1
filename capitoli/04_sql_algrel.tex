@@ -1304,5 +1304,73 @@ Se \texttt{EXTRACT} è parte dello standard, nel mondo reale:
 In contesti didattici si usa la sintassi standard ANSI (\texttt{EXTRACT} e \texttt{||}), ma in ambiente lavorativo le interrogazioni contenenti funzioni sulle date raramente sono "portabili" da un database all'altro senza un'attenta riscrittura del codice.
 \end{warningbox}
 
+\section{Manipolazione dei Dati (DML): INSERT, UPDATE, DELETE}
 
+Il \textit{Data Manipulation Language} (DML) comprende le istruzioni necessarie per popolare, modificare e svuotare le tabelle del database. Qualsiasi operazione DML è rigorosamente soggetta al controllo dei vincoli di integrità (chiavi primarie, esterne, \texttt{UNIQUE}, \texttt{NOT NULL}, \texttt{CHECK}): se l'operazione viola anche un solo vincolo su una singola riga, l'intero blocco di esecuzione viene rigettato dal motore relazionale.
+
+\subsection{L'istruzione INSERT}
+
+L'inserimento di nuove tuple all'interno di una relazione può avvenire tramite due costrutti sintattici ben distinti, a seconda che i dati provengano da un input esterno o siano calcolati dinamicamente dal database stesso.
+
+\paragraph{1. Inserimento di valori espliciti (INSERT ... VALUES)}
+Questa forma viene impiegata quando i dati da inserire sono noti a priori (es. parametri passati da un'applicazione backend).
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+INSERT INTO nome_tabella (attr_A, attr_B, attr_C)
+VALUES (valore_A, valore_B, valore_C);
+\end{lstlisting}
+
+La lista degli attributi è tecnicamente opzionale, ma ometterla è considerata una pessima pratica, poiché costringe a fornire i valori nell'esatto ordine fisico di creazione della tabella, esponendo il codice a rotture silenti se lo schema dovesse cambiare in futuro.
+
+\begin{observation}[Gestione dei campi opzionali e dei valori NULL]
+Esplicitare la lista delle colonne permette non solo di ignorare l'ordine fisico originale, ma anche di gestire elegantemente gli attributi non obbligatori. Se una tabella possiede 20 attributi di cui solo 3 sono obbligatori (\texttt{NOT NULL}), è sufficiente elencare e valorizzare solo quei 3. Il DBMS assegnerà automaticamente il valore \texttt{NULL} (o il valore di \texttt{DEFAULT}, se definito) a tutti gli attributi omessi dalla lista.
+\textit{Vincolo strutturale:} Il numero e il dominio dei valori presenti in \texttt{VALUES} deve sempre corrispondere esattamente al numero e al dominio delle colonne elencate nella direttiva \texttt{INSERT}.
+\end{observation}
+
+\paragraph{2. Inserimento massivo calcolato (INSERT ... SELECT)}
+Questa variante sostituisce la clausola \texttt{VALUES} con un'intera interrogazione nidificata. È lo strumento d'elezione per le migrazioni di dati o per il popolamento di tabelle di storicizzazione.
+
+\begin{example}[Archiviazione massiva]
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+INSERT INTO archivio_esami (matricola, corso, voto_definitivo)
+SELECT matr, corso, voto
+FROM esame
+WHERE anno < 2020;
+\end{lstlisting}
+Piuttosto che estrarre i dati in Java, ciclarli in un ciclo \texttt{for} e lanciare migliaia di \texttt{INSERT} singole, questa sintassi delega il travaso massivo direttamente al motore relazionale, abbattendo drasticamente i tempi di rete e di esecuzione.
+\end{example}
+
+\subsection{L'istruzione UPDATE}
+
+L'istruzione \texttt{UPDATE} altera i valori degli attributi di una o più tuple già esistenti. La clausola \texttt{SET} accetta assegnazioni multiple separate da virgola, e i nuovi valori possono derivare da costanti, espressioni matematiche o \textit{subquery} scalari.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE nome_tabella
+SET 
+    attr_1 = espressione_1,
+    attr_2 = (SELECT espressione FROM ... WHERE ...)
+WHERE condizione;
+\end{lstlisting}
+
+\begin{example}[Aggiornamento basato su espressioni e filtri]
+Aumentiamo di 2 punti il voto a tutti gli studenti che hanno sostenuto l'esame di "Architettura" con un professore specifico, senza superare il tetto massimo del 30:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE esame
+SET voto = LEAST(voto + 2, 30)
+WHERE corso = 'Architettura' AND data_esame < '2024-01-01';
+\end{lstlisting}
+\end{example}
+
+\subsection{L'istruzione DELETE}
+
+L'istruzione \texttt{DELETE} rimuove fisicamente intere righe dalla tabella. Poiché i database relazionali non permettono di eliminare il valore di una singola cella (per quello si usa \texttt{UPDATE SET colonna = NULL}), la sintassi non richiede l'elenco degli attributi.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+DELETE FROM nome_tabella
+WHERE condizione;
+\end{lstlisting}
+
+\begin{warningbox}[La Regola del WHERE nel codice di produzione]
+Sia in \texttt{UPDATE} che in \texttt{DELETE}, la clausola \texttt{WHERE} è sintatticamente opzionale ma operativamente vitale. Omettere il \texttt{WHERE} in un \texttt{UPDATE} sovrascriverà quel dato in \textbf{tutte} le righe della tabella. Ometterlo in una \texttt{DELETE} svuoterà l'intera tabella.
+\end{warningbox}
 
