@@ -868,6 +868,29 @@ HAVING AVG(voto) > 25;
 
 \end{example}
 
+\begin{observation}[Visibilità e Scope delle Funzioni di Aggregazione]
+Esiste un'importante distinzione architetturale tra il \textit{calcolare} una statistica di gruppo e il \textit{visualizzarla} nel risultato finale. Lo standard SQL non obbliga in alcun modo a inserire una funzione di aggregazione (come \texttt{COUNT} o \texttt{AVG}) all'interno della clausola \texttt{SELECT}.
+
+Se l'obiettivo è utilizzare il calcolo statistico esclusivamente per prendere decisioni logiche o per l'ordinamento, la funzione può risiedere unicamente:
+\begin{itemize}
+    \item Nell'\textbf{\texttt{HAVING}}: per filtrare intere partizioni (es. scartare i corsi con \texttt{COUNT(*) < 5}).
+    \item Nell'\textbf{\texttt{ORDER BY}}(che vedremo a breve): per ordinare il \textit{Result Set} finale (es. elencare i dipartimenti in base al \texttt{SUM(budget)} decrescente).
+\end{itemize}
+In questi casi, il calcolo avviene "dietro le quinte" nella memoria del server e il valore numerico non verrà estratto o trasmesso all'applicativo chiamante.
+\end{observation}
+
+\begin{example}[Aggregazione "silenziosa" in HAVING e ORDER BY]
+Vogliamo ottenere unicamente i nomi dei corsi la cui media voti è superiore a 25. Vogliamo inoltre che la lista sia ordinata in base al numero complessivo di esami registrati per quel corso (dal più frequentato al meno frequentato). Né la media matematica né il conteggio totale verranno estratti o visualizzati.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT corso
+FROM esame
+GROUP BY corso
+HAVING AVG(voto) > 25
+ORDER BY COUNT(*) DESC;
+\end{lstlisting}
+\end{example}
+
 
 \section{L'Ordine Logico di Esecuzione in SQL}
 
@@ -1237,6 +1260,8 @@ Questa è una necessità matematica: operando per ultima, la clausola di ordinam
 
 Un altro dettaglio strutturale vitale nello sviluppo reale riguarda la gestione dei valori \texttt{NULL}. Come si posiziona un "dato mancante" in una lista ordinata? Non essendo quantificabile, il DBMS lo tratta come un'entità a sé stante. A seconda del motore utilizzato (Oracle, PostgreSQL, SQL Server), durante un ordinamento tutti i valori \texttt{NULL} verranno spinti in blocco all'inizio o alla fine del \textit{Result Set}. Se non si gestisce esplicitamente questa casistica, si rischia di avere interfacce applicative in cui le prime cento righe visualizzate da un utente risultano completamente vuote.
 \end{warningbox}
+
+
 
 \section{Espressioni e Funzioni Predefinite nella SELECT}
 
