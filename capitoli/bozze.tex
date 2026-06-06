@@ -1,4 +1,131 @@
-% \chapter{Bozze}
+\chapter{Bozze}
+
+\section{L'Architettura Client-Server}
+
+Finora abbiamo analizzato l'algebra relazionale e il linguaggio SQL puro. L'SQL è un linguaggio \textbf{dichiarativo}: il programmatore descrive \textit{quale} dato vuole ottenere, lasciando al motore (DBMS) il compito di decidere \textit{come} estrarlo. Proprio per questa sua natura, l'SQL standard è privo dei costrutti di controllo tipici della programmazione imperativa, come i cicli iterativi (\texttt{FOR}, \texttt{WHILE}) o le ramificazioni condizionali complesse (\texttt{IF...ELSE}).
+
+Quando un'applicazione richiede una logica di business complessa (es. "Se il cliente ha un saldo negativo, blocca l'ordine, altrimenti scala l'importo e invia una notifica"), è necessario introdurre un linguaggio di programmazione vero e proprio. In un'architettura software moderna, questa logica può essere ospitata in due luoghi distinti: sul \textbf{Lato Server} (all'interno del DBMS) o sul \textbf{Lato Client} (all'interno dell'applicativo che si interfaccia al database).
+
+\paragraph{Approccio Lato Server: Linguaggi Procedurali del DBMS}
+
+In questo scenario, la logica di controllo viene scritta, compilata ed eseguita direttamente all'interno della memoria del database server. I produttori di DBMS hanno esteso lo standard SQL creando dei linguaggi proprietari definiti "Turing completi", che uniscono le direttive di interrogazione ai costrutti della programmazione procedurale.
+
+Esempi principali:
+\begin{itemize}
+    \item \textbf{PL/SQL} (\textit{Procedural Language/SQL}): Il linguaggio proprietario e altamente ottimizzato sviluppato da Oracle.
+    \item \textbf{PL/pgSQL}: L'equivalente implementato nel DBMS open-source PostgreSQL.
+    \item \textbf{T-SQL} (\textit{Transact-SQL}): Il dialetto procedurale utilizzato in Microsoft SQL Server.
+\end{itemize}
+
+L'approccio lato server garantisce prestazioni eccezionali nelle operazioni massive sui dati, poiché il codice viene eseguito esattamente dove risiedono le informazioni, eliminando del tutto il traffico di rete tra applicazione e database.
+
+\paragraph{Approccio Lato Client: API e Driver (Il modello Java/JDBC)}
+
+In questo scenario, il database viene degradato a mero "contenitore stupido" di dati. L'intera logica di controllo (\texttt{IF...ELSE}, cicli) viene scritta nel linguaggio generale dell'applicativo (es. Java, Python, C\#).
+
+L'applicazione (che funge da \textit{Client} rispetto al database) comunica con il DBMS attraverso specifiche \textbf{API} (Application Programming Interface). Nel mondo Java, lo standard assoluto per questa comunicazione è il protocollo \textbf{JDBC} (\textit{Java Database Connectivity}). Tramite JDBC, il codice Java apre una connessione di rete, invia una stringa contenente un'istruzione SQL pura, attende che il DBMS la esegua e raccoglie il \textit{Result Set} per elaborarlo.
+
+\subsection{Il Trade-off Architetturale: Prestazioni vs Scalabilità}
+
+La scelta tra l'implementazione della logica di business nel database (Lato Server) o nell'applicativo (Lato Client) rappresenta uno dei bivi decisionali più critici nell'ingegneria del software. Le forze in gioco si bilanciano su tre assi fondamentali:
+
+\paragraph{1. Prestazioni Pure (Vantaggio del Lato Server)}
+Se la logica risiede nel DBMS, le elaborazioni avvengono esattamente dove sono memorizzati fisicamente i dati. Questo azzera il traffico di rete. Calcolare e aggiornare una statistica complessa su un milione di record tramite una procedura PL/SQL interna al database è un'operazione estremamente rapida. Eseguire la stessa operazione dal lato client richiederebbe il trasferimento di un milione di righe attraverso la rete (creando un collo di bottiglia fatale), la loro elaborazione nella RAM dell'applicativo Java e il successivo invio massivo di istruzioni di \texttt{UPDATE}.
+
+\paragraph{2. Portabilità e Vendor Lock-in (Vantaggio del Lato Client)}
+Il codice procedurale (es. PL/SQL, T-SQL) è strettamente proprietario. Scrivere la logica di business all'interno del database incatena l'azienda a quello specifico fornitore (fenomeno del \textbf{Vendor Lock-in}). Centralizzare la logica in Java, utilizzando librerie standard come JDBC, rende l'applicativo agnostico: è possibile migrare da Oracle a PostgreSQL sostituendo semplicemente il driver, senza dover riscrivere anni di logica aziendale.
+
+\paragraph{3. L'ago della bilancia: La Scalabilità Orizzontale}
+Questo è il fattore ingegneristico che spinge l'industria moderna a preferire quasi sempre l'approccio Lato Client. 
+Se il traffico di un'applicazione esplode, scalare un'architettura backend scritta in Java (es. tramite framework come Spring Boot) è relativamente semplice: è sufficiente istanziare decine di nuovi server applicativi in parallelo, poiché essi sono \textbf{stateless} (non mantengono uno stato fisico persistente). 
+Al contrario, il database relazionale è un monolite \textbf{stateful} (conserva fisicamente il dato). Scalare orizzontalmente un RDBMS è un'operazione complessa, rischiosa e costosissima. Se si sovraccarica il database costringendolo a fare sia da magazzino che da motore decisionale, esso diventerà inevitabilmente il collo di bottiglia insormontabile dell'intero ecosistema.
+
+\begin{bestpractice}[La Best Practice dell'Ingegneria Backend]
+Nei moderni sistemi \textit{Enterprise}, la regola d'oro architetturale impone una rigida separazione delle responsabilità:
+\begin{itemize}
+    \item \textbf{Il Database funge da "Cassaforte":} Deve essere lasciato il più "stupido" possibile riguardo alle regole di business, ma deve essere blindato per quanto riguarda la sicurezza e la coerenza del dato (demandata esclusivamente ai vincoli di integrità: chiavi primarie, esterne, vincoli \texttt{UNIQUE} e \texttt{NOT NULL}).
+    \item \textbf{L'Applicativo (Backend) funge da "Cervello":} Tutte le decisioni operative, i flussi condizionali (\texttt{IF...ELSE}), i cicli iterativi e la logica di business pura risiedono nel codice (es. Java), in modo da poter essere versionate, testate automaticamente e, soprattutto, scalate orizzontalmente senza limiti.
+\end{itemize}
+\end{bestpractice}
+
+
+\section{Logica Attiva: I Trigger}
+
+I vincoli di integrità standard (\texttt{CHECK}, \texttt{FOREIGN KEY}) sono regole \textbf{passive}: si limitano a ispezionare il dato e a bloccare l'operazione in caso di violazione. I Trigger, al contrario, introducono il concetto di \textbf{Database Attivo}. 
+
+Un Trigger è un blocco di codice procedurale che risiede nel database e viene eseguito automaticamente (in gergo, "scatta" o \textit{fires}) in risposta a una specifica operazione di modifica (DML) su una tabella.
+Il funzionamento dei Trigger si basa sul \textbf{Paradigma E-C-A}:
+\begin{itemize}
+    \item \textbf{E (Evento):} L'azione DML che "risveglia" il trigger (\texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}).
+    \item \textbf{C (Condizione):} Un test logico opzionale. Se falso, il trigger si ferma senza eseguire l'azione.
+    \item \textbf{A (Azione):} Il corpo del codice procedurale da eseguire.
+\end{itemize}
+
+\subsection{Anatomia di un Trigger}
+
+La definizione logica di un trigger richiede la configurazione di quattro parametri strutturali.
+
+\paragraph{1. Il Quando (Timing dell'esecuzione)}
+Definisce l'istante esatto in cui l'azione deve essere intrapresa rispetto all'evento scatenante:
+\begin{itemize}
+    \item \textbf{\texttt{BEFORE}} (Azione preventiva): Il trigger scatta \textit{prima} che il record venga effettivamente scritto su disco. È lo strumento d'elezione per validare i dati, manipolarli in volo (es. forzare una stringa in maiuscolo) o bloccare preventivamente l'operazione sollevando un'eccezione.
+    \item \textbf{\texttt{AFTER}} (Azione consuntiva): Il trigger scatta \textit{dopo} che il database ha salvato il dato e verificato i vincoli standard. Si usa per le propagazioni a catena, come l'aggiornamento di tabelle statistiche, la scrittura di log di sicurezza o la sincronizzazione di giacenze di magazzino.
+    \item \textbf{\texttt{INSTEAD OF}} (Azione sostitutiva): Esclusivo per le Viste (\texttt{VIEW}). Intercetta l'operazione DML e, invece di eseguirla, esegue un codice alternativo.
+\end{itemize}
+
+\paragraph{2. L'Evento Scatenante}
+Gli eventi intercettabili sono \texttt{INSERT ON tabella}, \texttt{DELETE ON tabella} e \texttt{UPDATE ON tabella}.
+
+\begin{observation}[L'ottimizzazione dell'UPDATE]
+A differenza di inserimenti e cancellazioni che coinvolgono invariabilmente l'intera tupla, l'operazione di aggiornamento permette una sintassi più granulare: \texttt{UPDATE OF nome\_attributo ON tabella}. 
+Questa distinzione è vitale per le prestazioni: permette di "svegliare" il trigger \textbf{solo} se viene modificata una colonna specifica d'interesse, ignorando gli aggiornamenti su campi ininfluenti e risparmiando preziosi cicli di CPU.
+\end{observation}
+
+\paragraph{3. La Granularità (FOR EACH ROW vs Statement Level)}
+Determina quante volte l'azione deve essere eseguita a fronte di un evento che coinvolge molteplici tuple (es. \texttt{UPDATE esami SET voto = 18 WHERE voto < 18}).
+\begin{itemize}
+    \item \textbf{Statement Level (Di Default):} L'azione viene eseguita \textbf{una sola volta} per l'intera istruzione DML, indipendentemente dal fatto che vengano modificate zero, una o un milione di righe.
+    \item \textbf{\texttt{FOR EACH ROW} (A livello di Riga):} Il trigger viene messo in un ciclo iterativo iterando l'esecuzione \textbf{per ogni singola riga} modificata dall'istruzione.
+\end{itemize}
+
+\paragraph{4. Le Pseudo-Variabili di Stato (OLD e NEW)}
+Se si sceglie la granularità \texttt{FOR EACH ROW}, il DBMS inietta automaticamente nel corpo del trigger due variabili speciali che contengono lo stato della riga:
+\begin{itemize}
+    \item \textbf{\texttt{NEW}:} Contiene i dati "nuovi" in arrivo (disponibile in \texttt{INSERT} e \texttt{UPDATE}).
+    \item \textbf{\texttt{OLD}:} Contiene i dati "vecchi" già presenti su disco (disponibile in \texttt{UPDATE} e \texttt{DELETE}).
+\end{itemize}
+
+\subsection{Esempio Architetturale: L'Audit Trail (PostgreSQL)}
+
+\begin{warningbox}[Differenze di Dialetto: Oracle vs PostgreSQL]
+La sintassi unificata (\texttt{CREATE TRIGGER ... BEGIN ... END}) è tipica di Oracle PL/SQL. Nei moderni database open-source come PostgreSQL, l'architettura è più modulare e ingegnerizzata: si crea prima la logica procedurale dentro una \textbf{Funzione}, e successivamente si crea il \textbf{Trigger} che si limiterà ad "ascoltare" l'evento e invocare la funzione.
+\end{warningbox}
+
+Nello sviluppo \textit{Enterprise}, una delle applicazioni più frequenti dei trigger è l'\textit{Audit Trail}: tracciare storicamente le modifiche a campi sensibili (come un salario o il voto di un esame).
+Vogliamo registrare in una tabella \texttt{log\_voti} ogni volta che un professore modifica il voto di un esame già registrato.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- 1. La Funzione Procedurale (Azione)
+CREATE FUNCTION traccia_cambio_voto() RETURNS TRIGGER AS $$
+BEGIN
+    -- Eseguiamo l'azione solo se il voto e' EFFETTIVAMENTE cambiato
+    IF NEW.voto <> OLD.voto THEN
+        INSERT INTO log_voti (matricola, corso, vecchio_voto, nuovo_voto, data_modifica)
+        VALUES (OLD.matr, OLD.corso, OLD.voto, NEW.voto, CURRENT_TIMESTAMP);
+    END IF;
+    
+    RETURN NEW; -- Necessario nei trigger a livello di riga
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. La Definizione del Trigger (Evento e Condizione)
+CREATE TRIGGER audit_voti_trigger
+AFTER UPDATE OF voto ON esame -- Evento ottimizzato: scatta solo se si tocca 'voto'
+FOR EACH ROW                  -- Granularita': deve valutare ogni riga modificata
+EXECUTE FUNCTION traccia_cambio_voto();
+\end{lstlisting}
+
+
 % \section{parti di lezioni da rivedere/segnalibri lezioni}
 
 % -- esercitazione su class diagrams: prima parte lezione 6.\\
@@ -41,7 +168,42 @@
 
 
 % \section{bozze 23}
+% triggers
+% un trigger viene utilizzato per gestire la consistenza della base di dati. 
+% Funziona in questo modo: quando capita un evento, fai delle operazioni per gestire la consistenza dei dati; il pattern è quindi: evento --> azione.
+% Per i vincoli che abbiamo trattato finora, cioè quelli che inserisco nella definizione di una tabella, quando compio un'azione, se rispetto i vincoli --> azione compiuta con successo, se non li rispetto --> azione bloccata (gestione di eccezioni o altre cose). L'approccio con i triggers è completamente diverso, come abbiamo accennato sopra. Facciamo un esempio considerando gli schemi relazionali studenti - esami. ON DELETE CASCADE: ON DELETE è l'evento, CASCADE è l'azione. Il concetto di trigger generalizza questo pattern (con potenziale reazione a catena). 
 
+% sintassi del trigger:
+%  CREATE TRIGGER nome 
+% <quando> <evento>
+% <granularità>
+% <condizione>
+% BEGIN 
+% .
+% .
+% (corpo del trigger)
+% .
+% .
+% END
+
+% Consideriamo tre tipi di eventi: 
+% INSERT ON tabella
+% DELETE ON tabella
+% UPDATE OF attributo ON tabella
+
+% Vale la pena osservare che i primi due eventi intervengono su righe, mentre update su singoli attributi. (non ho ben capito perché vale la pena osservare questa cosa per ora)
+
+% sul quando : BEFORE (azione preventiva) e AFTER (azione consuntiva)
+% Un altro valore è INSTEAD OF, che può essere usata solo sulle viste e che vedremo a parte in seguito. 
+
+% granularità: qui si decide se l'azione debba essere compiuta per ogni riga oppure per l'intero blocco dell'operazione
+% Supponiamo ad esempio di fare un insert di 5 righe. Se devo fare un'azione per ogni riga, ne risultano 5 azioni. Oppure posso fare una sola azione per tutto il blocco. 
+% Per fare una azione per ogni riga inserisco il valore FOR EACH ROW
+% Per fare un'unica azione in blocco: questo valore è di default e non viene proprio indicato. 
+
+% condizione: la condizione per far partire il trigger (opzionale)
+
+% A questo punto il professore procede a fare un esempio utilizzando una sequence in sintassi oracle. Se reputi che questo tipo di approccio sia obsoleto, genera tu un esempio adatto per illustrare in modo esaustivo tutti i concetti di sopra. 
 
 
 
