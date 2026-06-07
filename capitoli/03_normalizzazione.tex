@@ -1,0 +1,87 @@
+\chapter{Teoria della Normalizzazione Relazionale}
+
+La normalizzazione è un processo di "collaudo" e raffinamento degli schemi relazionali. Il suo scopo è garantire che il database sia privo di ridondanze e, di conseguenza, immune a specifiche vulnerabilità strutturali note come \textbf{Anomalie}.
+
+\section{Ridondanze e Anomalie: Il Problema Strutturale}
+
+Un database relazionale è progettato male quando un singolo schema (una tabella) raggruppa forzatamente concetti eterogenei che non dovrebbero stare insieme. Questo errore di modellazione genera \textbf{ridondanza} (la duplicazione inutile della stessa informazione su più righe) che, a sua volta, innesca tre tipologie di anomalie critiche durante il normale ciclo di vita del software.
+
+\begin{example}[Il disastro della tabella non normalizzata]
+Supponiamo di aver modellato un'unica tabella mista per gestire i dipendenti e i dipartimenti in cui lavorano, eleggendo la matricola a chiave primaria:
+
+\texttt{DIPENDENTE(\underline{matricola}, nome, dipartimento, sede\_dipartimento)}
+
+Se il dipartimento "IT" si trova a "Milano" e ha 1000 dipendenti, la stringa "Milano" verrà memorizzata fisicamente 1000 volte. Questa ridondanza apre le porte alle tre anomalie relazionali:
+
+\begin{enumerate}
+    \item \textbf{Anomalia di Aggiornamento (Update Anomaly):} 
+    Se il dipartimento "IT" viene trasferito a "Roma", l'applicativo dovrà eseguire una \texttt{UPDATE} su 1000 righe distinte. Se per un calo di rete o un crash del server l'aggiornamento si interrompe a 500 righe, il database entra in uno stato \textit{inconsistente}: metà dei dipendenti IT risulterà a Roma, l'altra metà a Milano. Il dato perde affidabilità.
+    
+    \item \textbf{Anomalia di Inserimento (Insert Anomaly):}
+    L'azienda apre un nuovo dipartimento "Marketing" a "Napoli", ma non ha ancora assunto nessun dipendente. Poiché la \texttt{matricola} è chiave primaria (quindi \texttt{NOT NULL} per definizione), il database rifiuterà l'inserimento. È strutturalmente impossibile registrare l'esistenza di un dipartimento vuoto.
+    
+    \item \textbf{Anomalia di Cancellazione (Delete Anomaly):}
+    Il dipartimento "HR" ha un solo dipendente. Se questo dipendente si dimette, l'applicativo eseguirà una \texttt{DELETE} sulla sua riga. Oltre a cancellare il dipendente, \textbf{distruggeremo involontariamente anche l'informazione che il dipartimento HR esiste} e che si trovava in una determinata sede. Abbiamo perso un dato vitale per l'azienda a causa dell'eliminazione di un dato non correlato.
+\end{enumerate}
+\end{example}
+
+\begin{observation}[La Soluzione Ingegneristica]
+Per risolvere alla radice queste anomalie, il progettista non deve scrivere codice applicativo più complesso, ma deve modificare la struttura del database. La soluzione consiste nello \textbf{spaccare} (decomporre) la tabella difettosa in due tabelle distinte, legate da una chiave esterna:
+\begin{itemize}
+    \item \texttt{DIPENDENTE(\underline{matricola}, nome, dipartimento*)}
+    \item \texttt{DIPARTIMENTO(\underline{nome\_dip}, sede\_dipartimento)}
+\end{itemize}
+La teoria della normalizzazione (le Forme Normali) fornisce le regole esatte per capire \textit{quando} e \textit{come} effettuare questa scomposizione in modo sicuro.
+\end{observation}
+
+\section{Dipendenze Funzionali}
+
+Nel paragrafo precedente abbiamo visto come le ridondanze generino bug strutturali (le anomalie). Per evitare di dover scovare queste ridondanze "a occhio" o basandosi solo sull'intuito, la teoria relazionale fornisce uno strumento analitico per identificare e dimostrare matematicamente le anomalie: la \textbf{Dipendenza Funzionale} (Spesso abbreviata in \textit{FD - Functional Dependency}).
+
+Una dipendenza funzionale stabilisce che il valore di un determinato campo "decide" in modo univoco il valore di un altro campo. Se conosco il primo, non ho dubbi sul secondo.
+
+Formalmente, data una relazione (tabella) $r$ definita su uno schema $R(X)$, e dati due sottoinsiemi di attributi non vuoti $Y$ e $Z$ (appartenenti a $X$), diremo che esiste su $r$ una dipendenza funzionale tra $Y$ e $Z$ se:
+
+\begin{quote}
+Per ogni coppia di tuple (righe) $t_1$ e $t_2$ presenti in $r$ che hanno \textbf{gli stessi valori sugli attributi $Y$}, risulta obbligatoriamente che $t_1$ e $t_2$ hanno \textbf{gli stessi valori anche sugli attributi $Z$}.
+\end{quote}
+
+In notazione algebrica, questo vincolo di integrità si scrive:
+$$ Y \rightarrow Z $$
+E si legge: \textit{"Y determina funzionalmente Z"}, oppure \textit{"Z dipende funzionalmente da Y"}. L'insieme $Y$ prende il nome di \textbf{Determinante}.
+
+\begin{example}[La Dipendenza Funzionale nel dominio InsurTech]
+Immaginiamo una tabella temporanea che traccia i veicoli assicurati e le relative polizze:
+
+\begin{center}
+    \texttt{COPERTURA(numero\_polizza, targa, marca, modello)}
+\end{center}
+
+
+Osservando la natura dei dati (ovvero la semantica del mondo reale), possiamo affermare con certezza matematica che esiste la dipendenza funzionale:
+$$ \texttt{targa} \rightarrow \texttt{marca, modello} $$
+Il motivo risponde esattamente alla definizione formale: se prendiamo due righe qualsiasi della tabella ($t_1$ e $t_2$) che presentano lo stesso valore nel campo \texttt{targa} (es. "AB123CD"), quelle due righe dovranno \textbf{obbligatoriamente} avere lo stesso valore nei campi \texttt{marca} (es. "Fiat") e \texttt{modello} (es. "Panda"). Un veicolo non può cambiare marca da una riga all'altra.
+\end{example}
+
+\paragraph{}
+
+L'analisi delle dipendenze funzionali si basa su tre postulati pratici che semplificano il lavoro di progettazione:
+
+\begin{enumerate}
+    \item \textbf{Scomposizione (Decomposizione del conseguente):}
+    Se un determinante $Y$ definisce un insieme di attributi $Z$ composto da $A_1, A_2, \dots, A_k$, allora possiamo affermare che la relazione soddisfa $Y \rightarrow Z$ se e solo se soddisfa singolarmente tutte le dipendenze: 
+    $$ Y \rightarrow A_1 \quad \text{e} \quad Y \rightarrow A_2 \quad \text{e} \dots \quad Y \rightarrow A_k $$
+    \textit{Esempio:} Dire che $\texttt{targa} \rightarrow \texttt{marca, modello}$ equivale a dire che $\texttt{targa} \rightarrow \texttt{marca}$ e $\texttt{targa} \rightarrow \texttt{modello}$. Per semplicità, d'ora in avanti considereremo sempre dipendenze del tipo $Y \rightarrow A$ (dove la parte destra è un singolo attributo).
+
+    \item \textbf{Dipendenze Banali (da ignorare):}
+    Se l'attributo $A$ fa già parte dell'insieme $Y$, la dipendenza viene definita \textbf{banale}. Ad esempio, la dipendenza $\texttt{targa, modello} \rightarrow \texttt{targa}$ è ovvia e non aggiunge alcuna informazione utile al design del database. Nello studio della normalizzazione, si prendono in esame esclusivamente le dipendenze funzionali \textbf{non banali}.
+
+    \item \textbf{La generalizzazione del concetto di Chiave:}
+    Cos'è una Chiave Primaria in ottica matematica? Non è altro che un determinante supremo. Dire che \texttt{numero\_polizza} è la chiave della tabella, equivale a dichiarare la dipendenza funzionale:
+    $$ \texttt{numero\_polizza} \rightarrow \text{\textit{Tutti gli altri attributi dello schema}} $$
+    La Dipendenza Funzionale, quindi, \textbf{generalizza il concetto di chiave}. 
+\end{enumerate}
+
+\begin{tip}[L'intuizione dietro le Forme Normali]
+Questa generalizzazione ci fornisce la chiave di lettura per l'intera teoria della normalizzazione. Se in una tabella troviamo una dipendenza funzionale forte (come $\texttt{targa} \rightarrow \texttt{marca}$), ma la \texttt{targa} \textbf{non è} la chiave primaria di quella tabella, significa che c'è un difetto strutturale: stiamo costringendo un sotto-tema (il veicolo) dentro un tema più grande (la copertura). È esattamente questa discrepanza a generare le ridondanze e le anomalie che impongono la scomposizione in più tabelle.
+\end{tip}
