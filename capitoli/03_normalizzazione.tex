@@ -27,18 +27,17 @@ Se il dipartimento "IT" si trova a "Milano" e ha 1000 dipendenti, la stringa "Mi
 \end{enumerate}
 \end{example}
 
-\begin{observation}[La Soluzione Ingegneristica]
 Per risolvere alla radice queste anomalie, il progettista non deve scrivere codice applicativo più complesso, ma deve modificare la struttura del database. La soluzione consiste nello \textbf{spaccare} (decomporre) la tabella difettosa in due tabelle distinte, legate da una chiave esterna:
 \begin{itemize}
     \item \texttt{DIPENDENTE(\underline{matricola}, nome, dipartimento*)}
     \item \texttt{DIPARTIMENTO(\underline{nome\_dip}, sede\_dipartimento)}
 \end{itemize}
 La teoria della normalizzazione (le Forme Normali) fornisce le regole esatte per capire \textit{quando} e \textit{come} effettuare questa scomposizione in modo sicuro.
-\end{observation}
+
 
 \section{Dipendenze Funzionali}
 
-Nel paragrafo precedente abbiamo visto come le ridondanze generino bug strutturali (le anomalie). Per evitare di dover scovare queste ridondanze "a occhio" o basandosi solo sull'intuito, la teoria relazionale fornisce uno strumento analitico per identificare e dimostrare matematicamente le anomalie: la \textbf{Dipendenza Funzionale} (Spesso abbreviata in \textit{FD - Functional Dependency}).
+Nel paragrafo precedente abbiamo visto come le ridondanze generino bug strutturali (le anomalie). Per evitare di dover scovare queste ridondanze "a occhio" o basandosi solo sull'intuito, la teoria relazionale fornisce uno strumento analitico per identificare le anomalie: la \textbf{Dipendenza Funzionale} (Spesso abbreviata in \textit{FD - Functional Dependency}).
 
 Una dipendenza funzionale stabilisce che il valore di un determinato campo "decide" in modo univoco il valore di un altro campo. Se conosco il primo, non ho dubbi sul secondo.
 
@@ -52,7 +51,7 @@ In notazione algebrica, questo vincolo di integrità si scrive:
 $$ Y \rightarrow Z $$
 E si legge: \textit{"Y determina funzionalmente Z"}, oppure \textit{"Z dipende funzionalmente da Y"}. L'insieme $Y$ prende il nome di \textbf{Determinante}.
 
-\begin{example}[La Dipendenza Funzionale nel dominio InsurTech]
+\begin{example}
 Immaginiamo una tabella temporanea che traccia i veicoli assicurati e le relative polizze:
 
 \begin{center}
@@ -87,3 +86,46 @@ L'analisi delle dipendenze funzionali si basa su tre postulati pratici che sempl
 \begin{tip}[L'intuizione dietro le Forme Normali]
 Questa generalizzazione ci fornisce la chiave di lettura per l'intera teoria della normalizzazione. Se in una tabella troviamo una dipendenza funzionale forte (come $\texttt{targa} \rightarrow \texttt{marca}$), ma la \texttt{targa} \textbf{non è} la chiave primaria di quella tabella, significa che c'è un difetto strutturale: stiamo costringendo un sotto-tema (il veicolo) dentro un tema più grande (la copertura). È esattamente questa discrepanza a generare le ridondanze e le anomalie che impongono la scomposizione in più tabelle.
 \end{tip}
+
+\section{La Forma Normale di Boyce-Codd (BCNF)}
+
+Il traguardo ultimo della progettazione logica relazionale è garantire che il database sia totalmente privo di anomalie e ridondanze. Lo strumento che certifica questa garanzia strutturale è la Forma Normale di Boyce-Codd (BCNF). 
+
+\paragraph{Definizione della BCNF}
+Uno schema relazionale $R$ è in Forma Normale di Boyce-Codd se, per ogni sua dipendenza funzionale non banale $X \rightarrow Y$, risulta che \textbf{$X$ è una superchiave} per lo schema $R$.
+
+In termini pratici e ingegneristici, questa regola si traduce in un diktat assoluto: \textit{"L'unica cosa che ha il diritto di determinare il valore di un attributo è la chiave primaria (o una chiave candidata) della tabella stessa."} Se un attributo non-chiave si arroga il diritto di determinare altri attributi, il database nasconde un difetto strutturale.
+
+\begin{example}[Violazione della BCNF e Ritorno alle Anomalie]
+Riprendiamo lo schema difettoso analizzato nel primo paragrafo e applichiamo la lente delle dipendenze funzionali per dimostrarne l'invalidità:
+
+$$ \texttt{DIPENDENTE(\underline{matricola}, nome, dipartimento, sede\_dipartimento)} $$
+
+In questo schema, l'unica chiave candidata (eletta a chiave primaria) è \texttt{matricola}. Di conseguenza, la \texttt{matricola} è una superchiave. La dipendenza funzionale $\texttt{matricola} \rightarrow \texttt{nome, dipartimento, sede\_dipartimento}$ è quindi del tutto lecita e rispetta la regola della BCNF.
+
+Tuttavia, analizzando la semantica del dominio aziendale, sappiamo che un dipartimento si trova in una specifica sede. Esiste quindi una seconda dipendenza funzionale non banale "nascosta" nello schema:
+$$ \texttt{dipartimento} \rightarrow \texttt{sede\_dipartimento} $$
+
+Sottoponiamo questa dipendenza al test della BCNF: il determinante \texttt{dipartimento} è una superchiave dello schema \texttt{DIPENDENTE}? \textbf{Assolutamente no.} Il nome di un dipartimento non identifica in modo univoco una riga, poiché possono coesistere centinaia di impiegati assegnati allo stesso dipartimento.
+
+Poiché esiste almeno una dipendenza funzionale il cui determinante non è una superchiave, l'intero schema \textbf{viola la BCNF}. È esattamente questa specifica violazione a generare le ridondanze e le letali anomalie di inserimento, aggiornamento e cancellazione.
+\end{example}
+
+\paragraph{La Decomposizione: Il ripristino della BCNF}
+Quando uno schema fallisce il collaudo della BCNF, la teoria relazionale impone di decomporlo. Il processo consiste nell'isolare la dipendenza funzionale "illegale" e promuoverla a tabella autonoma. In questo nuovo schema, il vecchio determinante difettoso diventa finalmente una chiave primaria legittima.
+
+Applicando la scomposizione al nostro esempio, otteniamo due nuovi schemi:
+\begin{itemize}
+    \item \texttt{DIPARTIMENTO(\underline{nome\_dip}, sede\_dipartimento)}
+    \begin{itemize}
+        \item Dipendenze presenti: $\texttt{nome\_dip} \rightarrow \texttt{sede\_dipartimento}$.
+        \item Test BCNF: \texttt{nome\_dip} è la chiave primaria. L'unica dipendenza rispetta la BCNF.
+    \end{itemize}
+    \item \texttt{DIPENDENTE(\underline{matricola}, nome, dipartimento*)}
+    \begin{itemize}
+        \item Dipendenze presenti: $\texttt{matricola} \rightarrow \texttt{nome, dipartimento}$.
+        \item Test BCNF: \texttt{matricola} è la chiave primaria. L'unica dipendenza rispetta la BCNF.
+    \end{itemize}
+\end{itemize}
+
+Entrambi gli schemi generati si trovano ora rigorosamente in Forma Normale di Boyce-Codd. Il database è strutturalmente inattaccabile.
