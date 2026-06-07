@@ -111,7 +111,7 @@ Sottoponiamo questa dipendenza al test della BCNF: il determinante \texttt{dipar
 Poiché esiste almeno una dipendenza funzionale il cui determinante non è una superchiave, l'intero schema \textbf{viola la BCNF}. È esattamente questa specifica violazione a generare le ridondanze e le letali anomalie di inserimento, aggiornamento e cancellazione.
 \end{example}
 
-\paragraph{La Decomposizione: Il ripristino della BCNF}
+\subsection{Decomposizioni}
 Quando uno schema fallisce il collaudo della BCNF, la teoria relazionale impone di decomporlo. Il processo consiste nell'isolare la dipendenza funzionale "illegale" e promuoverla a tabella autonoma. In questo nuovo schema, il vecchio determinante difettoso diventa finalmente una chiave primaria legittima.
 
 Applicando la scomposizione al nostro esempio, otteniamo due nuovi schemi:
@@ -129,3 +129,54 @@ Applicando la scomposizione al nostro esempio, otteniamo due nuovi schemi:
 \end{itemize}
 
 Entrambi gli schemi generati si trovano ora rigorosamente in Forma Normale di Boyce-Codd. Il database è strutturalmente inattaccabile.
+
+\medskip
+
+Nell'esempio precedente, la scomposizione delle dipendenze (e quindi dei concetti da esse rappresentati) è stata facilitata dalla struttura delle dipendenze stesse, "naturalmente" separate e indipendenti l'una dall'altra. In molti casi pratici, infatti, la decomposizione in BCNF si ottiene linearmente isolando ogni dipendenza funzionale con un diverso determinante.
+
+Tuttavia, in scenari di dominio più complessi, le dipendenze possono intrecciarsi: può accadere che il tentativo di forzare la scomposizione per raggiungere la BCNF finisca per distruggere (perdere) alcune dipendenze funzionali originarie, rendendo impossibile per il DBMS validarle in modo efficiente. 
+
+Per questa ragione, nella pratica ingegneristica, la BCNF rappresenta l'ideale strutturale a cui tendere, ma non un dogma assoluto. Qualora il raggiungimento della BCNF comportasse la perdita di vincoli semantici o un decadimento inaccettabile delle prestazioni (a causa di un partizionamento verticale eccessivo), il progettista adotta come compromesso architetturale la \textbf{Terza Forma Normale (3NF)} (che vedremo a seguire), che tollera lievi ridondanze pur garantendo la preservazione totale delle dipendenze.
+
+\subsection{Qualità delle Decomposizioni}
+
+L'attività di scomposizione di uno schema non deve limitarsi a eliminare le anomalie, ma deve produrre relazioni di "qualità sufficiente". Considereremo una scomposizione accettabile solo se soddisfa due proprietà fondamentali: la \textbf{decomposizione senza perdita} e la \textbf{conservazione delle dipendenze}.
+
+\paragraph{1. Decomposizione Senza Perdita (Lossless Join)}
+La decomposizione senza perdita garantisce che le informazioni presenti nella relazione originaria siano ricostruibili con precisione, senza la generazione di informazioni spurie, a partire dalle relazioni scomposte. In termini pratici, interrogando le nuove tabelle tramite un'operazione di \texttt{JOIN}, si devono ottenere gli stessi identici risultati che si otterrebbero interrogando la tabella originale.
+
+Per garantire questo risultato, basta applicare una regola: \textit{gli attributi (eventualmente uno solo) in comune utilizzati per dividere le due tabelle devono obbligatoriamente essere una Chiave Primaria (o Superchiave) in almeno una delle due.}
+
+\begin{example}[Decomposizione Senza Perdita vs Con Perdita]
+Consideriamo uno schema che mappa i sinistri e i periti assegnati: 
+$$ \texttt{SINISTRO(\underline{id\_sinistro}, nome\_perito, telefono\_perito)} $$
+
+\textbf{Scomposizione Corretta (Senza Perdita):}
+Separiamo l'entità usando un identificatore univoco (creando ad esempio \texttt{p\_iva\_perito}):
+\begin{itemize}
+    \item \texttt{SINISTRO(id\_sinistro, p\_iva\_perito)}
+    \item \texttt{PERITO(\underline{p\_iva\_perito}, nome\_perito, telefono\_perito)}
+\end{itemize}
+Ricongiungendo le tabelle tramite \texttt{p\_iva\_perito} (che è chiave primaria in \texttt{PERITO}), il DBMS ricostruisce esattamente l'abbinamento corretto.
+
+\textbf{Scomposizione Errata (Con Perdita):}
+Se scomponessimo usando il nome come attributo di legame:
+\begin{itemize}
+    \item \texttt{SINISTRO(id\_sinistro, nome\_perito)}
+    \item \texttt{PERITO(nome\_perito, telefono\_perito)}
+\end{itemize}
+Se esistono due periti diversi che si chiamano "Mario Rossi", un'operazione di \texttt{JOIN} sul nome combinerebbe erroneamente il sinistro con i telefoni di entrambi i periti, generando tuple "spurie" (false) che non esistevano nella relazione originale.
+\end{example}
+
+\paragraph{2. Conservazione delle Dipendenze}
+La conservazione delle dipendenze garantisce che le relazioni decomposte mantengano la stessa capacità della relazione originaria di rappresentare i vincoli di integrità del dominio. Questo permette al database di rilevare agevolmente eventuali aggiornamenti illeciti, poiché ad ogni operazione non lecita sullo schema originale corrisponderà una violazione dei vincoli anche sulle tabelle scomposte.
+
+Se una scomposizione "rompe" una dipendenza funzionale separando i suoi attributi in tabelle diverse, il DBMS non sarà più in grado di validare quel vincolo in fase di \texttt{INSERT} o \texttt{UPDATE} senza ricorrere a complessi e lenti controlli incrociati (es. tramite Trigger).
+
+\begin{example}[Conservazione delle Dipendenze]
+Sia dato lo schema \texttt{R(\underline{A}, B, C)} con le dipendenze: $A \rightarrow B, B \rightarrow C$.
+\begin{itemize}
+    \item \textbf{Decomposizione che conserva le dipendenze:} Scomporre in $R_1(A, B)$ e $R_2(\underline{B}, C)$ è eccellente. Il DBMS può validare $A \rightarrow B$ guardando solo $R_1$, e può validare $B \rightarrow C$ guardando solo $R_2$ (assicurandosi che per un dato B non vengano inseriti due C diversi).
+    \item \textbf{Decomposizione che NON conserva le dipendenze:} Scomporre in $R_1(A, B)$ e $R_3(\underline{A}, C)$. Sebbene questa scomposizione sia "senza perdita" (A è chiave in entrambe), abbiamo distrutto la dipendenza $B \rightarrow C$. Il DBMS permetterà l'inserimento di due tuple in $R_1$ e $R_3$ che, combinate, associano allo stesso B due valori di C differenti, violando silenziosamente la regola di business originale.
+\end{itemize}
+\end{example}
