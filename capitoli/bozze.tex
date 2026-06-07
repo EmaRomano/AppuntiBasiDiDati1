@@ -126,19 +126,6 @@ EXECUTE FUNCTION traccia_cambio_voto();
 \end{lstlisting}
 
 
-% \section{parti di lezioni da rivedere/segnalibri lezioni}
-
-% -- esercitazione su class diagrams: prima parte lezione 6.\\
-% -- esercitazione su schemi relazionali e ristrutturazione logica del class diagram: seconda parte lezione 12. \\
-% -- primi 30 minuti lezione 13: riepilogo e precisazioni rilevanti. \\
-% -- esercizi assegnati sulle prime query fine lezione 15
-% -- esercizi queries di conteggio: seconda parte lezione 16
-% -- esercizi queries: prima ora lezione 17
-
-
-
-
-
 % \section{parte lezione 12 da ricontrollare}
 
 % quando dichiaro un vincolo primary key si intende: 
@@ -155,64 +142,16 @@ EXECUTE FUNCTION traccia_cambio_voto();
 
 % N.B.: l'indice viene costruito sempre dal dbms per le chiavi primarie, per altri attributi con vincoli di unicità non è detto, molto dipende dallo specifico dbms.
 
+
+
 % \section{parti marginali lezione 18}
 % (parentesi sull'efficienza computazionale su una domanda di uno studente. Noi ci stiamo occupando principalmente di scrivere queries corrette e semplici e facili da leggere. L'efficienza computazionale in un DB non è sempre una cosa che è sotto il nostro controllo, perché se ne occupa l'ottimizzatore del dbms, che noi non conosciamo)
-
 
 % (quando eseguo un qualsiasi tipo di select il risultato è una tabella che non ha nome e non viene memorizzata. Questa tabella o viene usata subito, oppure si perde: il risultato di una interrogazione è volatile. Se voglio dare un nome al risultato devo eseguire ciò che si chiama VISTA. Le viste però non vengono comunque memorizzate. Se voglio dare un nome alla tabella per salvarla e riutilizzarla devo creare ciò che si chiama una VISTA MATERIALIZZATA. Quest'ultima sembra ovviamente più vantaggiosa, ma presenta degli svantaggi. Infatti i dati in essa contenuti dipendono in generale da altre tabelle. Quindi deve essere aggiornata, e questo ha un costo. Questo tipo di vista può essere aggiornata in base a criteri temporali o criteri condizionali)
 
 % \section{parti in sospeso lezione 22}
 % DROP nome_tabella
 % ALTER TABLE
-
-
-
-% \section{bozze 23}
-% triggers
-% un trigger viene utilizzato per gestire la consistenza della base di dati. 
-% Funziona in questo modo: quando capita un evento, fai delle operazioni per gestire la consistenza dei dati; il pattern è quindi: evento --> azione.
-% Per i vincoli che abbiamo trattato finora, cioè quelli che inserisco nella definizione di una tabella, quando compio un'azione, se rispetto i vincoli --> azione compiuta con successo, se non li rispetto --> azione bloccata (gestione di eccezioni o altre cose). L'approccio con i triggers è completamente diverso, come abbiamo accennato sopra. Facciamo un esempio considerando gli schemi relazionali studenti - esami. ON DELETE CASCADE: ON DELETE è l'evento, CASCADE è l'azione. Il concetto di trigger generalizza questo pattern (con potenziale reazione a catena). 
-
-% sintassi del trigger:
-%  CREATE TRIGGER nome 
-% <quando> <evento>
-% <granularità>
-% <condizione>
-% BEGIN 
-% .
-% .
-% (corpo del trigger)
-% .
-% .
-% END
-
-% Consideriamo tre tipi di eventi: 
-% INSERT ON tabella
-% DELETE ON tabella
-% UPDATE OF attributo ON tabella
-
-% Vale la pena osservare che i primi due eventi intervengono su righe, mentre update su singoli attributi. (non ho ben capito perché vale la pena osservare questa cosa per ora)
-
-% sul quando : BEFORE (azione preventiva) e AFTER (azione consuntiva)
-% Un altro valore è INSTEAD OF, che può essere usata solo sulle viste e che vedremo a parte in seguito. 
-
-% granularità: qui si decide se l'azione debba essere compiuta per ogni riga oppure per l'intero blocco dell'operazione
-% Supponiamo ad esempio di fare un insert di 5 righe. Se devo fare un'azione per ogni riga, ne risultano 5 azioni. Oppure posso fare una sola azione per tutto il blocco. 
-% Per fare una azione per ogni riga inserisco il valore FOR EACH ROW
-% Per fare un'unica azione in blocco: questo valore è di default e non viene proprio indicato. 
-
-% condizione: la condizione per far partire il trigger (opzionale)
-
-% A questo punto il professore procede a fare un esempio utilizzando una sequence in sintassi oracle. Se reputi che questo tipo di approccio sia obsoleto, genera tu un esempio adatto per illustrare in modo esaustivo tutti i concetti di sopra. 
-
-
-
-
-
-
-
-
-
 
 
 
@@ -227,13 +166,6 @@ EXECUTE FUNCTION traccia_cambio_voto();
 % PARENTELA(cf, cfMadre, cfPadre)
 
 % dove cf sta per codice fiscale. 
-
-
-%DA FARE PER LO STUDIO DI SPECIFICI DBMS
-%quali sono i dati predefiniti
-%funzioni di aggregazione
-%funzioni che lavorano sui dati primitivi/predefiniti. 
-
 
 % -------------------------------------------------------------------------
 

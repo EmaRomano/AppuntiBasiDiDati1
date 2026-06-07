@@ -1,6 +1,8 @@
-\chapter{Teoria della Normalizzazione Relazionale}
+\chapter{Normalizzazione Relazionale}
 
-La normalizzazione è un processo di "collaudo" e raffinamento degli schemi relazionali. Il suo scopo è garantire che il database sia privo di ridondanze e, di conseguenza, immune a specifiche vulnerabilità strutturali note come \textbf{Anomalie}.
+Nel capitolo precedente abbiamo affrontato la transizione dal modello concettuale (Class Diagram UML) agli schemi relazionali. Durante la fase di ristrutturazione (si vedano, ad esempio, i paragrafi sulla risoluzione degli attributi strutturati e multivalore), abbiamo già sfiorato e applicato intuitivamente alcuni principi volti a "pulire" le tabelle e separare i concetti. 
+
+Tuttavia, l'ingegneria del software non può basarsi unicamente sulle euristiche o sull'intuito del progettista. In questo capitolo tratteremo la normalizzazione (e le relative Forme Normali) in modo rigoroso, dettagliato e formale. Questa teoria rappresenta il "collaudo" definitivo degli schemi relazionali appena prodotti: fornisce gli strumenti esatti per dimostrare che la struttura del database è solida e immune da difetti. Solo superando questo test formale, il discorso sulla progettazione logica può considerarsi completato e pronto per la traduzione in codice SQL.
 
 \section{Ridondanze e Anomalie: Il Problema Strutturale}
 
