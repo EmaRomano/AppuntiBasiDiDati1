@@ -4,7 +4,7 @@ Nel capitolo precedente abbiamo affrontato la transizione dal modello concettual
 
 Tuttavia, l'ingegneria del software non può basarsi unicamente sulle euristiche o sull'intuito del progettista. In questo capitolo tratteremo la normalizzazione (e le relative Forme Normali) in modo rigoroso, dettagliato e formale. Questa teoria rappresenta il "collaudo" definitivo degli schemi relazionali appena prodotti: fornisce gli strumenti esatti per dimostrare che la struttura del database è solida e immune da difetti. Solo superando questo test formale, il discorso sulla progettazione logica può considerarsi completato e pronto per la traduzione in codice SQL.
 
-\section{Ridondanze e Anomalie: Il Problema Strutturale}
+\section{Ridondanze e Anomalie}
 
 Un database relazionale è progettato male quando un singolo schema (una tabella) raggruppa forzatamente concetti eterogenei che non dovrebbero stare insieme. Questo errore di modellazione genera \textbf{ridondanza} (la duplicazione inutile della stessa informazione su più righe) che, a sua volta, innesca tre tipologie di anomalie critiche durante il normale ciclo di vita del software.
 
@@ -180,3 +180,83 @@ Sia dato lo schema \texttt{R(\underline{A}, B, C)} con le dipendenze: $A \righta
     \item \textbf{Decomposizione che NON conserva le dipendenze:} Scomporre in $R_1(A, B)$ e $R_3(\underline{A}, C)$. Sebbene questa scomposizione sia "senza perdita" (A è chiave in entrambe), abbiamo distrutto la dipendenza $B \rightarrow C$. Il DBMS permetterà l'inserimento di due tuple in $R_1$ e $R_3$ che, combinate, associano allo stesso B due valori di C differenti, violando silenziosamente la regola di business originale.
 \end{itemize}
 \end{example}
+
+\section{La Terza Forma Normale (3NF)}
+
+Nella stragrande maggioranza dei casi, l'applicazione della BCNF produce un design perfetto, garantendo sia l'assenza di anomalie (decomposizione senza perdita) sia la conservazione delle dipendenze. Tuttavia, esistono rari e specifici scenari di dominio in cui la BCNF non è applicabile in modo efficace, costringendo il progettista a un compromesso.
+
+\paragraph{Il Limite della BCNF}
+Il limite della BCNF emerge quando uno schema presenta chiavi candidate sovrapposte (che condividono attributi) e dipendenze funzionali incrociate. In questi casi, il tentativo di forzare la scomposizione in BCNF causa la perdita irreparabile di una dipendenza originaria.
+
+\begin{example}[La BCNF che distrugge le dipendenze]
+Si consideri una tabella che traccia l'assegnazione degli sviluppatori ai vari moduli di un software, e i relativi Tech Lead:
+$$ \texttt{SVILUPPO(\underline{id\_sviluppatore}, \underline{modulo}, tech\_lead)} $$
+
+Le regole di business impongono due dipendenze funzionali:
+\begin{enumerate}
+    \item Uno sviluppatore assegnato a un modulo risponde a un solo Tech Lead. \\
+    $(\texttt{id\_sviluppatore, modulo} \rightarrow \texttt{tech\_lead})$
+    \item Ogni Tech Lead è responsabile di un unico modulo software, sebbene gestisca molti sviluppatori. \\
+    $(\texttt{tech\_lead} \rightarrow \texttt{modulo})$
+\end{enumerate}
+
+Poiché un Tech Lead determina il modulo, la coppia \texttt{\{id\_sviluppatore, tech\_lead\}} è una seconda chiave candidata valida. 
+Sottoponiamo lo schema al test della BCNF analizzando la seconda dipendenza $(\texttt{tech\_lead} \rightarrow \texttt{modulo})$: il determinante \texttt{tech\_lead} è una superchiave dell'intera tabella? \textbf{No}, perché un lead gestisce più sviluppatori, quindi il suo nome si ripeterà su più righe. Lo schema vìola la BCNF.
+
+Se applicassimo ciecamente l'algoritmo di normalizzazione, dovremmo scomporre la tabella in:
+\begin{itemize}
+    \item $R_1(\underline{tech\_lead}, modulo)$
+    \item $R_2(\underline{id\_sviluppatore, tech\_lead})$
+\end{itemize}
+Questa scomposizione è senza perdita, ma \textbf{non conserva le dipendenze}. Avendo separato \texttt{id\_sviluppatore} e \texttt{modulo} in due tabelle diverse, il database non ha più modo di validare nativamente la prima dipendenza $(\texttt{id\_sviluppatore, modulo} \rightarrow \texttt{tech\_lead})$. Un bug nell'applicativo potrebbe inserire dati discordanti senza che il DBMS se ne accorga.
+\end{example}
+
+\paragraph{La Soluzione: Definizione di 3NF}
+Per uscire da questo stallo, la teoria relazionale ammette un rilassamento dei vincoli attraverso la \textbf{Terza Forma Normale (3NF)}. Essa tollera situazioni come quella appena descritta (accettando una lieve e controllata ridondanza), ma blinda lo schema contro qualsiasi altra fonte di anomalia, garantendo matematicamente sia la decomposizione senza perdita sia la conservazione totale delle dipendenze.
+
+Uno schema relazionale è in 3NF se, per ogni sua dipendenza funzionale non banale $X \rightarrow Y$, si verifica \textbf{almeno una} delle due seguenti condizioni:
+\begin{enumerate}
+    \item $X$ contiene una chiave (ovvero, $X$ è una superchiave, identico alla BCNF).
+    \item $Y$ appartiene ad almeno una chiave candidata dello schema.
+\end{enumerate}
+
+\begin{observation}[Metodo di riduzione in 3NF]
+Applicando la definizione al nostro esempio \texttt{SVILUPPO}, la dipendenza "incriminata" era $\texttt{tech\_lead} \rightarrow \texttt{modulo}$.
+\begin{itemize}
+    \item \texttt{tech\_lead} è una superchiave? \textbf{No} (Fallisce il primo criterio).
+    \item \texttt{modulo} appartiene a una chiave candidata? \textbf{Sì}, fa parte della chiave primaria \texttt{\{id\_sviluppatore, modulo\}}. (Soddisfa il secondo criterio).
+\end{itemize}
+Di conseguenza, la tabella \texttt{SVILUPPO} originale \textbf{è già in 3NF}. Il progettista sceglie consapevolmente di non scomporla: accetta la ridondanza (il modulo del Tech Lead sarà ripetuto per ogni suo sviluppatore) al fine superiore di preservare intatti tutti i vincoli logici.
+\end{observation}
+
+\section{Le Forme Normali 1NF e 2NF}
+
+ Nel moderno sviluppo software, queste due forme normali vengono spesso soddisfatte in modo automatico grazie all'adozione di best practice architetturali (come l'uso di chiavi surrogate), ma le citiamo comunque per completezza.
+
+\paragraph{Prima Forma Normale (1NF): L'Atomicità}
+Un database relazionale puro non ammette l'esistenza di tuple con strutture dati annidate. La \textbf{Prima Forma Normale (1NF)} stabilisce un'unica, inderogabile regola:
+\begin{quote}
+Una relazione è in 1NF se e solo se il dominio di ciascun attributo è \textbf{atomico} (indivisibile) e ogni cella della tabella contiene un singolo valore scalare.
+\end{quote}
+
+La 1NF è quindi la traduzione di quanto abbiamo già affrontato nel Capitolo 2 durante la ristrutturazione del Class Diagram. Vieta esplicitamente l'uso di \textit{attributi strutturati} (es. una colonna "Indirizzo" che contiene logicamente via, cap e città) e di \textit{attributi multivalore} (es. un array di "Numeri di Telefono" all'interno di una singola cella). Per rispettare la 1NF, il progettista è costretto ad appiattire gli attributi strutturati o a spostare le liste in tabelle esterne (relazioni 1:N).
+
+\paragraph{Seconda Forma Normale (2NF): Eliminazione delle Dipendenze Parziali}
+La 2NF interviene quando una tabella possiede una Chiave Primaria \textit{composta} (formata da due o più attributi). 
+\begin{quote}
+Uno schema relazionale è in 2NF se è in 1NF e se ogni attributo non-chiave dipende \textbf{interamente} da tutta la chiave primaria, e non solo da una parte di essa (assenza di dipendenze parziali).
+\end{quote}
+
+\begin{example}[Violazione della 2NF]
+Si consideri una tabella per la registrazione degli esami, in cui la chiave primaria è la coppia \texttt{\{\underline{matricola}, \underline{codice\_corso}\}}:
+$$ \texttt{ESAME(\underline{matricola}, \underline{codice\_corso}, voto, nome\_studente)} $$
+
+Questo schema vìola la 2NF. Mentre l'attributo \texttt{voto} dipende interamente da tutta la chiave composta (serve sia la matricola che il corso per stabilire un voto), l'attributo \texttt{nome\_studente} dipende funzionalmente \textbf{solo da una parte} della chiave: la \texttt{matricola}. Il \texttt{codice\_corso} è ininfluente per determinare il nome. Questa dipendenza parziale genera un'anomalia di aggiornamento (il nome dello studente verrebbe ripetuto per ogni esame che sostiene).
+
+La soluzione consiste nel rimuovere \texttt{nome\_studente} e spostarlo in una tabella \texttt{STUDENTE} a sé stante.
+\end{example}
+
+\begin{observation}[Perché la 2NF è quasi "estinta" nel Backend moderno]
+Nel moderno sviluppo applicativo (es. Spring Boot e Hibernate), i progettisti tendono a evitare le chiavi primarie composte, preferendo dotare ogni entità di una \textbf{Chiave Surrogata} a singola colonna (es. un ID auto-incrementante o un UUID). 
+Da un punto di vista puramente matematico, se la chiave primaria di una tabella è formata da un solo attributo, \textbf{è impossibile che si verifichi una dipendenza parziale}. Pertanto, qualsiasi tabella dotata di una singola chiave surrogata (e priva di array interni) si trova automaticamente e istantaneamente in Seconda Forma Normale.
+\end{observation}

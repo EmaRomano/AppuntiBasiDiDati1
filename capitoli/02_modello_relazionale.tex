@@ -543,13 +543,13 @@ La scelta della tecnica di risoluzione è quasi sempre a favore dell'entità est
 \end{enumerate}
 \end{tip}
 
-\subsection{Codifica delle Gerarchie (Ereditarietà)}
+\section{Codifica delle Gerarchie (Ereditarietà)}
 
 Il modello relazionale è intrinsecamente "piatto" e non supporta nativamente il concetto orientato agli oggetti di ereditarietà (superclasse e sottoclassi). Pertanto, quando nel Class Diagram si incontra una gerarchia di generalizzazione/specializzazione, è necessario "smontarla" trasformandola in tabelle ordinarie. 
 
 L'ingegneria del software offre tre strategie principali per affrontare questa traduzione, ciascuna con precisi impatti su prestazioni, memoria e integrità dei dati.
 
-\subsubsection*{1. Partizionamento Orizzontale (Accorpamento verso il basso)}
+\paragraph{1. Partizionamento Orizzontale (Accorpamento verso il basso)}
 Questa soluzione prevede l'eliminazione della superclasse e la creazione di una tabella per ciascuna sottoclasse. Ogni tabella figlia "eredita" fisicamente copiando al proprio interno tutti gli attributi della generalizzazione.
 
 \begin{itemize}
@@ -558,7 +558,7 @@ Questa soluzione prevede l'eliminazione della superclasse e la creazione di una 
     \item \textbf{Svantaggi e Limiti:} Questa strada è matematicamente percorribile \textbf{solo se la generalizzazione è totale} (ovvero se non esistono istanze della superclasse che non appartengano a nessuna sottoclasse). Inoltre, se si vuole fare una query su tutte le persone (indipendentemente dal tipo), il database deve eseguire una pesante operazione di \texttt{UNION} tra le tabelle.
 \end{itemize}
 
-\subsubsection*{2. Partizionamento Singolo (Accorpamento verso l'alto)}
+\paragraph{2. Partizionamento Singolo (Accorpamento verso l'alto)}
 Questa soluzione, all'opposto, prevede l'eliminazione delle sottoclassi. Si crea un'unica, grande tabella (la superclasse) che ingloba tutti gli attributi di tutte le specializzazioni, introducendo un attributo \textbf{discriminante} (un enumeratore) per capire di che "tipo" sia la riga.
 
 \begin{itemize}
@@ -573,7 +573,7 @@ Utilizzando l'accorpamento verso l'alto, la tabella \texttt{CORSO} dovrà avere 
 Questo permette a livello strutturale l'assurdità di far insegnare un corso a uno Studente. Per recuperare l'informazione persa, si \textbf{deve} imporre un vincolo applicativo o un \textit{CHECK constraint} SQL che assicuri che la chiave esterna punti solo a righe in cui l'attributo discriminante \texttt{tipoPersona = 'Docente'}.
 \end{example}
 
-\subsubsection*{3. Partizionamento Verticale (Traduzione in Associazioni 1:1)}
+\paragraph{3. Partizionamento Verticale (Traduzione in Associazioni 1:1)}
 Questa strategia preserva la struttura del diagramma originale. Si crea una tabella per la superclasse (con i soli attributi comuni) e una tabella per ogni sottoclasse (con i soli attributi specifici). Le tabelle figlie vengono legate alla tabella padre tramite un'associazione 1:1 rigorosa, utilizzando la tecnica della \textbf{Chiave Primaria Condivisa}.
 
 \begin{itemize}
