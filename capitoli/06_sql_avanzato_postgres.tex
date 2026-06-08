@@ -1,0 +1,7 @@
+\chapter{SQL Avanzato in PostgreSQL}
+
+Nei capitoli precedenti abbiamo affrontato la sintassi e gli operatori dell'SQL standard (ANSI SQL), concentrandoci sui costrutti universali supportati in modo trasversale da qualsiasi motore relazionale. Questa aderenza rigorosa allo standard è fondamentale per garantire la portabilità di base del database.
+
+Tuttavia, nello sviluppo di applicazioni \textit{Enterprise} moderne (come i backend Java con Spring Boot), limitarsi allo standard puro rappresenta spesso un collo di bottiglia prestazionale. I DBMS moderni mettono a disposizione estensioni e funzioni analitiche avanzate che permettono di spostare carichi di calcolo pesanti (come reportistica, partizionamento statistico e logiche condizionali) dal server applicativo direttamente all'interno del motore del database, abbattendo drasticamente i tempi di rete e l'uso della memoria RAM dell'applicativo.
+
+In questo capitolo abbandoneremo il rigore dell'ANSI SQL puro per esplorare le funzionalità avanzate offerte dal dialetto di \textbf{PostgreSQL}. Studieremo i costrutti architetturali indispensabili per l'ingegneria del software moderna: le espressioni di tabella comuni (CTE), la logica condizionale e, soprattutto, le funzioni analitiche (Window Functions).
