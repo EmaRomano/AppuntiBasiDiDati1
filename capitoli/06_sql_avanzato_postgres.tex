@@ -5,3 +5,169 @@ Nei capitoli precedenti abbiamo affrontato la sintassi e gli operatori dell'SQL 
 Tuttavia, nello sviluppo di applicazioni \textit{Enterprise} moderne (come i backend Java con Spring Boot), limitarsi allo standard puro rappresenta spesso un collo di bottiglia prestazionale. I DBMS moderni mettono a disposizione estensioni e funzioni analitiche avanzate che permettono di spostare carichi di calcolo pesanti (come reportistica, partizionamento statistico e logiche condizionali) dal server applicativo direttamente all'interno del motore del database, abbattendo drasticamente i tempi di rete e l'uso della memoria RAM dell'applicativo.
 
 In questo capitolo abbandoneremo il rigore dell'ANSI SQL puro per esplorare le funzionalità avanzate offerte dal dialetto di \textbf{PostgreSQL}. Studieremo i costrutti architetturali indispensabili per l'ingegneria del software moderna: le espressioni di tabella comuni (CTE), la logica condizionale e, soprattutto, le funzioni analitiche (Window Functions).
+
+\section{Common Table Expressions (CTE): Modularità e Ricorsione}
+
+Quando la logica di business richiede estrazioni complesse, l'approccio standard basato sulle interrogazioni nidificate (subquery) genera rapidamente un codice illeggibile. Le query annidate costringono il motore e lo sviluppatore a leggere il codice "dall'interno verso l'esterno", rendendo il debugging un incubo operativo. 
+
+PostgreSQL e lo standard SQL moderno offrono una soluzione architetturale elegante a questo problema: le \textbf{Common Table Expressions (CTE)}, introdotte tramite la clausola \texttt{WITH}.
+
+\subsection{La clausola \texttt{WITH} (Sintassi e semantica)}
+Una CTE agisce come una vista temporanea o una "variabile di tabella" la cui visibilità (scope) è limitata esclusivamente al tempo di esecuzione dell'interrogazione che la definisce. 
+
+In termini di ingegneria del software, usare una CTE equivale ad applicare il pattern di refactoring dell'\textit{Extract Method} in Java: si prende un blocco logico complesso, lo si isola assegnandogli un nome semantico e lo si richiama successivamente nel flusso principale.
+
+La sintassi di base prevede la dichiarazione della clausola \texttt{WITH} all'inizio assoluto dell'istruzione, seguita dal nome della CTE e dalla query che la popola:
+
+\begin{verbatim}
+WITH nome_cte AS (
+    SELECT espressione_1, espressione_2
+    FROM tabella_origine
+    WHERE condizione
+)
+SELECT * FROM nome_cte 
+JOIN altra_tabella ON ...;
+\end{verbatim}
+
+Dal punto di vista dell'algebra relazionale e del piano di esecuzione interno (Query Optimizer), una CTE semplice e una subquery posizionata nella clausola \texttt{FROM} (Inline View) sono spesso perfettamente equivalenti: entrambe generano tabelle virtuali in memoria. 
+
+La differenza abissale risiede nella \textbf{leggibilità top-down} e nella \textbf{manutenibilità} del codice sorgente.
+
+\begin{example}[Il vantaggio della Leggibilità]
+Assumendo un dominio di tipo assicurativo (polizze auto), supponiamo di voler estrarre il nome dei clienti e la targa dei loro veicoli coinvolti in un sinistro 'Under Review', incrociando l'anagrafica con una pre-aggregazione delle polizze attive.
+Il percorso logico di navigazione è: \texttt{Cliente} $\rightarrow$ \texttt{Veicolo} $\rightarrow$ \texttt{Polizza} $\rightarrow$ \texttt{Sinistro}.
+
+\textbf{Approccio Legacy (Subquery nel FROM):}
+Il codice è un monolite in cui la logica di estrazione delle polizze attive è "sepolta" al centro dell'istruzione principale, spezzando la naturale lettura delle JOIN.
+\begin{verbatim}
+SELECT c.nome, c.cognome, v.targa
+FROM cliente c
+JOIN veicolo v ON c.id_cliente = v.id_cliente
+JOIN (
+    SELECT id_veicolo, numero_polizza
+    FROM polizza
+    WHERE data_scadenza > CURRENT_DATE
+) p_attive ON v.id_veicolo = p_attive.id_veicolo
+JOIN sinistro s ON p_attive.numero_polizza = s.numero_polizza
+WHERE s.status = 'Under Review';
+\end{verbatim}
+
+\textbf{Approccio Moderno (CTE):}
+La logica viene srotolata in modo lineare. Prima si definisce il "tavolo di lavoro" (le polizze attive), e poi lo si interroga nel blocco principale, mantenendo la catena delle JOIN pulita e leggibile.
+\begin{verbatim}
+WITH PolizzeAttive AS (
+    SELECT id_veicolo, numero_polizza
+    FROM polizza
+    WHERE data_scadenza > CURRENT_DATE
+)
+SELECT c.nome, c.cognome, v.targa
+FROM cliente c
+JOIN veicolo v ON c.id_cliente = v.id_cliente
+JOIN PolizzeAttive pa ON v.id_veicolo = pa.id_veicolo
+JOIN sinistro s ON pa.numero_polizza = s.numero_polizza
+WHERE s.status = 'Under Review';
+\end{verbatim}
+\end{example}
+
+Oltre all'innegabile vantaggio sintattico, le CTE offrono capacità strutturali che le subquery non possono eguagliare, come la concatenazione multipla e la ricorsione, come illustriamo a seguire. 
+
+\subsection{CTE Multiple e Concatenate (Data Pipelining)}
+
+Il vero vantaggio architetturale delle Common Table Expressions rispetto alle subquery tradizionali emerge quando l'estrazione richiede elaborazioni intermedie multiple. 
+
+Lo standard SQL permette di dichiarare una sequenza di CTE all'interno della medesima clausola \texttt{WITH}, separandole semplicemente con una virgola. La potenza di questo costrutto risiede nella \textbf{visibilità sequenziale}: una CTE dichiarata per seconda può interrogare direttamente la CTE dichiarata per prima, comportandosi a tutti gli effetti come una "Data Pipeline" (una catena di montaggio dei dati).
+
+Se provassimo a replicare questo comportamento con le subquery classiche (Inline Views), saremmo costretti a nidificare le query l'una dentro l'altra (creando il famigerato anti-pattern della "piramide del codice"), rendendo il debugging di fatto impossibile.
+
+\begin{example}[Data Pipeline: Analisi dei Sinistri Gravi]
+Nel dominio \textit{SafeDrive InsurTech}, le regole di business stabiliscono che un sinistro può richiedere molteplici perizie (es. danni al veicolo, danni fisici, danni a terzi). Il management richiede l'anagrafica dei clienti coinvolti in "Sinistri Gravi", definendo come "grave" un sinistro in cui la somma totale delle perizie supera i 10.000 euro.
+
+Risolviamo il problema spezzandolo in passaggi logici sequenziali tramite CTE concatenate:
+1. Calcoliamo la somma delle perizie per ogni singolo sinistro.
+2. Filtriamo solo i sinistri la cui somma supera la soglia.
+3. Incrociamo i risultati isolati con la complessa gerarchia anagrafica.
+
+\begin{verbatim}
+WITH DanniPerSinistro AS (
+-- Step 1: Aggregazione (collassa le N perizie di un sinistro in 1 riga)
+    SELECT id_sinistro, SUM(valore_stimato) AS totale_danni
+    FROM perizia
+    GROUP BY id_sinistro
+),
+SinistriGravi AS (
+-- Step 2: Filtraggio (Interroga DIRETTAMENTE la CTE precedente)
+    SELECT id_sinistro, totale_danni
+    FROM DanniPerSinistro
+    WHERE totale_danni > 10000
+)
+-- Step 3: Query Principale (Incrocio anagrafico)
+SELECT c.nome, c.cognome, s.codice_sinistro, sg.totale_danni
+FROM cliente c
+JOIN veicolo v ON c.id_cliente = v.id_cliente
+JOIN polizza p ON v.id_veicolo = p.id_veicolo
+JOIN sinistro s ON p.numero_polizza = s.numero_polizza
+JOIN SinistriGravi sg ON s.id_sinistro = sg.id_sinistro;
+\end{verbatim}
+\end{example}
+
+\begin{dettagli}[Ottimizzazione del Motore PostgreSQL]
+Dal punto di vista delle prestazioni fisiche, l'uso di CTE multiple non degrada l'efficienza. A partire dalla versione 12, l'ottimizzatore (Query Planner) di PostgreSQL esegue di default l'\textit{Inlining} delle CTE: analizza l'intera catena di \texttt{WITH} e la "srotola" ricomponendola nella strategia di esecuzione a più basso costo, esattamente come farebbe per una vista. Il programmatore ottiene quindi il massimo della leggibilità senza pagare alcuna penalità in termini di tempi di esecuzione.
+\end{dettagli}
+
+\subsection{Cenni alle CTE Ricorsive (\texttt{WITH RECURSIVE})}
+
+Nel mondo reale, i dati aziendali sono spesso organizzati in strutture gerarchiche o ad albero: l'organigramma dei dipendenti, la distinta base di un veicolo, o un sistema di categorie annidate. Estrarre un intero albero logico utilizzando l'SQL standard (o peggio, demandando il ciclo al codice Java tramite decine di query consecutive) risulta letale per le prestazioni a causa del famigerato problema del "N+1 query".
+
+PostgreSQL risolve elegantemente l'esplorazione dei grafi introducendo il modificatore \texttt{RECURSIVE}. Una \textbf{CTE Ricorsiva} è una tabella temporanea che ha la capacità di richiamare (interrogare) se stessa, comportandosi come un ciclo \texttt{while} nativo all'interno del motore del database.
+
+\paragraph{Anatomia della Ricorsione in SQL}
+Una query \texttt{WITH RECURSIVE} è rigorosamente composta da tre elementi fondamentali, uniti dall'operatore \texttt{UNION ALL}:
+\begin{enumerate}
+    \item \textbf{Il Termine Non Ricorsivo (Caso Base):} È la query di partenza. Seleziona il nodo (o i nodi) radice dell'albero da cui iniziare l'esplorazione.
+    \item \textbf{L'Operatore di Unione:} \texttt{UNION} o \texttt{UNION ALL} viene utilizzato per "incollare" i risultati di ogni iterazione a quelli precedenti.
+    \item \textbf{Il Termine Ricorsivo (Passo Induttivo):} È la query che richiama il nome della CTE stessa. Viene eseguita ripetutamente finché non restituisce un insieme vuoto (la condizione di uscita implicita).
+\end{enumerate}
+
+\begin{example}[Esplorazione Gerarchica: Rete di Vendita SafeDrive]
+Nel dominio \textit{SafeDrive InsurTech}, la rete di vendita è strutturata in modo gerarchico: ogni agente assicurativo risponde a un capo area, che a sua volta è un agente. Lo schema prevede quindi una \textit{Self-Join} (una chiave esterna che punta alla chiave primaria della stessa tabella): \\
+\texttt{AGENTE(\underline{id\_agente}, nome, id\_responsabile*)}
+
+Il management richiede l'estrazione dell'intera catena di comando partendo dal Direttore Generale (\texttt{id\_agente = 1}) fino all'ultimo collaboratore sul territorio, calcolando dinamicamente il livello di profondità gerarchica.
+
+\begin{verbatim}
+WITH RECURSIVE Organigramma AS (
+    -- 1. CASO BASE: Inizializziamo l'albero partendo dal Direttore
+    SELECT id_agente, nome, id_responsabile, 1 AS livello
+    FROM agente
+    WHERE id_agente = 1
+
+    UNION ALL
+
+    -- 2. PASSO RICORSIVO: Troviamo i sottoposti della riga precedente
+    SELECT a.id_agente, a.nome, a.id_responsabile, org.livello + 1
+    FROM agente a
+    JOIN Organigramma org ON a.id_responsabile = org.id_agente
+)
+-- 3. QUERY FINALE: Estraiamo l'albero completo ordinato per grado
+SELECT * FROM Organigramma ORDER BY livello, nome;
+\end{verbatim}
+
+\textbf{Il funzionamento interno (Query Execution):}
+Inizialmente, la tabella temporanea \texttt{Organigramma} viene popolata unicamente con la riga del Direttore. Al passaggio successivo, la \texttt{JOIN} del termine ricorsivo prende quella riga e cerca tutti gli agenti il cui \texttt{id\_responsabile} corrisponde all'ID del Direttore. Questi nuovi agenti (Livello 2) vengono accodati nella CTE tramite l'unione. Alla terza iterazione, la \texttt{JOIN} cercherà i sottoposti degli agenti di Livello 2. 
+Questo processo a catena continua in modo del tutto automatico finché la query non raggiunge la base della piramide (agenti senza sottoposti). Quando un'iterazione non trova più alcun record, la ricorsione si arresta in modo sicuro.
+\end{example}
+
+\begin{bestpractice}[Il Vantaggio Architetturale per il Backend]
+L'utilizzo di \texttt{WITH RECURSIVE} rappresenta la \textit{best practice} assoluta per la gestione delle gerarchie. Permette al backend (es. un servizio Spring Boot) di recuperare un intero albero logico con \textbf{una singola chiamata di rete}. Il codice Java si limiterà a ricevere un \texttt{ResultSet} piatto (la lista degli agenti) che potrà facilmente parsare in memoria per ricostruire l'albero di oggetti, risparmiando al database decine o centinaia di esecuzioni separate.
+\end{bestpractice}
+
+\begin{bestpractice}[\texttt{UNION ALL} vs \texttt{UNION} nella Ricorsione]
+Negli snippet e nella manualistica sulle CTE ricorsive applicate a gerarchie (come un organigramma o una distinta base), l'operatore di giunzione utilizzato è quasi sempre \texttt{UNION ALL} anziché il semplice \texttt{UNION}. Non si tratta di una scelta stilistica, ma di una regola aurea per l'ottimizzazione estrema delle prestazioni.
+
+\begin{itemize}
+    \item \textbf{Assenza naturale di duplicati:} In un albero gerarchico puro (relazione 1:N), ogni nodo figlio (es. il sottoposto) risponde a un solo nodo padre (es. il manager). Di conseguenza, esplorando l'albero dall'alto verso il basso, è matematicamente impossibile che la query estragga la stessa riga più di una volta.
+    \item \textbf{Il costo computazionale del DISTINCT implicito:} L'operatore \texttt{UNION} non si limita a incollare due insiemi, ma applica sempre un'operazione di \texttt{DISTINCT} per scartare le doppie occorrenze. Se venisse usato in una ricorsione, costringerebbe il motore di PostgreSQL a memorizzare, ordinare e confrontare l'intero set di dati accumulato \textbf{a ogni singola iterazione}. Usando \texttt{UNION ALL}, il motore si limita ad accodare brutalmente i nuovi record in RAM, garantendo un'esecuzione fulminea.
+\end{itemize}
+
+\textbf{Quando usare \texttt{UNION}?} L'uso di \texttt{UNION} classico è giustificato e necessario in una CTE ricorsiva \textit{esclusivamente} quando si esplorano \textbf{grafi ciclici} (es. reti stradali con percorsi alternativi per la stessa destinazione, o reti sociali). In quel caso, l'eliminazione del duplicato in tempo reale diventa vitale per impedire alla ricorsione di viaggiare in tondo ed entrare in un loop infinito.
+\end{bestpractice}
