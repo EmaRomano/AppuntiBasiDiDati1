@@ -48,6 +48,35 @@ Nei moderni sistemi \textit{Enterprise}, la regola d'oro architetturale impone u
 \end{itemize}
 \end{bestpractice}
 
+\subsection{Il Confine tra Backend e Database}
+
+Nello sviluppo di architetture \textit{Enterprise} (es. stack Java/Spring Boot + PostgreSQL) è un errore comune fare confusione sul concetto di "logica" da delegare al database. Per garantire scalabilità, prestazioni e manutenibilità, l'ingegneria del software impone di tracciare una linea netta tra \textbf{Logica di Business} e \textbf{Logica dei Dati}.
+
+\paragraph{1. Il Dominio del Backend (Java): Logica di Business e Stato}
+Il server applicativo (il client del database) è l'unico responsabile delle regole aziendali (Business Rules), dei workflow operativi e delle integrazioni esterne.
+Esempi tipici includono l'invio di email, l'autorizzazione di un pagamento, o il blocco della cancellazione di un'anagrafica se esistono pratiche pendenti.
+
+\textbf{Perché delegare a Java?}
+\begin{itemize}
+    \item \textbf{Scalabilità Orizzontale:} In caso di picchi di traffico, è possibile accendere istantaneamente decine di nuove istanze del server Spring Boot per distribuire il carico. Scalare un database relazionale in scrittura, al contrario, è un'operazione estremamente rigida e costosa.
+    \item \textbf{Manutenibilità e Testing:} La logica scritta in Java è facilmente testabile tramite \textit{Unit Test} (es. JUnit). Eseguire il debug di logica di business nascosta nel database (tramite \textit{Trigger} o \textit{Stored Procedure}) è un anti-pattern operativo che rallenta lo sviluppo.
+    \item \textbf{Prevenzione del Vendor Lock-in:} Scrivere le regole aziendali nevralgiche nel dialetto procedurale di un DBMS (es. PL/pgSQL) lega indissolubilmente l'azienda a quel software, rendendo proibitiva un'eventuale migrazione futura verso un altro motore.
+\end{itemize}
+
+\paragraph{2. Il Dominio del Database (PostgreSQL): Logica dei Dati (Data Crushing)}
+Il database relazionale non deve conoscere le regole di business, ma deve essere sfruttato per la sua capacità nativa di filtrare, aggregare (Aggregations), ruotare (Pivoting) e formattare in modo condizionale (\texttt{CASE WHEN}) moli enormi di dati.
+
+\textbf{Perché delegare a PostgreSQL?}
+\begin{itemize}
+    \item \textbf{Abbattimento della Latenza di Rete (Network Latency):} Spostare decine di migliaia di righe dal database alla RAM di Java per contarle o raggrupparle satura inutilmente la larghezza di banda. Eseguendo le aggregazioni direttamente in SQL, sul cavo di rete viaggerà solo il risultato finale.
+    \item \textbf{Prevenzione della Saturazione della RAM (OutOfMemoryError):} Evitare il \textit{Data Fetching} massivo (ovvero scaricare tabelle intere per elaborarle in memoria tramite \texttt{Stream API} e \texttt{for-loop}) previene crash disastrosi del server applicativo.
+    \item \textbf{Efficienza Computazionale:} I database relazionali (scritti in C/C++) sono dotati di un \textit{Query Optimizer} che analizza gli indici fisici sul disco. Sono ingegnerizzati appositamente per applicare l'algebra relazionale a una velocità inarrivabile per il codice applicativo standard.
+\end{itemize}
+
+\begin{observation}[La Regola Aurea dell'Architettura Dati]
+Il database relazionale non deve mai generare effetti collaterali (Trigger) o governare i flussi decisionali, ma \textbf{deve sempre restituire allo strato Java un set di dati strettamente necessario, già filtrato, pre-calcolato e formattato}. In un'architettura moderna, Java rappresenta il cervello del sistema, mentre il DBMS ne è il muscolo matematico.
+\end{observation}
+
 
 \section{Logica Attiva: I Trigger}
 

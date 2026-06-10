@@ -6,6 +6,119 @@ Tuttavia, nello sviluppo di applicazioni \textit{Enterprise} moderne (come i bac
 
 In questo capitolo abbandoneremo il rigore dell'ANSI SQL puro per esplorare le funzionalità avanzate offerte dal dialetto di \textbf{PostgreSQL}. Studieremo i costrutti architetturali indispensabili per l'ingegneria del software moderna: le espressioni di tabella comuni (CTE), la logica condizionale e, soprattutto, le funzioni analitiche (Window Functions).
 
+\medskip
+
+Per gli esempi di questo capitolo utilizzeremo quasi sempre un dominio assicurativo (polizze auto) riferendoci ad una immaginaria compagnia \textit{SafeDrive InsurTech}. 
+
+\section{Controllo del Result Set: Limit, Offset e Nulls}
+
+Prima di esplorare i costrutti avanzati di aggregazione e manipolazione, è fondamentale padroneggiare gli strumenti che governano la dimensione e la forma esatta dei dati restituiti al backend. Estrarre intere tabelle per poi filtrarle o ordinarle in memoria (ad esempio tramite le \texttt{Collection} di Java) è l'anti-pattern prestazionale per eccellenza. Il database relazionale deve restituire esclusivamente la porzione di dati che l'interfaccia utente è fisicamente in grado di visualizzare.
+
+\subsection{Taglio e Paginazione: \texttt{LIMIT} e \texttt{OFFSET}}
+Nelle applicazioni aziendali, le liste di dati vengono sempre impaginate (es. 10, 50 o 100 risultati per pagina). In PostgreSQL, il controllo granulare sulla quantità di righe estratte è delegato alle clausole \texttt{LIMIT} e \texttt{OFFSET}, che si posizionano alla fine assoluta dell'istruzione SQL.
+
+\begin{itemize}
+    \item \textbf{\texttt{LIMIT n}:} Istruisce il motore a interrompere l'estrazione non appena ha accumulato esattamente $n$ righe.
+    \item \textbf{\texttt{OFFSET m}:} Istruisce il motore a scartare le prime $m$ righe prima di iniziare a restituire i risultati.
+\end{itemize}
+
+\begin{example}[Paginazione dei Sinistri (Pagina 2)]
+Il frontend di \textit{SafeDrive} richiede la "Pagina 2" di una lista cronologica di sinistri, visualizzando 10 risultati per pagina. Questo significa che il database deve saltare i primi 10 record (quelli della Pagina 1) e restituire i successivi 10.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT codice_sinistro, data_apertura, danno_stimato
+FROM sinistro
+ORDER BY data_apertura DESC
+LIMIT 10 OFFSET 10;
+\end{lstlisting}
+\end{example}
+
+\begin{observation}[L'Obbligo dell'\texttt{ORDER BY}]
+L'utilizzo della clausola \texttt{LIMIT} senza un'esplicita clausola \texttt{ORDER BY} è un grave errore di progettazione. Senza un ordinamento forzato, i database relazionali restituiscono le righe nell'ordine fisico casuale in cui le trovano allocate sul disco in quella specifica frazione di secondo (che può variare dopo ogni aggiornamento). Per garantire risultati predicibili e una paginazione che non mostri record duplicati o mancanti tra una pagina e l'altra, \texttt{LIMIT} e \texttt{ORDER BY} devono sempre essere accoppiati.
+\end{observation}
+
+\subsection{Gestione delle Incognite nell'Ordinamento: \texttt{NULLS FIRST / LAST}}
+Un aspetto critico e spesso trascurato dello sviluppo SQL riguarda il posizionamento dei valori \texttt{NULL} (le incognite) durante un ordinamento.
+
+In PostgreSQL, per convenzione matematica interna, un valore \texttt{NULL} è considerato "più grande" di qualsiasi valore noto. Questo genera un effetto collaterale pericoloso per le interfacce utente: se si richiede un ordinamento decrescente (\texttt{DESC}) per mostrare i numeri più alti in cima, tutte le righe con valore \texttt{NULL} appariranno per prime, relegando i dati utili in basso.
+
+Per assumere il controllo totale su questo comportamento, si aggiungono i modificatori \texttt{NULLS FIRST} o \texttt{NULLS LAST} direttamente alla dichiarazione della colonna nella clausola \texttt{ORDER BY}.
+
+\begin{example}[Classifica dei Danni con Dati Mancanti]
+La direzione richiede la lista dei sinistri ordinata per danno stimato, dal più costoso al meno costoso. Alcuni sinistri appena aperti non sono ancora stati periziati, pertanto il loro \texttt{danno\_stimato} è fisicamente \texttt{NULL}. 
+
+Utilizzando un semplice \texttt{ORDER BY danno\_stimato DESC}, i sinistri senza stima finirebbero in cima al report. Correggiamo la logica forzando i valori nulli alla fine del \textit{Result Set}:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT codice_sinistro, danno_stimato
+FROM sinistro
+ORDER BY danno_stimato DESC NULLS LAST;
+\end{lstlisting}
+In questo modo, i sinistri con danni milionari si troveranno correttamente al vertice, mentre tutti i record in attesa di perizia scivoleranno ordinatamente in fondo all'elenco, indipendentemente dalla direzione decrescente dell'ordinamento.
+\end{example}
+
+\section{DML Avanzato in PostgreSQL: RETURNING e UPSERT}
+
+Lo standard SQL puro presenta alcune limitazioni architetturali quando il database deve interfacciarsi con un'applicazione backend moderna (es. in Java o Python). PostgreSQL estende il DML standard con due costrutti essenziali per garantire la sicurezza concorrenziale e minimizzare le chiamate di rete.
+
+\paragraph{1. La clausola RETURNING (Recupero immediato)}
+Nelle operazioni standard di \texttt{INSERT}, \texttt{UPDATE} o \texttt{DELETE}, il database restituisce all'applicazione chiamante solo il numero di righe modificate. Se durante un \texttt{INSERT} la Chiave Primaria viene generata automaticamente dal database (es. un campo \texttt{SERIAL}), il backend non ha modo di conoscerla.
+Richiedere l'ID con una \texttt{SELECT MAX(id)} successiva è un gravissimo anti-pattern soggetto a \textit{race conditions} (condizioni di gara) se altri utenti stanno inserendo dati simultaneamente.
+
+PostgreSQL permette di appendere la clausola \textbf{\texttt{RETURNING}} alla fine di qualsiasi istruzione DML per farle restituire i dati appena elaborati, comportandosi a tutti gli effetti come una \texttt{SELECT} contestuale.
+
+\begin{example}[Recupero della Chiave Primaria]
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+INSERT INTO sinistro (id_cliente, data_apertura, danno_stimato)
+VALUES (42, CURRENT_DATE, 1500.00)
+RETURNING codice_sinistro, data_apertura;
+\end{lstlisting}
+In una singola operazione di rete (Round-Trip), il backend inserisce i dati e riceve immediatamente indietro il \texttt{codice\_sinistro} appena generato, pronto per essere utilizzato nella logica di business. I framework ORM moderni come Hibernate utilizzano massicciamente questo costrutto "sotto il cofano".
+\end{example}
+
+\paragraph{2. L'Upsert (INSERT ... ON CONFLICT)}
+Uno degli scenari applicativi più comuni è la logica di \textit{Upsert} ("Update or Insert"): se un record non esiste nel database, inseriscilo; se esiste già, aggiornalo.
+Delegare questa logica al codice Java implica l'apertura di una transazione e l'esecuzione di interrogazioni multiple (una \texttt{SELECT} di controllo seguita da un \texttt{INSERT} o \texttt{UPDATE}), consumando risorse e rischiando conflitti di concorrenza.
+
+PostgreSQL gestisce l'operazione in modo nativo e atomico attraverso la clausola \textbf{\texttt{ON CONFLICT}}, che intercetta la violazione di un vincolo di univocità (es. Primary Key o constraint \texttt{UNIQUE}) e devia l'inserimento verso un aggiornamento.
+
+\begin{example}[Aggiornamento del Budget Dipartimentale]
+Se il dipartimento 'IT' non è ancora stato registrato a sistema, lo creiamo con un budget iniziale di 50.000. Se invece esiste già (violazione della chiave primaria sul nome del dipartimento), incrementiamo il suo budget attuale di 50.000.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+INSERT INTO dipartimento (nome, budget_totale)
+VALUES ('IT', 50000)
+ON CONFLICT (nome) 
+DO UPDATE SET budget_totale = dipartimento.budget_totale + 50000;
+\end{lstlisting}
+La pseudo-tabella \texttt{EXCLUDED} può essere utilizzata all'interno del blocco \texttt{DO UPDATE} per fare riferimento ai valori proposti dalla clausola \texttt{VALUES} originale, rendendo il costrutto dinamicamente adattabile.
+\end{example}
+
+\section{Gestione Dati Semi-Strutturati: Il tipo JSONB}
+
+Una delle sfide più ardue nello sviluppo backend è il salvataggio di dati con struttura mutevole o imprevedibile (es. risposte di API di terze parti, configurazioni utente dinamiche, o log di sensori hardware). L'approccio relazionale classico costringerebbe alla creazione di decine di tabelle e complessi anti-pattern come l'EAV (\textit{Entity-Attribute-Value}).
+
+PostgreSQL aggira il problema introducendo il tipo di dato nativo \textbf{\texttt{JSONB}} (JSON Binary). A differenza di un semplice campo di testo, il \texttt{JSONB} memorizza il documento in un formato binario ottimizzato, permettendo l'indicizzazione completa delle chiavi interne e l'interrogazione chirurgica del JSON direttamente da SQL.
+
+\begin{example}[Analisi Telemetria Veicolare]
+Nel sistema \textit{SafeDrive}, le scatole nere delle auto inviano ogni minuto un payload JSON con struttura variabile. La tabella \texttt{telemetria} contiene un attributo \texttt{dati\_sensore} di tipo \texttt{JSONB}.
+Il backend ha bisogno di estrarre e mediare solo la velocità di un veicolo specifico, filtrando la data.
+
+Invece di scaricare l'intero documento in Java e farne il \textit{parsing} con librerie come Jackson o Gson, sfruttiamo gli operatori di estrazione JSON di PostgreSQL (\texttt{->>}), che navigano il documento e restituiscono il valore come testo:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_veicolo,
+    -- Estrae il valore 'velocita' e lo casta a intero per la matematica
+    AVG((dati_sensore ->> 'velocita')::INTEGER) AS media_velocita
+FROM telemetria
+WHERE id_veicolo = 88 
+  AND timestamp_ricezione >= CURRENT_DATE;
+\end{lstlisting}
+
+Questa operazione viene eseguita a velocità native relazionali. L'uso di \texttt{JSONB} permette agli sviluppatori di godere della flessibilità strutturale tipica dei database NoSQL (come MongoDB), senza rinunciare all'integrità referenziale, alle transazioni ACID e all'algebra relazionale.
+\end{example}
+
 \section{Common Table Expressions (CTE): Modularità e Ricorsione}
 
 Quando la logica di business richiede estrazioni complesse, l'approccio standard basato sulle interrogazioni nidificate (subquery) genera rapidamente un codice illeggibile. Le query annidate costringono il motore e lo sviluppatore a leggere il codice "dall'interno verso l'esterno", rendendo il debugging un incubo operativo. 
@@ -19,7 +132,7 @@ In termini di ingegneria del software, usare una CTE equivale ad applicare il pa
 
 La sintassi di base prevede la dichiarazione della clausola \texttt{WITH} all'inizio assoluto dell'istruzione, seguita dal nome della CTE e dalla query che la popola:
 
-\begin{verbatim}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 WITH nome_cte AS (
     SELECT espressione_1, espressione_2
     FROM tabella_origine
@@ -27,7 +140,7 @@ WITH nome_cte AS (
 )
 SELECT * FROM nome_cte 
 JOIN altra_tabella ON ...;
-\end{verbatim}
+\end{lstlisting}
 
 Dal punto di vista dell'algebra relazionale e del piano di esecuzione interno (Query Optimizer), una CTE semplice e una subquery posizionata nella clausola \texttt{FROM} (Inline View) sono spesso perfettamente equivalenti: entrambe generano tabelle virtuali in memoria. 
 
@@ -39,7 +152,7 @@ Il percorso logico di navigazione è: \texttt{Cliente} $\rightarrow$ \texttt{Vei
 
 \textbf{Approccio Legacy (Subquery nel FROM):}
 Il codice è un monolite in cui la logica di estrazione delle polizze attive è "sepolta" al centro dell'istruzione principale, spezzando la naturale lettura delle JOIN.
-\begin{verbatim}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 SELECT c.nome, c.cognome, v.targa
 FROM cliente c
 JOIN veicolo v ON c.id_cliente = v.id_cliente
@@ -50,11 +163,11 @@ JOIN (
 ) p_attive ON v.id_veicolo = p_attive.id_veicolo
 JOIN sinistro s ON p_attive.numero_polizza = s.numero_polizza
 WHERE s.status = 'Under Review';
-\end{verbatim}
+\end{lstlisting}
 
 \textbf{Approccio Moderno (CTE):}
 La logica viene srotolata in modo lineare. Prima si definisce il "tavolo di lavoro" (le polizze attive), e poi lo si interroga nel blocco principale, mantenendo la catena delle JOIN pulita e leggibile.
-\begin{verbatim}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 WITH PolizzeAttive AS (
     SELECT id_veicolo, numero_polizza
     FROM polizza
@@ -66,7 +179,7 @@ JOIN veicolo v ON c.id_cliente = v.id_cliente
 JOIN PolizzeAttive pa ON v.id_veicolo = pa.id_veicolo
 JOIN sinistro s ON pa.numero_polizza = s.numero_polizza
 WHERE s.status = 'Under Review';
-\end{verbatim}
+\end{lstlisting}
 \end{example}
 
 Oltre all'innegabile vantaggio sintattico, le CTE offrono capacità strutturali che le subquery non possono eguagliare, come la concatenazione multipla e la ricorsione, come illustriamo a seguire. 
@@ -87,7 +200,7 @@ Risolviamo il problema spezzandolo in passaggi logici sequenziali tramite CTE co
 2. Filtriamo solo i sinistri la cui somma supera la soglia.
 3. Incrociamo i risultati isolati con la complessa gerarchia anagrafica.
 
-\begin{verbatim}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 WITH DanniPerSinistro AS (
 -- Step 1: Aggregazione (collassa le N perizie di un sinistro in 1 riga)
     SELECT id_sinistro, SUM(valore_stimato) AS totale_danni
@@ -107,7 +220,7 @@ JOIN veicolo v ON c.id_cliente = v.id_cliente
 JOIN polizza p ON v.id_veicolo = p.id_veicolo
 JOIN sinistro s ON p.numero_polizza = s.numero_polizza
 JOIN SinistriGravi sg ON s.id_sinistro = sg.id_sinistro;
-\end{verbatim}
+\end{lstlisting}
 \end{example}
 
 \begin{dettagli}[Ottimizzazione del Motore PostgreSQL]
@@ -129,12 +242,12 @@ Una query \texttt{WITH RECURSIVE} è rigorosamente composta da tre elementi fond
 \end{enumerate}
 
 \begin{example}[Esplorazione Gerarchica: Rete di Vendita SafeDrive]
-Nel dominio \textit{SafeDrive InsurTech}, la rete di vendita è strutturata in modo gerarchico: ogni agente assicurativo risponde a un capo area, che a sua volta è un agente. Lo schema prevede quindi una \textit{Self-Join} (una chiave esterna che punta alla chiave primaria della stessa tabella): \\
+In \textit{SafeDrive InsurTech} la rete di vendita è strutturata in modo gerarchico: ogni agente assicurativo risponde a un capo area, che a sua volta è un agente. Lo schema prevede quindi una \textit{Self-Join} (una chiave esterna che punta alla chiave primaria della stessa tabella): \\
 \texttt{AGENTE(\underline{id\_agente}, nome, id\_responsabile*)}
 
 Il management richiede l'estrazione dell'intera catena di comando partendo dal Direttore Generale (\texttt{id\_agente = 1}) fino all'ultimo collaboratore sul territorio, calcolando dinamicamente il livello di profondità gerarchica.
 
-\begin{verbatim}
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 WITH RECURSIVE Organigramma AS (
     -- 1. CASO BASE: Inizializziamo l'albero partendo dal Direttore
     SELECT id_agente, nome, id_responsabile, 1 AS livello
@@ -150,7 +263,7 @@ WITH RECURSIVE Organigramma AS (
 )
 -- 3. QUERY FINALE: Estraiamo l'albero completo ordinato per grado
 SELECT * FROM Organigramma ORDER BY livello, nome;
-\end{verbatim}
+\end{lstlisting}
 
 \textbf{Il funzionamento interno (Query Execution):}
 Inizialmente, la tabella temporanea \texttt{Organigramma} viene popolata unicamente con la riga del Direttore. Al passaggio successivo, la \texttt{JOIN} del termine ricorsivo prende quella riga e cerca tutti gli agenti il cui \texttt{id\_responsabile} corrisponde all'ID del Direttore. Questi nuovi agenti (Livello 2) vengono accodati nella CTE tramite l'unione. Alla terza iterazione, la \texttt{JOIN} cercherà i sottoposti degli agenti di Livello 2. 
@@ -171,3 +284,487 @@ Negli snippet e nella manualistica sulle CTE ricorsive applicate a gerarchie (co
 
 \textbf{Quando usare \texttt{UNION}?} L'uso di \texttt{UNION} classico è giustificato e necessario in una CTE ricorsiva \textit{esclusivamente} quando si esplorano \textbf{grafi ciclici} (es. reti stradali con percorsi alternativi per la stessa destinazione, o reti sociali). In quel caso, l'eliminazione del duplicato in tempo reale diventa vitale per impedire alla ricorsione di viaggiare in tondo ed entrare in un loop infinito.
 \end{bestpractice}
+
+\section{Logica Condizionale e Gestione delle Incognite}
+
+Nel classico flusso di sviluppo backend, si tende spesso a utilizzare il database come un mero archivio di lettura (scaricando i dati grezzi) per poi delegare la logica di business e la formattazione al codice Java tramite infiniti cicli \texttt{for} e costrutti \texttt{if-else}. Questo approccio, noto come anti-pattern \textit{Data Fetching}, sovraccarica inutilmente la memoria RAM del server applicativo e le reti di comunicazione.
+
+L'SQL moderno fornisce potenti costrutti condizionali che permettono di alterare, raggruppare o etichettare l'output riga per riga direttamente all'interno del motore relazionale. Il dato arriva al backend già "digerito" e pronto per essere consumato.
+
+\subsection{Il costrutto \texttt{CASE WHEN} (Semplice vs Ricercato)}
+L'espressione \texttt{CASE} è l'equivalente diretto dell'istruzione \texttt{switch-case} o degli \texttt{if-else} nidificati in Java. Essendo un'espressione logica e non un comando strutturale, può essere inserita ovunque sia ammesso un valore: nella clausola \texttt{SELECT} per generare nuove colonne "al volo", nella \texttt{WHERE} per applicare filtri dinamici, o nella \texttt{ORDER BY} per stabilire ordinamenti personalizzati.
+
+PostgreSQL supporta due varianti sintattiche del costrutto:
+
+\paragraph{1. CASE Semplice (Match di Uguaglianza)}
+Si utilizza quando occorre confrontare \textbf{una singola colonna} contro una lista di valori esatti. È architetturalmente identico allo \texttt{switch} di Java.
+
+\begin{example}[Normalizzazione degli Status Aziendali]
+Nel database \textit{SafeDrive}, lo stato di una polizza è archiviato a livello fisico come un singolo carattere (es. 'A' per Attiva, 'S' per Sospesa, 'E' per Scaduta/Expired). Il frontend web, tuttavia, richiede di visualizzare le etichette descrittive complete. Invece di mappare il dato scaricato in Java tramite un \texttt{Enum}, generiamo l'etichetta direttamente in SQL:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT numero_polizza,
+       -- il case crea una seconda colonna calcolata
+       CASE status_polizza
+           WHEN 'A' THEN 'Polizza Attiva'
+           WHEN 'S' THEN 'Polizza Sospesa'
+           WHEN 'E' THEN 'Polizza Scaduta'
+           ELSE 'Stato Sconosciuto'
+       -- la colonna viene rinominata    
+       END AS descrizione_stato
+FROM polizza;
+\end{lstlisting}
+\end{example}
+
+\paragraph{2. CASE Ricercato (Predicati Complessi)}
+Si utilizza quando le condizioni non sono semplici uguaglianze, ma richiedono operatori logici (es. \texttt{>}, \texttt{<}, \texttt{AND}, \texttt{OR}) o il coinvolgimento di \textbf{più colonne contemporaneamente}. È l'equivalente di una catena di \texttt{if - else if}.
+
+\begin{example}[Segmentazione del Rischio per il Pricing]
+Il motore di calcolo dei premi di \textit{SafeDrive} deve categorizzare i veicoli in fasce di rischio basandosi contemporaneamente sull'età del conducente e sulla potenza del veicolo. Valutare queste condizioni sul database riduce drasticamente i dati in transito.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT c.nome, v.targa,
+       CASE
+           WHEN c.eta < 25 AND v.cavalli > 150 THEN 'Rischio Altissimo'
+           WHEN c.eta < 25 THEN 'Rischio Alto'
+           WHEN c.eta >= 25 
+                AND v.alimentazione = 'Elettrica' THEN 'Green Driver'
+           ELSE 'Rischio Standard'
+       END AS fascia_rischio
+FROM cliente c
+JOIN veicolo v ON c.id_cliente = v.id_cliente;
+\end{lstlisting}
+\end{example}
+
+\begin{observation}[Valutazione Cortocircuitata (Short-Circuit)]
+Esattamente come la JVM in Java, il motore di PostgreSQL applica al \texttt{CASE} una logica a \textit{cortocircuito} (Short-Circuit Evaluation). Le condizioni vengono valutate rigorosamente dall'alto verso il basso. Non appena una clausola \texttt{WHEN} risulta vera (\texttt{TRUE}), il database restituisce il risultato corrispondente e \textbf{interrompe immediatamente} la valutazione delle condizioni successive per quella specifica riga, risparmiando cicli di CPU.
+\end{observation}
+
+\paragraph{Oltre la clausola SELECT}
+
+Essendo un'espressione logica che si risolve sempre in un valore scalare, il \texttt{CASE} può essere iniettato in quasi ogni punto di un'istruzione SQL, fornendo un controllo granulare sul comportamento del database. 
+
+I due scenari applicativi più potenti riguardano l'ordinamento customizzato e gli aggiornamenti massivi condizionali.
+
+\begin{example}[1. Ordinamento Customizzato nella clausola ORDER BY]
+Le logiche di business spesso richiedono ordinamenti che non sono né alfabetici né numerici. Nel dominio \textit{SafeDrive}, supponiamo che il frontend debba mostrare una lista di sinistri, ma la direzione esige che i sinistri 'Under Review' (In revisione) appaiano sempre in cima alla lista, seguiti da quelli 'Open' (Aperti) e infine quelli 'Closed' (Chiusi). 
+L'ordinamento alfabetico standard fallirebbe (metterebbe prima 'Closed'). Usiamo il \texttt{CASE} per assegnare un "peso" numerico invisibile a ogni stato:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT codice_sinistro, data_apertura, status
+FROM sinistro
+ORDER BY 
+    CASE status
+        WHEN 'Under Review' THEN 1
+        WHEN 'Open' THEN 2
+        WHEN 'Closed' THEN 3
+        ELSE 4
+    END, 
+    data_apertura DESC; -- Ordinamento secondario
+\end{lstlisting}
+\end{example}
+
+\begin{example}[2. Aggiornamenti Massivi Condizionali (UPDATE)]
+Questa è una delle tecniche più performanti in assoluto. Supponiamo di dover applicare un rincaro annuale ai premi delle polizze: +10\% per i veicoli a benzina e +5\% per i diesel. 
+L'approccio "Junior" (Data Fetching) prevederebbe di scaricare tutte le polizze in Java, iterarle con un \texttt{for}, fare gli \texttt{if} e lanciare migliaia di query \texttt{UPDATE} singole (intasando la rete). 
+L'approccio "Senior" sposta la logica in un'unica transazione atomica direttamente sul DBMS:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE polizza
+SET premio_annuale = 
+    CASE 
+        WHEN tipo_alimentazione = 'Benzina' THEN premio_annuale * 1.10
+        WHEN tipo_alimentazione = 'Diesel' THEN premio_annuale * 1.05
+        ELSE premio_annuale -- Nessuna variazione per gli altri
+    END
+WHERE data_scadenza > CURRENT_DATE;
+\end{lstlisting}
+In una singola frazione di secondo, il database aggiorna milioni di righe applicando la logica di business corretta riga per riga, senza che un solo byte transiti verso il server Java.
+\end{example}
+
+\subsection{Pivoting dei Dati (Trasposizione)}
+
+I database relazionali sono ottimizzati per memorizzare i dati in righe (formato \textit{Long}). Tuttavia, i requisiti di business per la reportistica e le dashboard richiedono quasi sempre che i dati siano organizzati in colonne (formato \textit{Wide}). Il processo di rotazione dei dati dalle righe alle colonne prende il nome di \textbf{Pivoting}.
+
+Nel backend, l'anti-pattern più diffuso tra i developer consiste nell'estrarre i dati grezzi e scrivere complessi algoritmi in Java (spesso abusando delle \texttt{Stream API} e di \texttt{Map} annidate) per trasformarli in formato \textit{Wide}. L'ingegneria del software moderna impone invece di delegare questa trasformazione al DBMS, combinando le funzioni di aggregazione (come \texttt{SUM} o \texttt{COUNT}) con il costrutto \texttt{CASE WHEN}.
+
+\begin{example}[Generazione di una Dashboard Sinistri]
+Il frontend di \textit{SafeDrive} richiede una tabella riassuntiva che mostri, per ogni area geografica, il numero totale di sinistri suddivisi per stato. 
+
+Se usassimo un raggruppamento classico (\texttt{GROUP BY area, status}), otterremmo fino a tre righe per ogni area. Utilizzando la tecnica del pivoting, costringiamo il database a restituire \textbf{esattamente una riga per area}, con i dati già incolonnati e pronti per essere serializzati in JSON.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    area_geografica,
+    COUNT(id_sinistro) AS totale_sinistri,
+    SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) AS aperti,
+    SUM(CASE WHEN status = 'Closed' THEN 1 ELSE 0 END) AS chiusi,
+    SUM(CASE WHEN status = 'Under Review' THEN 1 ELSE 0 END)
+        AS in_revisione
+FROM sinistro
+GROUP BY area_geografica
+ORDER BY area_geografica;
+\end{lstlisting}
+
+\textbf{L'algoritmo interno:} Per ogni \texttt{area\_geografica}, il motore collassa le righe. La funzione \texttt{SUM} valuta il \texttt{CASE} come un "filtro interruttore": se lo stato della riga corrente corrisponde alla colonna in calcolo, il \texttt{CASE} restituisce \texttt{1} (che viene sommato), altrimenti restituisce \texttt{0} (neutro per l'addizione).
+\end{example}
+
+\begin{bestpractice}[Il dialetto PostgreSQL: La clausola FILTER]
+Per eseguire il pivoting, PostgreSQL implementa un'estensione dello standard SQL moderno tramite la clausola \texttt{FILTER}. Questa sintassi è semanticamente identica al \texttt{SUM(CASE...)} dal punto di vista delle prestazioni, ma risulta architetturalmente più pulita e leggibile:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    area_geografica,
+    COUNT(id_sinistro) FILTER (WHERE status = 'Open') AS aperti,
+    COUNT(id_sinistro) FILTER (WHERE status = 'Closed') AS chiusi
+FROM sinistro
+GROUP BY area_geografica;
+\end{lstlisting}
+Questa è la \textit{best practice} assoluta quando si opera su stack tecnologici limitati all'ecosistema PostgreSQL.
+\end{bestpractice}
+
+\subsection{Funzioni di coalescenza: gestione dei valori NULL}
+
+L'algebra relazionale gestisce i dati mancanti tramite il marcatore speciale \texttt{NULL} (incognita). La criticità principale del \texttt{NULL} è la sua propagazione matematica: qualsiasi operazione aritmetica o concatenazione di stringhe che coinvolge un \texttt{NULL} restituisce inesorabilmente \texttt{NULL}. 
+
+Nello sviluppo backend, delegare la gestione dei \texttt{NULL} al codice Java è una pratica rischiosa: mappare un \texttt{NULL} proveniente dal database su un tipo primitivo (come \texttt{int} o \texttt{double}) provoca un'immediata \texttt{NullPointerException}, causando il crash dell'applicazione. Lo standard SQL fornisce due funzioni di coalescenza per disinnescare questo problema direttamente nel motore dati.
+
+\paragraph{1. La funzione \texttt{COALESCE} (Fallback garantito)}
+La funzione \texttt{COALESCE(valore1, valore2, ..., valoreN)} accetta una lista di argomenti e restituisce \textbf{il primo valore non nullo} che incontra scorrendo da sinistra verso destra. È l'equivalente elegante di una serie di \texttt{if (valore != null)} in Java.
+
+\begin{example}[Prevenzione della Propagazione del NULL nell'Aritmetica]
+Nel sistema \textit{SafeDrive}, il calcolo del premio finale di una polizza prevede la somma del \texttt{premio\_base} e di un eventuale \texttt{malus\_aggiuntivo}. Se un cliente non ha mai fatto incidenti, la colonna \texttt{malus\_aggiuntivo} sarà fisicamente \texttt{NULL}.
+Se eseguissimo la semplice somma \texttt{premio\_base + malus\_aggiuntivo}, tutti i clienti virtuosi otterrebbero un premio totale pari a \texttt{NULL}.
+
+Disinneschiamo il problema fornendo uno "Zero matematico" di fallback:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    numero_polizza,
+    premio_base,
+    malus_aggiuntivo,
+    (premio_base + COALESCE(malus_aggiuntivo, 0))
+                      AS premio_totale_da_pagare
+FROM polizza;
+\end{lstlisting}
+In questo modo, il backend riceverà sempre un numero decimale valido, garantendo la stabilità del calcolo.
+\end{example}
+
+\paragraph{2. La funzione \texttt{NULLIF} (Anti-Divisione per Zero)}
+La funzione \texttt{NULLIF(parametro1, parametro2)} ha un comportamento apparentemente controintuitivo: confronta i due parametri e, se sono uguali, restituisce \texttt{NULL}; se sono diversi, restituisce il \texttt{parametro1}. 
+Il suo caso d'uso ingegneristico principale è uno solo, ma vitale: \textbf{prevenire l'errore di divisione per zero} (DivisionByZeroException).
+
+\begin{example}[Prevenzione della Divisione per Zero]
+La direzione richiede di calcolare il "Costo Medio per Sinistro" di ogni perito. La formula è
+\begin{center}
+    \texttt{somma\_danni / numero\_sinistri\_periziati}
+\end{center}
+Se un perito è appena stato assunto e ha periziato 0 sinistri, l'operazione \texttt{X / 0} manderà in crash l'esecuzione della query.
+
+Utilizziamo \texttt{NULLIF} per trasformare lo zero in \texttt{NULL}. Poiché l'SQL ammette la divisione per \texttt{NULL} (restituendo semplicemente \texttt{NULL} senza andare in crash), salviamo l'esecuzione:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    p.nome_perito,
+    SUM(s.danno_stimato) AS totale_danni,
+    COUNT(s.id_sinistro) AS numero_sinistri,
+    -- NULLIF trasforma lo 0 del COUNT in NULL. 
+    -- Il calcolo diventa "X / NULL", che restituisce un NULL sicuro.
+    SUM(s.danno_stimato) / NULLIF(COUNT(s.id_sinistro), 0) AS media_danno
+FROM perito p
+LEFT JOIN sinistro s ON p.id_perito = s.id_perito
+GROUP BY p.nome_perito;
+\end{lstlisting}
+Il backend riceverà un valore nullo per i nuovi periti, che potrà facilmente gestire nell'interfaccia utente (mostrando, ad esempio, "N.D.").
+\end{example}
+
+\section{Funzioni Analitiche (Window Functions)}
+
+L'introduzione delle \textit{Window Functions} (Funzioni Finestra o Analitiche) rappresenta la più grande evoluzione dello standard SQL moderno. Queste funzioni permettono di eseguire calcoli complessi su un set di righe correlate alla riga corrente, risolvendo problemi architetturali che storicamente richiedevano centinaia di righe di codice imperativo lato backend (Java, Python) o l'uso di complesse \textit{Stored Procedure}.
+
+\paragraph{L'Anatomia di una Window Function: Aggregazione vs Finestra}
+L'ostacolo principale nell'apprendimento delle funzioni analitiche è comprenderne la differenza rispetto alle classiche funzioni di aggregazione (\texttt{GROUP BY}).
+
+\begin{itemize}
+    \item \textbf{Aggregazione Classica (\texttt{GROUP BY}):} Ha un comportamento "distruttivo". Collassa (fonde) righe multiple in un'unica riga di riepilogo. Le informazioni di dettaglio della singola riga originale vengono perse.
+    \item \textbf{Funzione Finestra (\texttt{OVER}):} Ha un comportamento "conservativo". Esegue un calcolo aggregato su un gruppo di righe (la \textit{finestra}), ma \textbf{preserva intatta ogni singola riga originale}, aggiungendo semplicemente il risultato del calcolo come una nuova colonna.
+\end{itemize}
+
+La clausola chiave che trasforma una normale funzione (\texttt{SUM}, \texttt{COUNT}, \texttt{AVG}) in una funzione analitica è la parola chiave \texttt{OVER()}, che definisce esattamente come costruire la "finestra" di righe su cui operare.
+
+\begin{example}[La differenza architetturale in SafeDrive]
+Il management richiede un report che mostri \textbf{ogni singolo sinistro} e, accanto ad esso, il \textbf{totale dei danni dell'area geografica} in cui è avvenuto, per permettere al frontend di calcolare l'incidenza percentuale del singolo evento sul totale dell'area.
+
+Se usassimo un \texttt{GROUP BY area\_geografica}, otterremmo il totale dell'area, ma perderemmo i dettagli del singolo sinistro (es. la targa, la data). Saremmo costretti a fare una query di aggregazione, salvarla in una CTE e poi metterla in \texttt{JOIN} con la tabella originale dei sinistri.
+
+Usando una Window Function, il calcolo avviene \textit{inline}:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_sinistro,
+    area_geografica,
+    danno_stimato,
+    -- Inizia la Window Function
+    SUM(danno_stimato) OVER (PARTITION BY area_geografica)
+                       AS totale_danni_area
+FROM sinistro;
+\end{lstlisting}
+
+\textbf{Il funzionamento interno:} Il motore di PostgreSQL legge la prima riga (es. un sinistro a 'Nord'). Vede la clausola \texttt{OVER (PARTITION BY area\_geografica)}, quindi apre temporaneamente una "finestra" logica che contiene tutti i sinistri dell'area 'Nord', ne fa la somma, la scrive nella colonna \texttt{totale\_danni\_area} e chiude la finestra. Passa alla seconda riga e ripete l'operazione, senza mai cancellare le righe originali.
+\end{example}
+
+\subsection{L'Ordinamento interno alla Finestra (\texttt{ORDER BY})}
+
+Se la clausola \texttt{PARTITION BY} definisce i confini "spaziali" della finestra (quali righe raggruppare), la clausola \texttt{ORDER BY} al suo interno ne definisce i confini temporali o sequenziali (in che ordine processarle).
+
+L'aggiunta dell'\texttt{ORDER BY} all'interno della clausola \texttt{OVER()} altera radicalmente il comportamento delle classiche funzioni di aggregazione come \texttt{SUM()} o \texttt{COUNT()}. Invece di calcolare il totale statico dell'intera partizione riga per riga, il motore calcola un \textbf{totale progressivo} (\textit{Running Total}), sommando il valore della riga corrente a quello di tutte le righe precedenti all'interno della partizione.
+
+\begin{example}[Il Totale Progressivo: Analisi Storica dei Sinistri]
+Nel dominio \textit{SafeDrive}, il dipartimento antifrode sta indagando su due clienti sospetti e vuole monitorare l'evoluzione temporale dei danni dichiarati da ciascuno. L'obiettivo è mostrare l'elenco cronologico dei sinistri e, di fianco, l'accumulo progressivo dei danni richiesti fino a quella specifica data, \textbf{azzerando il contatore} quando si passa da un cliente all'altro.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_cliente,
+    data_apertura,
+    codice_sinistro,
+    danno_stimato,
+    -- Window Function con partizionamento e ordinamento interno
+    SUM(danno_stimato) OVER (
+        PARTITION BY id_cliente 
+        ORDER BY data_apertura ASC
+    ) AS totale_danni_progressivo
+FROM sinistro
+WHERE id_cliente IN (42, 88)
+-- Ordinamento fisico per il Client (Backend Java)
+ORDER BY id_cliente ASC, data_apertura ASC;
+\end{lstlisting}
+
+\textbf{Il funzionamento del Query Planner:}
+\begin{enumerate}
+    \item Il \texttt{PARTITION BY} divide i dati in due blocchi separati: uno per il cliente 42 e uno per il cliente 88.
+    \item L'\texttt{ORDER BY} mette in fila i sinistri dal più vecchio al più recente \textit{all'interno} di ogni blocco.
+    \item Alla prima riga del cliente 42 (es. danno 1.000€), il progressivo stampato è 1.000€.
+    \item Alla seconda riga (es. danno 500€), la funzione calcola la somma, restituendo 1.500€.
+    \item Quando il motore esaurisce i sinistri del cliente 42 e passa alla prima riga del cliente 88, \textbf{la finestra logica si chiude e si riapre}: il totale progressivo si azzera e inizia a sommare da capo i danni del nuovo cliente.
+\end{enumerate}
+Questo meccanismo risolve in modo elegante un problema che in Java richiederebbe mappe annidate e l'inizializzazione di variabili contatore esterne a un ciclo, azzerando il rischio di errori di calcolo nel backend.
+\end{example}
+
+\begin{observation}[Omissione del Partizionamento]
+In SQL, l'uso dell'\texttt{ORDER BY} in una Window Function non rende obbligatorio il \texttt{PARTITION BY}. Se nel nostro esempio avessimo filtrato in partenza un singolo cliente (\texttt{WHERE id\_cliente = 42}), l'intero set di risultati in memoria sarebbe già appartenuto unicamente a lui. In quel caso specifico, omettere il partizionamento e scrivere semplicemente \texttt{OVER (ORDER BY data\_apertura ASC)} sarebbe stato non solo valido, ma sufficiente per ottenere il totale progressivo corretto, trattando l'intera tabella come un'unica grande partizione.
+\end{observation}
+
+\begin{warningbox}[L'Anti-pattern dell'Ordinamento Implicito]
+È un errore comune presumere che l'ordinamento definito all'interno di una Window Function determini l'ordine finale di output della query. L'\texttt{ORDER BY} dentro la clausola \texttt{OVER} regola esclusivamente il comportamento della funzione. Se l'applicazione client necessita di dati ordinati per la visualizzazione o l'impaginazione, è tassativo dichiarare un \texttt{ORDER BY} globale alla fine dell'istruzione SQL, come abbiamo fatto sopra. 
+\end{warningbox}
+
+\begin{warningbox}[Attenzione al Comportamento di Default]
+È fondamentale ricordare una regola silente dello standard SQL: quando si omette l'\texttt{ORDER BY} in una Window Function, la finestra comprende implicitamente \textit{tutte} le righe della partizione contemporaneamente. Quando invece si inserisce l'\texttt{ORDER BY}, la finestra viene automaticamente limitata dalla regola: "dalla prima riga della partizione fino alla riga corrente". Questo concetto avanzato, che permette di definire in modo millimetrico l'ampiezza della finestra di calcolo, prende il nome di \textbf{Framing} e verrà affrontato nel paragrafo successivo.
+\end{warningbox}
+
+\subsection{Il Framing (\texttt{ROWS BETWEEN} / \texttt{RANGE BETWEEN})}
+
+Mentre il \texttt{PARTITION BY} definisce i confini assoluti del gruppo di calcolo, il \textbf{Framing} permette di restringere ulteriormente la finestra logica, creando una sotto-finestra mobile (\textit{sliding window}) che si sposta dinamicamente seguendo la riga corrente. 
+
+È lo strumento architetturale indispensabile per calcolare analitiche cumulative su finestre fisse, come le \textbf{medie mobili} o il controllo dei trend temporali ristretti a un numero specifico di eventi consecutivi.
+
+\paragraph{Il Framing Fisico(\texttt{RANGE BETWEEN})} La sintassi fondamentale si inserisce dopo l' \texttt{ORDER BY} interno alla clausola \texttt{OVER} ed utilizza la seguente struttura:
+\begin{verbatim}
+ROWS BETWEEN <inizio> AND <fine>
+\end{verbatim}
+
+I modificatori più utilizzati per stabilire i punti di inizio e fine sono:
+\begin{itemize}
+    \item \texttt{CURRENT ROW}: La riga su cui il motore si trova in questo esatto momento.
+    \item \texttt{N PRECEDING}: Le $N$ righe fisiche precedenti alla riga corrente.
+    \item \texttt{N FOLLOWING}: Le $N$ righe fisiche successive alla riga corrente.
+    \item \texttt{UNBOUNDED PRECEDING}: Dalla primissima riga della partizione.
+    \item \texttt{UNBOUNDED FOLLOWING}: Fino all'ultimissima riga della partizione.
+\end{itemize}
+
+\begin{example}[Media Mobile Antifrode: Finestra di Controllo Mobile]
+Nel sistema \textit{SafeDrive}, gli analisti antifrode notano che una truffa comune prevede la denuncia di sinistri con danni via via crescenti in un breve lasso di tempo. Per intercettare questa anomalia, il backend deve calcolare la \textbf{media mobile del danno stimato sugli ultimi 3 sinistri consecutivi} di ogni veicolo (quello corrente e i due immediatamente precedenti).
+
+Se provassimo a implementare questo algoritmo in Java, dovremmo gestire buffer circolari e code in memoria per ogni veicolo. In SQL si risolve in una riga:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_veicolo,
+    data_apertura,
+    codice_sinistro,
+    danno_stimato,
+    -- Calcolo della media mobile su finestra fissa di 3 elementi
+    AVG(danno_stimato) OVER (
+        PARTITION BY id_veicolo
+        ORDER BY data_apertura ASC
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS media_mobile_3_sinistri
+FROM sinistro
+ORDER BY id_veicolo, data_apertura;
+\end{lstlisting}
+
+\textbf{Il funzionamento del Query Planner:}
+\begin{enumerate}
+    \item Il motore isola i sinistri dello stesso veicolo e li ordina per data.
+    \item Alla riga 1 del veicolo, non ci sono righe precedenti. La finestra contiene solo la riga corrente. La media mobile coincide con il danno singolo.
+    \item Alla riga 2, c'è una sola riga precedente. Il motore calcola la media tra la riga 1 e la riga 2.
+    \item Dalla riga 3 in poi, l'algoritmo entra a pieno regime: la sotto-finestra si blocca sulla dimensione fissa di 3 righe (la corrente e le 2 precedenti), scartando i sinistri ancora più vecchi. Il backend ottiene un indicatore di trend pulito e aggiornato riga per riga.
+\end{enumerate}
+\end{example}
+
+\paragraph{Il Framing Logico (\texttt{ROWS BETWEEN})}
+
+Mentre la clausola \texttt{ROWS} definisce una finestra basata esclusivamente sul conteggio fisico delle tuple, la clausola \texttt{RANGE} costruisce una finestra basata sul \textbf{valore logico} assunto dalla colonna di ordinamento.
+
+Questa distinzione architetturale diventa vitale quando si analizzano serie temporali che presentano "buchi" (giorni senza eventi) o "pareggi" (eventi multipli verificatisi nello stesso istante). In questi scenari, estrarre "le ultime 3 righe" produrrebbe risultati fuorvianti e statisticamente invalidi. Utilizzando \texttt{RANGE}, il calcolo si svincola dalla struttura fisica della tabella e si aggancia al dominio del tempo o della matematica pura.
+
+\begin{example}[Analisi di Rischio: Accumulo Danni a 30 Giorni]
+Nel dipartimento \textit{Pricing} di \textit{SafeDrive}, gli attuari vogliono valutare la frequenza a breve termine dei sinistri per ricalcolare il premio delle polizze. Per ogni sinistro denunciato, il sistema deve calcolare la somma totale dei danni richiesti da quello stesso cliente \textbf{esattamente nei 30 giorni precedenti} all'evento corrente.
+
+In Java, questo richiederebbe l'estrazione di tutta la storia del cliente e l'utilizzo di librerie come \texttt{java.time} per calcolare le durate ciclando all'indietro. In SQL, la logica temporale è nativa:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_cliente,
+    data_apertura,
+    codice_sinistro,
+    danno_stimato,
+    -- Finestra temporale logica dinamica
+    SUM(danno_stimato) OVER (
+        PARTITION BY id_cliente
+        ORDER BY data_apertura ASC
+        RANGE BETWEEN INTERVAL '30' DAY PRECEDING AND CURRENT ROW
+    ) AS accumulo_danni_30_giorni
+FROM sinistro
+ORDER BY id_cliente, data_apertura;
+\end{lstlisting}
+
+\textbf{Il funzionamento del Query Planner (Valutazione Logica):}
+\begin{enumerate}
+    \item Il motore isola il cliente e ordina i sinistri cronologicamente.
+    \item Quando analizza la riga corrente (es. un sinistro avvenuto il 15 Novembre), la finestra logica non cerca un numero fisso di righe. Calcola invece un \textit{offset} matematico: il confine inferiore della finestra diventa il 16 Ottobre (\texttt{15 Novembre - INTERVAL '30' DAY}).
+    \item Il motore include nella somma \textbf{tutte e sole} le righe fisiche la cui \texttt{data\_apertura} ricade tra il 16 Ottobre e il 15 Novembre.
+    \item Se in quella finestra di 30 giorni il cliente ha avuto 0 incidenti (oltre a quello in corso), la somma coinciderà con il danno attuale. Se ne ha avuti 50, il motore li sommerà tutti. Il conteggio fisico delle righe viene del tutto ignorato a favore del vincolo temporale.
+\end{enumerate}
+\end{example}
+
+\subsection{Funzioni di Ranking (\texttt{ROW\_NUMBER()}, \texttt{RANK()}, \texttt{DENSE\_RANK()})}
+
+Un requisito estremamente frequente nelle applicazioni aziendali è la generazione di classifiche o la selezione dei primi $N$ record all'interno di una categoria (es. identificare i 3 clienti con il più alto indice di rischio per regione). 
+
+Svolgere questa operazione lato backend (Java) richiede il recupero di enormi dataset, l'ordinamento in memoria e la successiva potatura manuale delle liste, con un impatto devastante sulle prestazioni. L'SQL risolve questo problema nativamente attraverso le \textbf{Funzioni di Ranking}. 
+
+Queste funzioni necessitano tassativamente della clausola \texttt{ORDER BY} all'interno di \texttt{OVER()}, poiché non ha senso calcolare una posizione senza un criterio di ordinamento prestabilito.
+
+PostgreSQL fornisce tre funzioni principali, che differiscono esclusivamente per il modo in cui gestiscono i casi di "pareggio" (righe con lo stesso identico valore di ordinamento).
+
+
+
+\begin{itemize}
+    \item \texttt{ROW\_NUMBER()}: Assegna un numero sequenziale univoco e incrementale a ogni riga, partendo da 1. In caso di pareggio, non si cura dell'uguaglianza e assegna numeri diversi in base all'ordine fisico in cui legge i dati. Non genera mai buchi nella sequenza.
+    \item \texttt{RANK()}: Assegna la stessa posizione alle righe in pareggio. Tuttavia, quando la sequenza riprende, \textbf{salta tante posizioni quanti sono i duplicati} precedenti (comportamento "olimpico"). Genera buchi nella numerazione.
+    \item \texttt{DENSE\_RANK()}: Simile a \texttt{RANK()}, assegna la stessa posizione ai pareggi, ma alla ripresa della sequenza \textbf{non salta alcuna posizione}, procedendo con il numero immediatamente successivo (classifica "densa"). Non genera mai buchi.
+\end{itemize}
+
+\begin{example}[Analisi Antifrode: Identificazione dei Sinistri Top per Area]
+Il reparto Audit di \textit{SafeDrive} vuole estrarre una classifica dei sinistri all'interno di ciascuna area geografica, ordinandoli dal danno più alto a quello più basso, per evidenziare le anomalie. Alcuni sinistri presentano lo stesso identico valore di danno stimato.
+
+Visualizziamo il comportamento delle tre funzioni a confronto:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    area_geografica,
+    codice_sinistro,
+    danno_stimato,
+    ROW_NUMBER() 
+        OVER (PARTITION BY area_geografica ORDER BY danno_stimato DESC) 
+        AS row_num,
+    RANK()       
+        OVER (PARTITION BY area_geografica ORDER BY danno_stimato DESC) 
+        AS rnk,
+    DENSE_RANK() 
+        OVER (PARTITION BY area_geografica ORDER BY danno_stimato DESC) 
+        AS dense_rnk
+FROM sinistro
+ORDER BY area_geografica, danno_stimato DESC;
+\end{lstlisting}
+
+\textbf{Simulazione del comportamento con valori in pareggio:}
+Supponiamo che nell'area 'Centro' ci siano quattro sinistri con i seguenti danni: 5000, 4000, 4000, 2000. Il motore calcolerà le colonne di ranking in questo modo:
+
+\begin{itemize}
+    \item \textbf{Danno 5000:} \texttt{ROW\_NUMBER} = 1, \texttt{RANK} = 1, \texttt{DENSE\_RANK} = 1
+    \item \textbf{Danno 4000 (Primo):} \texttt{ROW\_NUMBER} = 2, \texttt{RANK} = 2, \texttt{DENSE\_RANK} = 2
+    \item \textbf{Danno 4000 (Secondo):} \texttt{ROW\_NUMBER} = 3, \texttt{RANK} = \textbf{2} (pareggio), \texttt{DENSE\_RANK} = \textbf{2} (pareggio)
+    \item \textbf{Danno 2000:} \texttt{ROW\_NUMBER} = 4, \texttt{RANK} = \textbf{4} (ha saltato il 3), \texttt{DENSE\_RANK} = \textbf{3} (nessun buco)
+\end{itemize}
+\end{example}
+
+\begin{observation}[L'Uso Ingegneristico: Limitare i risultati con le CTE]
+Le funzioni di ranking non possono essere inserite direttamente nella clausola \texttt{WHERE} della stessa query (perché la \texttt{WHERE} viene eseguita prima del calcolo della finestra). Per ottenere i "Primi 3 sinistri per area", l'architettura standard impone l'uso di una CTE per materializzare il ranking, filtrando successivamente nel blocco principale:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+WITH ClassificaSinistri AS (
+    SELECT area_geografica, codice_sinistro, danno_stimato,
+        DENSE_RANK() 
+        OVER (PARTITION BY area_geografica ORDER BY danno_stimato DESC) 
+        AS posizione
+    FROM sinistro
+)
+SELECT * FROM ClassificaSinistri 
+WHERE posizione <= 3; -- Estrazione pulita dei primi 3 livelli di danno
+\end{lstlisting}
+\end{observation}
+
+\subsection{Funzioni Posizionali (\texttt{LEAD()} e \texttt{LAG()})}
+
+L'algebra relazionale valuta storicamente ogni tupla (riga) in modo indipendente. Confrontare il valore di una riga corrente con quello della riga precedente (es. per calcolare un delta temporale o una variazione percentuale) ha sempre rappresentato una sfida architetturale, tipicamente risolta tramite pesanti \textit{Self-Join} o delegando il calcolo a cicli iterativi nel backend Java.
+
+Le funzioni posizionali \texttt{LEAD()} e \texttt{LAG()} risolventono questo problema permettendo alla riga in corso di valutazione di accedere direttamente ai dati delle righe adiacenti all'interno della partizione definita, senza alterare la struttura del risultato.
+
+\begin{itemize}
+    \item \texttt{LAG(colonna, offset, default)}: Guarda all'indietro. Restituisce il valore della colonna nella riga precedente (o di $N$ righe precedenti, specificando l'offset).
+    \item \texttt{LEAD(colonna, offset, default)}: Guarda in avanti. Restituisce il valore della colonna nella riga successiva (o di $N$ righe successive).
+\end{itemize}
+
+\begin{example}[Analisi Comportamentale: Distanza Temporale tra Sinistri]
+Il reparto Analisi Dati di \textit{SafeDrive} vuole monitorare la frequenza degli incidenti. Per ogni sinistro denunciato, è necessario calcolare quanti giorni sono trascorsi dal sinistro \textbf{immediatamente precedente} dello stesso cliente. Una distanza temporale sospettosamente breve (es. meno di 10 giorni) potrebbe innescare un controllo antifrode automatico.
+
+Invece di scaricare la lista e fare sottrazioni tra date in Java, estraiamo la data precedente con \texttt{LAG()} e demandiamo la sottrazione direttamente a PostgreSQL:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT 
+    id_cliente,
+    codice_sinistro,
+    data_apertura,
+    -- Estraiamo la data del sinistro precedente (offset = 1)
+    LAG(data_apertura, 1) OVER (
+        PARTITION BY id_cliente 
+        ORDER BY data_apertura ASC
+    ) AS data_sinistro_precedente,
+    
+    -- Calcoliamo direttamente il delta in giorni (PostgreSQL date math)
+    data_apertura - LAG(data_apertura, 1) OVER (
+        PARTITION BY id_cliente 
+        ORDER BY data_apertura ASC
+    ) AS giorni_dal_precedente
+    
+FROM sinistro
+ORDER BY id_cliente, data_apertura ASC;
+\end{lstlisting}
+
+\textbf{Il funzionamento del Query Planner:}
+\begin{enumerate}
+    \item Il motore isola il cliente e ordina i sinistri cronologicamente.
+    \item Alla prima riga (il primissimo sinistro del cliente), non esiste un evento precedente. La funzione \texttt{LAG} restituisce l'incognita \texttt{NULL}. Di conseguenza, la sottrazione matematica (\texttt{Data - NULL}) restituisce \texttt{NULL}, che è l'unico risultato logicamente corretto per il primo evento.
+    \item Alla riga successiva, \texttt{LAG} estrae la data della riga 1. Il database esegue la sottrazione e restituisce il numero intero di giorni trascorsi (es. 45).
+\end{enumerate}
+\end{example}
+
+\begin{observation}[Gestione dei Valori di Default Nativi]
+Come evidenziato nell'esempio, la prima riga di una partizione restituirà \texttt{NULL} se interrogata tramite \texttt{LAG()} (e simmetricamente l'ultima riga restituirà \texttt{NULL} con \texttt{LEAD()}). Se la logica di business in Java non tollera i valori nulli, è possibile utilizzare il terzo parametro opzionale della funzione posizionale per fornire un \textit{fallback} immediato, evitando di dover innestare una funzione \texttt{COALESCE} esterna:
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Se non c'e' un sinistro precedente, 
+-- fingiamo sia avvenuto 1000 giorni fa
+LAG(data_apertura, 1, CURRENT_DATE - 1000) OVER (...)
+\end{lstlisting}
+Questo approccio garantisce la ricezione di dati robusti e tipizzati lato backend, azzerando il rischio di \texttt{NullPointerException}.
+\end{observation}
