@@ -149,17 +149,72 @@ Conoscere il funzionamento logaritmico $O(\log N)$ di un B-Tree è solo il primo
 Quando l'applicazione backend inserisce una nuova riga, il motore relazionale deve decidere dove scriverla fisicamente sull'hard disk. Esistono due architetture principali per la gestione di questo salvataggio:
 
 \paragraph{1. Il File di Heap (Heap File) e gli Indici Secondari}
-In questa architettura (che è il comportamento \textbf{di default in PostgreSQL}), la tabella vera e propria è un \textit{Heap File}: un file non ordinato in cui le nuove righe vengono semplicemente accodate nel primo blocco di memoria libero disponibile.
-L'indice (es. sulla Chiave Primaria) viene costruito come una struttura B-Tree separata. Le foglie di questo albero non contengono i dati della riga, ma solo un puntatore (chiamato \textit{Tuple ID} o \textit{TID}) che indica l'esatto offset nel file di Heap. 
-Gli indici che "puntano" a un file separato sono definiti \textbf{Indici Secondari} (\textit{Non-Clustered Indexes}).
+In questa architettura (che rappresenta il comportamento \textbf{di default in PostgreSQL}), il motore del database sceglie deliberatamente di separare i "dati reali" dalle "mappe" utilizzate per ricercarli, al fine di ottimizzare le scritture.
+
+La tabella vera e propria viene salvata fisicamente in un \textit{Heap File} (letteralmente "file a mucchio"). Si tratta di una struttura dati non ordinata: quando il backend applicativo esegue una \texttt{INSERT}, PostgreSQL non perde tempo a riordinare i gigabyte di dati già presenti sul disco rigido. Si limita ad accodare la nuova riga nel primo blocco di memoria libero disponibile. Questo garantisce inserimenti fulminei con un costo architetturale minimo ($O(1)$).
+
+Tuttavia, estrarre un record da un mucchio disordinato richiederebbe una letale ricerca lineare ($O(N)$). Per risolvere il problema, l'indice (ad esempio quello costruito sulla Chiave Primaria) viene istanziato come un \textbf{file separato} contenente una struttura B-Tree.
+Questi indici che "puntano" a un file dati separato prendono il nome di \textbf{Indici Secondari} (\textbf{Non-Clustered Indexes}).
+
+Il file dell'indice è estremamente leggero: le foglie di questo albero non contengono gli attributi pesanti della riga, ma esclusivamente due elementi:
+\begin{enumerate}
+    \item La chiave di ricerca ordinata.
+    \item Un puntatore assoluto chiamato \textbf{TID (Tuple Identifier)}, che funge da "indirizzo fisico". Il TID indica al database il numero esatto della pagina da caricare in RAM e l'offset (il byte di partenza) in cui si trova la riga all'interno del caotico \textit{Heap File}.
+\end{enumerate}
+
+\begin{example}[Meccanica del Pointer Lookup nell'Heap File]
+Consideriamo la tabella \texttt{sinistro}, popolata da milioni di record (id, data, targa, grado di colpa, danno stimato).
+Quando l'applicazione esegue un'interrogazione mirata come \texttt{SELECT * FROM sinistro WHERE id\_sinistro = 850}, il motore PostgreSQL non tocca immediatamente i dati reali. Esegue un'operazione in due fasi distinte:
+\begin{itemize}
+    \item \textbf{Fase 1: Navigazione dell'Indice ($O(\log N)$).} Il motore attraversa rapidamente il B-Tree ordinato fino a trovare la foglia associata all'ID 850. Qui estrae il TID (es. \textit{"Blocco 45, Riga 12"}).
+    \item \textbf{Fase 2: Salto verso l'Heap ($O(1)$).} Avendo l'indirizzo esatto, il motore esegue un accesso meccanico mirato, noto come \textit{Pointer Lookup}. Salta direttamente al Blocco 45 dell'Heap File, estrae tutti i campi del sinistro e li restituisce al chiamante.
+\end{itemize}
+\end{example}
+
+L'operazione completa risulta quindi ultra-performante, combinando la velocità di attraversamento logaritmico della mappa con l'estrazione a tempo costante dei dati grezzi dal mucchio. Tuttavia, ci sono anche degli svantaggi. 
+Il termine \textbf{Non-Clustered} (non raggruppato) evidenzia il principale svantaggio architetturale di questo approccio: l'ordine logico della mappa (l'indice) e l'ordine fisico dei dati sul disco (l'Heap File) sono completamente slegati. 
+
+Sebbene il \textit{Pointer Lookup} sia istantaneo per ricerche puntuali ($O(1)$), diventa un grave collo di bottiglia durante le interrogazioni a intervallo (\textit{Range Queries}). Se nel nostro gestionale richiediamo tutti i sinistri di un intero anno, l'albero B-Tree individuerà rapidamente 10.000 TID logicamente contigui. Tuttavia, per estrarre i dati reali, il motore sarà costretto a eseguire 10.000 salti meccanici casuali (\textit{Random Access}) verso blocchi fisici dispersi e frammentati nell'Heap File. Questa assenza di contiguità fisica rende la lettura massiva estremamente onerosa per il disco. 
+
+\begin{tip}
+    L'architettura a Heap File/indicizzazione non-clustered predilige le prestazioni in scrittura a discapito delle estrazioni massive.
+\end{tip}
 
 \paragraph{2. Tabelle Organizzate a Indice (Index-Organized Tables / Clustered)}
 In questa architettura (che è il default, ad esempio, nel motore InnoDB di MySQL), il file di Heap non esiste. La tabella \textbf{è} l'indice stesso. L'albero B-Tree viene costruito sulla Chiave Primaria e le sue foglie contengono nativamente l'intera riga dei dati (es. nome, cognome, indirizzo). Questo si definisce \textbf{Indice Clustered} (o Primario).
 Poiché i dati vivono direttamente nelle foglie dell'albero, la tabella è fisicamente costretta ad essere ordinata sul disco in base alla Chiave Primaria.
 
-\begin{observation}[Il costo del Pointer Lookup]
-Perché questa distinzione è vitale per le prestazioni? Se un'interrogazione utilizza un indice secondario (come fa nativamente PostgreSQL) per trovare un record, il motore deve prima attraversare il B-Tree per trovare il puntatore, e \textbf{successivamente} eseguire un ulteriore salto sul disco verso l'Heap File per estrarre le colonne richieste. Questo "salto extra" (\textit{Pointer Lookup}) su dischi meccanici può risultare un collo di bottiglia severo se la query estrae decine di migliaia di righe sparse in blocchi diversi del disco.
-\end{observation}
+\begin{tip}
+    L'architettura a Indice Clustered (Tabella Organizzata a Indice) massimizza le prestazioni nelle estrazioni massive grazie alla contiguità fisica dei record, ma penalizza severamente le scritture poiché costringe il motore a riordinare fisicamente i dati sul disco ad ogni inserimento.
+\end{tip}
+
+\subsubsection{Forzatura dell'Architettura: Il comando CLUSTER e il De-Clustering}
+
+Come analizzato, l'architettura nativa di PostgreSQL si basa intrinsecamente sul file di Heap (\textit{Non-Clustered}). Tuttavia, in scenari applicativi dove le estrazioni massive (\textit{Range Queries}) diventano il collo di bottiglia primario, è legittimo domandarsi se sia possibile forzare il motore a riorganizzare i dati in modo fisicamente contiguo, emulando i benefici di una tabella organizzata a indice.
+
+La risposta ingegneristica è che \textbf{non è possibile creare un vero indice clustered permanente in PostgreSQL}, ma è consentito imporre un riordinamento fisico una tantum attraverso il comando \texttt{CLUSTER}.
+
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Riorganizza fisicamente l'Heap File seguendo l'ordine dell'indice
+CLUSTER nome_tabella USING nome_indice;
+\end{lstlisting}
+
+Quando il Database Administrator invoca questa direttiva, PostgreSQL crea una copia integrale della tabella, legge l'indice specificato (es. quello sulla data di apertura del sinistro) e riordina fisicamente tutte le righe sul disco rigido per farle coincidere con l'albero B-Tree. Al termine dell'operazione, la lettura massiva non subirà più il ritardo del \textit{Random Access}, poiché i blocchi verranno letti sequenzialmente.
+
+\begin{warningbox}[La trappola del De-Clustering e del Table Lock]
+L'impiego del comando \texttt{CLUSTER} nei sistemi di produzione nasconde criticità architetturali severe:
+\begin{enumerate}
+    \item \textbf{Effetto "One-Shot" e De-Clustering:} L'allineamento fisico non viene mantenuto attivamente dal motore. Non appena l'applicazione backend eseguirà nuove istruzioni di \texttt{INSERT} o \texttt{UPDATE}, PostgreSQL riprenderà ad accodare i record nel primo spazio libero dell'Heap File, distruggendo progressivamente l'ordine fisico. Per garantire prestazioni costanti, l'operazione dovrebbe essere schedulata periodicamente (es. tramite un \textit{cron job} notturno).
+    \item \textbf{Access Exclusive Lock:} Durante la riorganizzazione, il database applica un blocco totale sulla tabella. L'applicazione Java non potrà né leggere né scrivere dati per l'intera durata del processo, causando inevitabilmente il collasso delle chiamate API (\textit{Timeout}).
+\end{enumerate}
+\end{warningbox}
+
+\paragraph{Motori Rigidi vs Motori Ibridi}
+L'impossibilità di stravolgere la natura di PostgreSQL senza compromessi severi evidenzia una netta spaccatura nel panorama dei database relazionali:
+\begin{itemize}
+    \item \textbf{Architetture Rigide:} Motori come PostgreSQL (vincolato all'Heap File) o MySQL/InnoDB (vincolato obbligatoriamente all'Indice Clustered) impongono il loro paradigma di memorizzazione. È responsabilità dello sviluppatore backend adattare le query e il carico di lavoro alla natura inalterabile del motore.
+    \item \textbf{Architetture Ibride (Enterprise):} Nei sistemi commerciali di fascia alta (come \textit{Microsoft SQL Server} o \textit{Oracle}), la scelta dell'architettura fisica è delegata nativamente al software engineer. Tramite sintassi esplicita (es. \texttt{CREATE CLUSTERED INDEX} vs \texttt{CREATE NONCLUSTERED INDEX}), è possibile ottimizzare ogni singola tabella del dominio in base ai reali pattern di traffico previsti.
+\end{itemize}
 
 \subsection{Indici Composti e la Regola del Prefisso Sinistro}
 
