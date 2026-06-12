@@ -63,7 +63,7 @@ Servono per memorizzare testo, codici alfanumerici o numeri su cui non si devono
     
     \item \texttt{\textbf{VARCHAR(n)}}: Stringa a lunghezza \textbf{variabile} con limite massimo di $n$ caratteri. Se si inserisce una stringa più corta, occupa su disco solo lo spazio effettivo più un marcatore di fine stringa.
     \begin{itemize}
-        \item \textit{Uso ingegneristico:} Lo standard \textit{de facto} per quasi tutto il testo (es. \texttt{VARCHAR(50)} per il Nome, \texttt{VARCHAR(255)} per l'Email). Fa risparmiare enorme spazio su disco, a costo di una microscopica latenza in più durante l'allocazione della memoria.
+        \item \textit{Uso ingegneristico:} Lo standard \textit{de facto} per quasi tutto il testo (\texttt{VARCHAR(50)} per il nome, \texttt{VARCHAR(255)} per l'email, ad esempio). Fa risparmiare enorme spazio su disco, a costo di una microscopica latenza in più durante l'allocazione della memoria.
     \end{itemize}
 \end{itemize}
 
