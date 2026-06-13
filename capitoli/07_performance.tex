@@ -140,11 +140,9 @@ Nell'ingegneria del backend moderno, definire esplicitamente degli indici Hash a
 
 Il paradigma Hash trova invece la sua massima e naturale espressione nei database NoSQL in-memory di tipo \textit{Key-Value Store} (come \textbf{Redis} o \textbf{Memcached}), dove le query ad intervalli non sono strutturalmente previste dal motore di archiviazione e l'obiettivo primario è la velocità di lettura assoluta in cache.
 
-\section{Strategie di Indicizzazione nel Mondo Reale}
+\section{Strategie di Indicizzazione: Clustered vs Non-Clustered Index}
 
 Conoscere il funzionamento logaritmico $O(\log N)$ di un B-Tree è solo il primo passo. L'ingegneria del database richiede di comprendere come l'albero si leghi fisicamente ai dati reali scritti sul disco. La distinzione fondamentale riguarda il contenuto delle "foglie" dell'albero: contengono i dati veri e propri o solo delle coordinate?
-
-\subsection{Clustered vs Non-Clustered Index (Primary vs Secondary)}
 
 Quando l'applicazione backend inserisce una nuova riga, il motore relazionale deve decidere dove scriverla fisicamente sull'hard disk. Esistono due architetture principali per la gestione di questo salvataggio:
 
@@ -188,7 +186,7 @@ Poiché i dati vivono direttamente nelle foglie dell'albero, la tabella è fisic
     L'architettura a Indice Clustered (Tabella Organizzata a Indice) massimizza le prestazioni nelle estrazioni massive grazie alla contiguità fisica dei record, ma penalizza severamente le scritture poiché costringe il motore a riordinare fisicamente i dati sul disco ad ogni inserimento.
 \end{tip}
 
-\subsubsection{Forzatura dell'Architettura: Il comando CLUSTER e il De-Clustering}
+\subsection{Forzatura dell'Architettura: Il comando CLUSTER e il De-Clustering}
 
 Come analizzato, l'architettura nativa di PostgreSQL si basa intrinsecamente sul file di Heap (\textit{Non-Clustered}). Tuttavia, in scenari applicativi dove le estrazioni massive (\textit{Range Queries}) diventano il collo di bottiglia primario, è legittimo domandarsi se sia possibile forzare il motore a riorganizzare i dati in modo fisicamente contiguo, emulando i benefici di una tabella organizzata a indice.
 
@@ -216,6 +214,63 @@ L'impossibilità di stravolgere la natura di PostgreSQL senza compromessi severi
     \item \textbf{Architetture Ibride (Enterprise):} Nei sistemi commerciali di fascia alta (come \textit{Microsoft SQL Server} o \textit{Oracle}), la scelta dell'architettura fisica è delegata nativamente al software engineer. Tramite sintassi esplicita (es. \texttt{CREATE CLUSTERED INDEX} vs \texttt{CREATE NONCLUSTERED INDEX}), è possibile ottimizzare ogni singola tabella del dominio in base ai reali pattern di traffico previsti.
 \end{itemize}
 
+\section{Uso degli Indici}
+
+\subsection{Indicizzazione Automatica vs Manuale}
+
+Un errore architetturale estremamente comune nello sviluppo backend è l'errata assunzione che il Database Management System ottimizzi nativamente tutte le relazioni definite nello schema logico. Per progettare un livello di persistenza solido ed evitare il collasso in produzione, è vitale tracciare una linea netta tra ciò che il motore relazionale indicizza per la propria "sopravvivenza" e ciò che deve essere esplicitamente indicizzato dal programmatore.
+
+\paragraph{1. Chiavi Primarie e Vincoli di Unicità (Indicizzazione Automatica)}
+Tutti i principali database relazionali (inclusi PostgreSQL, MySQL e Oracle) istanziano in modo del tutto automatico e invisibile un indice (tipicamente un B-Tree) ogni volta che si definisce una colonna come \texttt{PRIMARY KEY} o vi si applica un vincolo \texttt{UNIQUE}.
+
+Questa automazione non è una semplice "cortesia" del motore, ma un requisito computazionale inderogabile. Il vincolo di chiave primaria impone che non possano esistere due tuple con lo stesso identificatore esatto. Quando l'applicazione invia un'istruzione \texttt{INSERT}, il database deve accertarsi preventivamente che la nuova chiave non esista già. Se non disponesse di un indice ordinato da attraversare a costo logaritmico ($O(\log N)$), il motore sarebbe costretto a eseguire una disastrosa ricerca lineare ($O(N)$) sull'intero \textit{Heap File} prima di ogni singolo inserimento.
+Di conseguenza, dichiarare esplicitamente un \texttt{CREATE INDEX} sulla chiave primaria in uno script DDL è un'operazione ridondante e attivamente ignorata dal DBMS.
+
+\paragraph{2. Chiavi Esterne (Foreign Keys) e l'Indicizzazione Manuale Obbligatoria}
+Il vero baratro prestazionale si nasconde nella gestione delle relazioni tra tabelle. Sebbene il database verifichi costantemente l'integrità referenziale (assicurandosi, ad esempio, che non si inserisca un figlio senza un padre valido), \textbf{il DBMS non crea mai automaticamente un indice su una Foreign Key}.
+
+\begin{example}[La trappola della Foreign Key non indicizzata]
+Consideriamo le entità fondamentali del dominio assicurativo sulle auto: \texttt{cliente} e \texttt{sinistro}. Supponiamo che la tabella \texttt{sinistro} possieda logicamente una Foreign Key (\texttt{id\_cliente}) per tracciare a quale assicurato appartiene l'evento.
+Se il layer di persistenza in Java esegue un'operazione quotidiana, come il recupero dello storico sinistri di uno specifico cliente:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- Recupero di tutti i sinistri del cliente con ID 83
+SELECT * FROM sinistro WHERE id_cliente = 83;
+\end{lstlisting}
+Senza un intervento manuale dello sviluppatore, PostgreSQL si troverà sprovvisto di una mappa per la colonna \texttt{id\_cliente}. Non avendo alternative architetturali, sarà fisicamente costretto a eseguire un letale \textit{Sequential Scan}, leggendo in memoria i milioni di sinistri globali registrati sull'hardware per filtrare esclusivamente quelli associati al cliente 83.
+\end{example}
+
+\paragraph{3. Oltre le Chiavi Esterne: L'Indicizzazione guidata dai Pattern di Accesso}
+
+Sebbene l'omissione degli indici sulle Foreign Key rappresenti l'errore più sistematico, la necessità di indicizzazione manuale non si esaurisce affatto nella gestione delle relazioni. Il database è una macchina cieca: qualunque interrogazione richieda di filtrare o ordinare il dataset basandosi su una colonna sprovvista di mappa, scatenerà inevitabilmente un \textit{Sequential Scan}.
+
+Nell'ingegneria del software, gli indici B-Tree secondari devono essere istanziati proattivamente dall'ingegnere analizzando i \textbf{Pattern di Accesso} dell'applicazione, ovvero studiando quali query verranno eseguite più frequentemente dal backend. I tre contesti operativi più critici sono:
+
+\begin{itemize}
+\item \textbf{Ricerche Puntuali su Attributi di Business (Non Univoci):} Molti domini richiedono la ricerca rapida di un record tramite attributi descrittivi che non sono soggetti a vincoli di unicità. Nel contesto \textit{SafeDrive}, se un operatore del call center cerca un cliente per \texttt{cognome} o filtra i sinistri per \texttt{citta} di accadimento, senza un indice manuale su queste colonne il motore dovrà scansionare l'intero \textit{Heap File}. 
+    \textit{(Nota architetturale: Attributi di business come il \texttt{codice\_fiscale} o la \texttt{targa}, pur non essendo scelti come Chiave Primaria, nel mondo reale sono Chiavi Candidate e ricevono un vincolo \texttt{UNIQUE}. Essendo protetti da tale vincolo, godono già dell'indicizzazione automatica da parte del DBMS).}
+    
+    \item \textbf{Estrazioni Temporali (Range Queries):} I gestionali lavorano molto frequentemente su finestre di tempo. Un \textit{batch process} notturno scritto in Spring Boot potrebbe eseguire una query per estrarre tutte le polizze in scadenza nel mese successivo:
+    \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+    SELECT * FROM polizza WHERE data_scadenza BETWEEN '2026-07-01' AND '2026-07-31';
+    \end{lstlisting}
+    Senza un indice B-Tree dedicato alla colonna \texttt{data\_scadenza}, questa interrogazione si trasforma in una scansione lineare disastrosa.
+    
+    \item \textbf{Ordinamento e Paginazione (Sorting):} Quando un'API REST restituisce i dati a un'interfaccia frontend, lo fa quasi sempre paginandoli e ordinandoli (es. "Mostra gli ultimi 50 sinistri aperti"). 
+    \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+    SELECT * FROM sinistro ORDER BY data_apertura DESC LIMIT 50;
+    \end{lstlisting}
+    Se non esiste un indice pre-ordinato su \texttt{data\_apertura}, il DBMS è costretto a caricare in memoria (o peggio, su disco) l'intera tabella dei sinistri, eseguire un oneroso algoritmo di ordinamento (\textit{In-Memory Sort}) e infine restituire solo le prime 50 righe, sprecando enormi quantità di CPU.
+\end{itemize}
+
+\begin{warningbox}[La Selettività e il Paradosso dell'Indice Ignorato]
+Nell'applicare questi indici manuali, l'ingegnere deve prestare massima attenzione alla \textbf{selettività} della colonna (la percentuale di righe uniche rispetto al totale). 
+Creare un indice su una colonna di stato (es. \texttt{stato\_sinistro} con valori "APERTO" o "CHIUSO") è spesso uno spreco di risorse. Se un'interrogazione richiede tutti i sinistri "CHIUSI" e questi rappresentano il 90\% del database, il \textit{Query Optimizer} calcolerà matematicamente che eseguire milioni di salti meccanici (\textit{Pointer Lookup}) nell'albero risulta più oneroso che scansionare sequenzialmente il disco. L'indice verrà deliberatamente ignorato dal motore, risultando unicamente in un rallentamento delle operazioni di scrittura.
+\end{warningbox}
+
+\begin{bestpractice}[La Regola d'Oro per gli Script DDL e Migrations]
+Mentre le chiavi primarie possono essere ignorate in fase di ottimizzazione esplicita, è \textbf{precisa e inderogabile responsabilità dell'ingegnere software} valutare e istanziare manualmente un Indice Secondario (B-Tree) su tutte le colonne che fungono da Chiave Esterna. Queste colonne costituiscono infatti la spina dorsale fisica su cui vengono calcolate le clausole \texttt{JOIN} e instradate le estrazioni gerarchiche del livello applicativo.
+\end{bestpractice}
+
 \subsection{Indici Composti e la Regola del Prefisso Sinistro}
 
 Nel business reale, le interrogazioni filtrano raramente per un singolo attributo. Spesso le clausole \texttt{WHERE} combinano più colonne (es. \texttt{WHERE cognome = 'Rossi' AND citta = 'Roma'}). 
@@ -228,7 +283,7 @@ CREATE INDEX idx_cognome_nome ON studente (cognome, nome);
 
 Il funzionamento di un indice composto è concettualmente identico all'elenco telefonico cartaceo: i dati sono ordinati \textbf{primariamente} per la prima colonna (\texttt{cognome}). A parità di cognome (es. tutti i "Rossi"), i record interni vengono ordinati \textbf{secondariamente} in base alla seconda colonna (\texttt{nome}).
 
-\begin{warningbox}[La trappola mortale: La Regola del Prefisso Sinistro]
+\begin{warningbox}[La Regola del Prefisso Sinistro]
 L'ordine in cui si dichiarano le colonne durante la creazione di un indice composto è architetturalmente vincolante. Un indice composto è utilizzabile dal Query Planner \textbf{se e solo se} l'interrogazione filtra per la prima colonna dell'indice (o per un prefisso continuo letto rigorosamente da sinistra verso destra).
 
 Data la presenza dell'indice \texttt{idx\_cognome\_nome(cognome, nome)}:
@@ -242,6 +297,28 @@ Data la presenza dell'indice \texttt{idx\_cognome\_nome(cognome, nome)}:
 \begin{bestpractice}[Design degli Indici Composti]
 Quando si progetta un indice multicolonna per un'applicazione backend, la colonna posizionata all'estrema sinistra (\textit{Leading Column}) dovrebbe sempre essere l'attributo interrogato più di frequente in modo isolato, o quello con la \textbf{selettività maggiore} (l'attributo in grado di scartare matematicamente il maggior numero di righe fin dal primo filtraggio). Se la logica di business impone di cercare spesso gli utenti \textit{esclusivamente} per nome, sarà architetturalmente obbligatorio istanziare un secondo indice separato e dedicato alla colonna \texttt{nome}.
 \end{bestpractice}
+
+\subsection{Cheat Sheet: Quando creare un Indice (e quando evitarlo)}
+
+La regola aurea dell'ingegneria dei database impone che \textbf{ogni indice velocizza le letture ma penalizza le scritture}. Di conseguenza, l'indicizzazione non deve mai essere preventiva ("lo metto per sicurezza"), ma guidata dai reali pattern di accesso dell'applicazione.
+
+\paragraph{Dove usare gli indici:}
+
+\begin{itemize}
+    \item \textbf{Chiavi Esterne (Foreign Keys):} \textbf{Obbligatorio.} Il DBMS non le indicizza in automatico. Senza un indice B-Tree sulle Foreign Keys, le operazioni di \texttt{JOIN} in SQL e la navigazione a oggetti dell'ORM (es. \texttt{cliente.getSinistri()} in Hibernate) causeranno disastrosi \textit{Sequential Scans}.
+    \item \textbf{Attributi di Ricerca Frequenti:} Colonne che compaiono costantemente nelle clausole \texttt{WHERE} per ricerche puntuali (es. \texttt{cognome} del cliente, \texttt{citta} del sinistro), purché non siano già protette da vincoli di unicità.
+    \item \textbf{Colonne per Estrazioni Temporali (Range Queries):} Date o timestamp utilizzati per filtrare finestre temporali tramite operatori di disuguaglianza o \texttt{BETWEEN} (es. \texttt{data\_scadenza\_polizza}).
+    \item \textbf{Colonne di Ordinamento (ORDER BY):} Attributi su cui vengono frequentemente ordinate o paginate le estrazioni (es. ultimi 50 sinistri per \texttt{data\_apertura DESC}). L'indice evita al server l'onere computazionale di dover riordinare i dati in memoria (\textit{In-Memory Sort}) prima di inviarli al client.
+\end{itemize}
+
+\paragraph{Dove NON usare gli indici: }
+
+\begin{itemize}
+    \item \textbf{Chiavi Primarie e Vincoli UNIQUE:} \textbf{Inutile.} Il motore relazionale genera e gestisce già automaticamente un albero B-Tree per queste colonne per poter far rispettare i vincoli di univocità. Un indice manuale sarebbe un duplicato ridondante.
+    \item \textbf{Colonne a Bassa Selettività:} Attributi che contengono pochi valori distinti rispetto al numero totale di righe (es. un booleano \texttt{is\_attivo}, il sesso, o uno \texttt{stato\_sinistro} con soli valori "APERTO"/"CHIUSO"). L'ottimizzatore ignorerà volontariamente l'indice preferendo il \textit{Sequential Scan} per evitare il costo meccanico dei \textit{Pointer Lookups}.
+    \item \textbf{Tabelle ad Altissima Frequenza di Scrittura:} Se una tabella funge da log append-only puro (es. registrazione della telemetria IoT della scatola nera in tempo reale) e viene interrogata solo in caso di audit, l'aggiunta di indici degraderà severamente la latenza delle \texttt{INSERT} a causa dei continui \textit{Page Split} dell'albero.
+    \item \textbf{Violazione del Prefisso Sinistro (Indici Composti):} È inutile creare un indice composto \texttt{(A, B, C)} se l'applicativo filtra di frequente solo per la colonna \texttt{B} o \texttt{C}. Il DBMS non potrà utilizzare l'albero.
+\end{itemize}
 
 \section{Ispezione Fisica delle Query: I Piani di Esecuzione (PostgreSQL)}
 
