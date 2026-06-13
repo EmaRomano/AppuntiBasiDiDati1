@@ -1,1 +1,162 @@
-\chapter{Transazioni e Concorrenza}
+\chapter{Gestione delle Transazioni e Concorrenza}
+
+Fino a questo momento, abbiamo studiato il database all'interno di una campana di vetro. Abbiamo analizzato la modellazione dei dati e l'ottimizzazione fisica degli indici supponendo implicitamente che il nostro Database Management System (DBMS) servisse un unico utente alla volta, all'interno di un sistema hardware infallibile e perfetto. 
+
+La verità cruda dell'ingegneria del software, tuttavia, è che il mondo reale è un ambiente ostile e caotico. I server subiscono cali di tensione e si spengono improvvisamente, i dischi fissi si danneggiano, i cavi di rete perdono pacchetti e, soprattutto, un backend in produzione riceve centinaia o migliaia di richieste HTTP nello stesso identico millisecondo. 
+Se due operatori tentano di modificare i dati dello stesso sinistro contemporaneamente, o se un'operazione di pagamento fallisce a metà a causa di un crash del server, il database rischia di corrompersi in modo irrimediabile, generando informazioni parziali, incoerenti e legalmente inaccettabili.
+
+Questo capitolo abbandona l'ottimizzazione della singola interrogazione per esplorare lo scudo protettivo primario del database relazionale: la gestione della concorrenza e delle transazioni. Comprendere questi meccanismi è il requisito essenziale per poter utilizzare correttamente framework applicativi come Spring Boot o Hibernate senza causare disastri in produzione.
+
+\section{Fondamenti della Transazione e Proprietà ACID}
+
+Il problema fondamentale che un DBMS deve risolvere è la frammentazione delle operazioni. Nel codice dell'applicazione backend, un processo di business (es. "Rinnovo di una polizza") rappresenta un'unica azione logica per l'utente. Per il database, tuttavia, questa singola azione logica si traduce inevitabilmente in una molteplicità di operazioni fisiche separate (molteplici \texttt{INSERT} e \texttt{UPDATE} su tabelle diverse). 
+Se un guasto hardware interrompesse l'esecuzione a metà di questa sequenza, il sistema si ritroverebbe in uno stato ibrido e invalido.
+
+Per scongiurare questo scenario, i database relazionali introducono il concetto di \textbf{Transazione}.
+
+\subsection{Cos'è una transazione: il concetto di "Tutto o Niente" (Commit e Rollback)}
+
+Una \textbf{Transazione} è definita come \textit{un'unità logica di lavoro non divisibile}, composta da una o più istruzioni SQL, che il database deve eseguire in modo inscindibile. 
+
+Il principio architetturale alla base della transazione è la regola del \textbf{"Tutto o Niente"} (\textit{All-or-Nothing}). Il DBMS garantisce che:
+\begin{itemize}
+    \item O \textbf{tutte} le operazioni fisiche incluse nella transazione vanno a buon fine e vengono salvate permanentemente sul disco.
+    \item O, se si verifica un singolo errore in una qualsiasi delle operazioni (o un blocco hardware), \textbf{nessuna} delle operazioni precedenti produce effetti, e il database torna esattamente allo stato in cui si trovava un istante prima dell'inizio della transazione, come se nulla fosse mai accaduto.
+\end{itemize}
+
+Per controllare questo confine invisibile, il linguaggio SQL mette a disposizione tre comandi fondamentali che il programmatore (o il framework ORM per suo conto) deve orchestrare:
+
+\begin{enumerate}
+    \item \texttt{BEGIN} (o \texttt{START TRANSACTION}): Segna l'inizio ufficiale dell'unità di lavoro. Da questo momento, tutte le istruzioni SQL vengono temporaneamente "annotate" ma non rese definitive per il resto del sistema.
+    \item \texttt{COMMIT}: È il comando di successo. Dichiara che l'unità di lavoro è terminata senza errori. Il database prende le modifiche temporanee e le "scolpisce" permanentemente sul disco rigido, rendendole visibili a tutti gli altri utenti.
+    \item \texttt{ROLLBACK}: È il comando di emergenza (annullamento). Se un'istruzione fallisce o il backend Java intercetta un'eccezione, il comando \texttt{ROLLBACK} distrugge tutte le modifiche pendenti scritte dopo il \texttt{BEGIN}, ripristinando l'integrità totale del sistema.
+\end{enumerate}
+
+\begin{example}[Il collasso senza Transazioni nel dominio SafeDrive]
+Consideriamo il processo di "Emissione di una nuova Polizza" per un cliente esistente nel gestionale \textit{SafeDrive}. La logica di business impone due operazioni sequenziali:
+\begin{enumerate}
+    \item Inserire il nuovo contratto nella tabella \texttt{polizza}.
+    \item Aggiornare il veicolo del cliente nella tabella \texttt{veicolo}, impostando l'attributo \texttt{is\_assicurato = TRUE}.
+\end{enumerate}
+
+Se queste due operazioni venissero eseguite fuori da una transazione e, subito dopo il passo 1, il server del database esaurisse la memoria (Crash), la prima operazione rimarrebbe salvata sul disco, ma la seconda non verrebbe mai eseguita. Il database si ritroverebbe in uno stato \textit{incoerente}: esisterebbe un contratto di polizza attivo e pagato, ma il veicolo risulterebbe legalmente "non assicurato" nei sistemi di controllo.
+
+\textbf{La soluzione transazionale:}
+Avvolgendo il processo in una transazione:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+BEGIN;
+INSERT INTO polizza (id_cliente, targa, data_inizio) VALUES (83, 'AB123CD', CURRENT_DATE);
+UPDATE veicolo SET is_assicurato = TRUE WHERE targa = 'AB123CD';
+COMMIT;
+\end{lstlisting}
+In caso di crash subito dopo l'\texttt{INSERT}, il comando \texttt{COMMIT} non verrebbe mai raggiunto. Al riavvio, il \textit{Recovery Manager} del database eseguirebbe automaticamente un \texttt{ROLLBACK} d'ufficio, cancellando la polizza inserita a metà e salvando l'azienda da un'incoerenza fatale dei dati.
+\end{example}
+
+\subsection{Le 4 Proprietà ACID: Il Contratto del Database}
+
+Quando il livello di persistenza in Java invia un comando di \texttt{COMMIT}, il database relazionale non si limita a un semplice tentativo di salvataggio. Firma un vero e proprio contratto con lo sviluppatore, garantendo quattro proprietà fondamentali racchiuse nell'acronimo \textbf{ACID}. 
+Comprendere questo acronimo è obbligatorio, in quanto rappresenta una delle domande di sbarramento più frequenti in qualsiasi colloquio tecnico per ruoli backend.
+
+\paragraph{A - Atomicità (Atomicity)}
+È l'implementazione formale della regola del "tutto o niente" vista nel paragrafo precedente. L'Atomicità garantisce che le operazioni fisiche all'interno di una transazione siano indivisibili. 
+Se il processo di "Registrazione Sinistro e Aggiornamento Massimale" prevede cinque query \texttt{UPDATE} distinte, e la quinta fallisce (es. per un errore di sintassi o una violazione di vincolo), il database distrugge automaticamente i risultati delle prime quattro. Per il sistema, è come se la transazione non fosse mai iniziata. Non esistono stati intermedi.
+
+\paragraph{C - Coerenza (Consistency)}
+La transazione deve portare il database da uno stato di validità logica a un altro stato di validità logica, senza mai violare le regole strutturali definite nello schema (\textit{DDL}). 
+La verità ingegneristica è che il database non sa se il tuo codice Java sta calcolando il premio della polizza in modo giusto o sbagliato; lui si preoccupa solo dell'integrità referenziale.
+\begin{itemize}
+    \item Se la tua transazione tenta di inserire un \texttt{sinistro} associato a un \texttt{id\_cliente} che non esiste nella tabella madre (violazione di \textit{Foreign Key}).
+    \item Se tenta di inserire una \texttt{targa} già esistente (violazione \textit{UNIQUE}).
+    \item Se tenta di impostare un \texttt{danno\_stimato} negativo (violazione \textit{CHECK constraints}).
+\end{itemize}
+In tutti questi casi, la Coerenza viene compromessa. Il database intercetta la violazione, rifiuta l'istruzione e fa fallire l'intera transazione eseguendo un \texttt{ROLLBACK} forzato.
+
+\paragraph{I - Isolamento (Isolation) [Il fulcro per il Backend Developer]}
+Questa è la proprietà su cui nello sviluppo backend si passa la maggior parte del tempo a progettare e fare \textit{debug}. L'Isolamento impone che l'esecuzione simultanea di due transazioni debba produrre lo stesso identico risultato che si otterrebbe eseguendole in serie (una dopo l'altra).
+Se nel gestionale due periti assicurativi aprono contemporaneamente lo stesso record del \texttt{sinistro} per aggiornare la stima del danno, l'Isolamento impedisce che le due operazioni si "intreccino" sovrascrivendosi a vicenda in modo imprevedibile. 
+Mentre l'Atomicità, la Coerenza e la Durabilità sono concetti assoluti (o ci sono o non ci sono), l'Isolamento è un compromesso configurabile: sarai tu a dover dire a Spring Boot quanto forte deve essere questo isolamento, bilanciando l'integrità assoluta con le prestazioni del server (i cosiddetti \textit{Isolation Levels} che studieremo nei prossimi paragrafi).
+
+\paragraph{D - Durabilità (Durability)}
+Una volta che il database ha accettato il \texttt{COMMIT} e ha restituito "OK" alla tua applicazione Java, la transazione è permanente e incancellabile. Anche se un millisecondo dopo il completamento qualcuno stacca fisicamente il cavo di alimentazione del server, al riavvio i dati saranno esattamente lì.
+Per ottenere questo, i DBMS non scrivono direttamente i dati finali nell'Heap File (che è un'operazione lenta), ma appuntano il cambiamento su un registro sequenziale ultra-veloce chiamato \textbf{WAL (Write-Ahead Log)}. 
+Come sviluppatore Java, la Durabilità è un problema che deleghi totalmente all'hardware e ai sistemisti; devi solo sapere che esiste e che è il motivo per cui i database relazionali non perdono dati in caso di \textit{crash}.
+
+\begin{tip}[Riepilogo A.C.I.D.]
+    la spiegazione migliore dell'acronimo ACID è pratica:
+    L'Atomicità previene le operazioni a metà; la Coerenza previene i dati illegali; l'Isolamento previene il caos multi-utente; la Durabilità previene la perdita dei dati in caso di guasto hardware.
+\end{tip}
+
+\subsection{Il limite del singolo statement: perché una singola query non basta}
+
+Per comprendere la reale necessità del controllo transazionale esplicito (tramite \texttt{BEGIN}, \texttt{COMMIT} e \texttt{ROLLBACK}), è necessario chiarire il comportamento predefinito del database relazionale.
+
+La verità meccanica è che \textbf{ogni singola istruzione SQL è già, di per sé, una transazione atomica}. 
+Questo comportamento è noto come \textbf{Auto-Commit}. Se il backend invia una singola query come \texttt{UPDATE cliente SET email = 'nuova@email.com' WHERE id = 83}, il database garantisce matematicamente che questa operazione non rimarrà mai a metà: o l'email viene aggiornata completamente, o, in caso di errore di rete durante la query, l'aggiornamento fallisce senza lasciare tracce.
+
+Se il database è già atomico per natura, perché i programmatori Java devono preoccuparsi di gestire esplicitamente le transazioni?
+La risposta risiede nella \textbf{frammentazione del dominio di business}.
+
+Nel mondo reale dell'ingegneria del software, i processi aziendali (i cosiddetti \textit{Use Cases} o \textit{User Stories}) non si risolvono quasi mai con l'alterazione di una singola riga in una singola tabella. Una logica di business significativa coinvolge sempre l'orchestrazione di molteplici entità relazionate tra loro.
+
+\begin{example}[Il disastro del Rinnovo Polizza senza Transazione Esplicita]
+Analizziamo il processo di "Rinnovo e Pagamento Polizza" nel gestionale \textit{SafeDrive}. Quando il cliente paga il premio annuale, il livello di persistenza in Java deve tradurre questo processo aziendale in due istruzioni SQL distinte:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+-- 1. Registrazione dell'incasso
+INSERT INTO pagamento (id_polizza, importo, data_pagamento) 
+VALUES (1050, 450.00, CURRENT_DATE);
+
+-- 2. Spostamento in avanti della scadenza
+UPDATE polizza SET data_scadenza = '2027-06-13' 
+WHERE id_polizza = 1050;
+\end{lstlisting}
+
+Se ci affidassimo all'Auto-Commit predefinito, queste verrebbero trattate come \textbf{due transazioni atomiche separate e indipendenti}. 
+Se un calo di tensione, un \textit{Timeout} del server o un errore di validazione (es. violazione di una \textit{Foreign Key}) facesse crashare il sistema \textbf{esattamente un millisecondo dopo} il completamento della prima query e prima dell'inizio della seconda, ci ritroveremmo in uno scenario catastrofico:
+\begin{itemize}
+    \item L'azienda ha incassato e registrato 450 euro (la prima query ha fatto Auto-Commit).
+    \item La polizza risulta ancora scaduta (la seconda query non è mai partita).
+\end{itemize}
+Il cliente ha pagato ma risulta non assicurato. Dal punto di vista del business e legale, i dati sono corrotti.
+\end{example}
+
+Il limite del singolo statement rende obbligatorio l'intervento del programmatore. Utilizzando una transazione esplicita, il backend Java ordina al database di sopprimere l'Auto-Commit e di trattare le molteplici operazioni fisiche (\texttt{INSERT} e \texttt{UPDATE}) come un singolo blocco logico, estendendo la protezione dell'Atomicità sull'intero processo di business.
+
+\section{Le Anomalie della Concorrenza (Il Caos del Multi-threading)}
+
+Nel paragrafo precedente abbiamo stabilito che la proprietà di \textbf{Isolamento} (la 'I' di ACID) ha il compito di impedire che le transazioni simultanee si influenzino a vicenda in modo imprevedibile. Tuttavia, a differenza dell'Atomicità o della Coerenza, l'Isolamento non è una proprietà "binaria" (attiva o spenta). 
+
+Per massimizzare le prestazioni, i database relazionali permettono ai programmatori di configurare \textit{quanto} debba essere forte questo isolamento. Abbassare il livello di isolamento migliora drasticamente la velocità del server (perché i dati non vengono "bloccati"), ma espone il sistema al rischio di comportamenti imprevisti. 
+
+Questi comportamenti patologici, che si verificano solo ed esclusivamente sotto carico concorrente, prendono il nome formale di \textbf{Anomalie della Concorrenza}. Conoscerle è vitale per poter scegliere la strategia di \textit{Locking} corretta nel livello applicativo Java.
+
+\subsection{Lost Update (L'Aggiornamento Perduto)}
+
+L'Aggiornamento Perduto (\textit{Lost Update}) è in assoluto l'anomalia più distruttiva e frequente nello sviluppo backend. Si verifica quando due transazioni indipendenti leggono contemporaneamente lo stesso record dal database, lo modificano in memoria locale (RAM) in base al valore appena letto, e infine tentano di sovrascriverlo sul disco una dopo l'altra.
+
+La transazione che esegue il \texttt{COMMIT} per ultima sovrascrive ciecamente i dati salvati dalla prima transazione. Il lavoro della prima transazione viene letteralmente "perduto", cancellato per sempre dalla storia del sistema, senza che il database o l'applicativo segnalino alcun errore.
+
+\begin{example}[Il disastro del Lost Update nella liquidazione dei Sinistri]
+Immaginiamo che il gestionale \textit{SafeDrive} debba decurtare il massimale residuo di una polizza a seguito di due sinistri indipendenti.
+La tabella \texttt{polizza} contiene il record per il Cliente 83: \texttt{massimale\_residuo = 10.000 €}.
+
+Due periti assicurativi (Perito A e Perito B) lavorano contemporaneamente su due sinistri diversi del Cliente 83, su due computer diversi.
+\begin{enumerate}
+    \item \textbf{T1 (Perito A):} Legge dal DB il record della polizza. Il massimale in memoria è \textbf{10.000 €}.
+    \item \textbf{T2 (Perito B):} Nello stesso identico millisecondo, legge dal DB il record della polizza. Il massimale in memoria è \textbf{10.000 €}.
+    \item \textbf{T1 (Perito A):} Il sinistro ammonta a 2.000 €. Il codice Java del Perito A calcola il nuovo residuo (10.000 - 2.000 = 8.000) e invia l'\texttt{UPDATE}.
+    \item \textbf{T1 (Perito A):} Il database esegue il \texttt{COMMIT}. Sul disco ora c'è scritto \textbf{8.000 €}.
+    \item \textbf{T2 (Perito B):} Il sinistro ammonta a 3.000 €. Il codice Java del Perito B, che ricordiamo aveva letto il valore iniziale, calcola il nuovo residuo (10.000 - 3.000 = 7.000) e invia il suo \texttt{UPDATE}.
+    \item \textbf{T2 (Perito B):} Il database esegue il \texttt{COMMIT}. Sovrascrive gli 8.000 € del Perito A. Sul disco ora c'è scritto \textbf{7.000 €}.
+\end{enumerate}
+
+\textbf{Il Risultato Architetturale:} L'aggiornamento del Perito A è andato perduto. L'azienda ha erogato 5.000 € di risarcimenti totali (2.000 + 3.000), ma il massimale è sceso solo di 3.000 €. Dal punto di vista del business, l'azienda ha letteralmente perso 2.000 € a causa di una sovrascrittura cieca (Blind Write). Nessuna eccezione è stata generata, nessuna traccia è rimasta.
+\end{example}
+
+\begin{observation}[La soluzione meccanica: Incrementi Relativi vs Assoluti]
+Un errore ingenuo è tentare di risolvere il Lost Update calcolando il nuovo valore nell'applicativo Java e inviandolo come dato assoluto (\texttt{UPDATE polizza SET massimale = 7000}). 
+La prima difesa strutturale consiste nel delegare il calcolo matematico direttamente al motore del database, utilizzando incrementi (o decrementi) \textbf{relativi}:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE polizza SET massimale = massimale - 3000 WHERE id = 1050;
+\end{lstlisting}
+Questa operazione è intrinsecamente sicura in PostgreSQL (a partire dal livello READ COMMITTED), in quanto il database applica un \textit{Lock} implicito sulla riga al momento dell'operazione matematica, costringendo l'eventuale seconda transazione simultanea a mettersi in coda e ad attendere il rilascio della risorsa prima di poter eseguire la propria sottrazione.
+\end{observation}
