@@ -152,11 +152,171 @@ Due periti assicurativi (Perito A e Perito B) lavorano contemporaneamente su due
 \textbf{Il Risultato Architetturale:} L'aggiornamento del Perito A è andato perduto. L'azienda ha erogato 5.000 € di risarcimenti totali (2.000 + 3.000), ma il massimale è sceso solo di 3.000 €. Dal punto di vista del business, l'azienda ha letteralmente perso 2.000 € a causa di una sovrascrittura cieca (Blind Write). Nessuna eccezione è stata generata, nessuna traccia è rimasta.
 \end{example}
 
-\begin{observation}[La soluzione meccanica: Incrementi Relativi vs Assoluti]
-Un errore ingenuo è tentare di risolvere il Lost Update calcolando il nuovo valore nell'applicativo Java e inviandolo come dato assoluto (\texttt{UPDATE polizza SET massimale = 7000}). 
-La prima difesa strutturale consiste nel delegare il calcolo matematico direttamente al motore del database, utilizzando incrementi (o decrementi) \textbf{relativi}:
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-UPDATE polizza SET massimale = massimale - 3000 WHERE id = 1050;
-\end{lstlisting}
-Questa operazione è intrinsecamente sicura in PostgreSQL (a partire dal livello READ COMMITTED), in quanto il database applica un \textit{Lock} implicito sulla riga al momento dell'operazione matematica, costringendo l'eventuale seconda transazione simultanea a mettersi in coda e ad attendere il rilascio della risorsa prima di poter eseguire la propria sottrazione.
+% \begin{observation}[ BOZZA La soluzione meccanica: Calcolo in Java vs Calcolo nel Database]
+% Per scongiurare l'anomalia dell'Aggiornamento Perduto (\textit{Lost Update}), è vitale tracciare una linea netta tra il calcolo effettuato nella memoria locale dell'applicativo e la delega matematica al motore relazionale.
+
+% \textbf{1. L'Anti-Pattern (Il disastro del calcolo in Java):}
+% Se lo sviluppatore decide di calcolare il nuovo valore all'interno del backend Spring Boot, il processo viene inevitabilmente spezzato in tre fasi:
+% \begin{enumerate}
+%     \item Java interroga il database (\texttt{SELECT}) e memorizza in RAM il massimale attuale: \textbf{10.000}.
+%     \item Java esegue la sottrazione in locale: $10.000 - 3.000 = 7.000$.
+%     \item Java invia il risultato assoluto al database (\texttt{UPDATE polizza SET massimale = 7000}).
+% \end{enumerate}
+% Questo approccio è completamente cieco alla concorrenza. Nel lasso di tempo (anche minimo) che intercorre tra la \texttt{SELECT} e l'\texttt{UPDATE}, un'altra transazione potrebbe aver alterato la riga. L'applicativo Java non ne è consapevole e sovrascrive il dato imponendo prepotentemente il suo "7.000", cancellando il lavoro altrui.
+
+% \textbf{2. La Soluzione Strutturale (Incrementi Relativi e Row Lock):}
+% Il paradigma ingegneristico corretto consiste nel privare Java della competenza matematica, delegandola al DBMS tramite una formula di incremento (o decremento) \textbf{relativo}:
+% \begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+% UPDATE polizza SET massimale = massimale - 3000 WHERE id = 1050;
+% \end{lstlisting}
+% Quando un DBMS moderno (come PostgreSQL o MySQL) riceve un'istruzione di aggiornamento relativo, scatena un meccanismo fisico di protezione indivisibile:
+% \begin{itemize}
+%     \item Applica un \textbf{Row Lock} (un lucchetto esclusivo) sulla singola riga della polizza.
+%     \item Legge dal disco il valore reale e garantito al millesimo di secondo.
+%     \item Esegue l'operazione matematica localmente nel motore e salva il risultato.
+%     \item Toglie il lucchetto, rilasciando la risorsa.
+% \end{itemize}
+% Se le richieste di due periti (T1 e T2) arrivano al server nello stesso istante, il database concede il lucchetto a T1 e mette fisicamente in coda di attesa T2. Quando T1 ha terminato (il massimale scende a 8.000) e il lucchetto si apre, T2 riprende l'esecuzione: legge il valore "fresco" di 8.000, sottrae i suoi 3.000 e salva 5.000. Il \textit{Lost Update} è strutturalmente scongiurato.
+% \end{observation}
+
+\subsection{Dirty Read (Lettura Sporca)}
+
+Se il \textit{Lost Update} rappresenta il pericolo di sovrascrivere dati validi, la \textbf{Lettura Sporca} (\textit{Dirty Read}) rappresenta il pericolo di fidarsi di dati "fantasma" che non sono mai stati resi definitivi.
+
+Questa anomalia si verifica quando una transazione (\textbf{T2}) è autorizzata a leggere le modifiche effettuate da un'altra transazione concorrente (\textbf{T1}), \textbf{prima} che quest'ultima abbia eseguito il comando di \texttt{COMMIT}.
+Se T1, per qualsiasi motivo (un errore di validazione, un crash del server o una logica di business non soddisfatta), esegue un \texttt{ROLLBACK}, i dati letti da T2 diventano carta straccia: T2 sta basando la propria esecuzione su informazioni che, per il database, non sono mai legalmente esistite.
+
+\begin{example}[Il paradosso del pagamento basato su dati non confermati]
+Analizziamo una potenziale interazione nel sistema \textit{SafeDrive} tra il backoffice e il portale clienti rivolto al pubblico.
+
+\begin{enumerate}
+    \item \textbf{T1 (Operatore Backoffice):} Inizia una transazione per ricalcolare in aumento il premio della polizza 1050 a causa di un sinistro con colpa. Esegue l'\texttt{UPDATE} portando il premio da \textbf{500 € a 800 €}. L'operatore non ha ancora confermato (\textbf{nessun COMMIT}).
+    \item \textbf{T2 (Cliente sul Sito Web):} Nello stesso istante, il cliente accede alla sua area personale e clicca su "Paga Rinnovo". Il backend Java avvia la transazione T2, legge il premio attuale e, a causa del basso livello di isolamento, vede il dato "sporco": \textbf{800 €}.
+    \item \textbf{T2 (Cliente sul Sito Web):} L'applicativo mostra 800 € a schermo e avvia la chiamata all'API della carta di credito per incassare la cifra.
+    \item \textbf{T1 (Operatore Backoffice):} Il sistema di backoffice rileva che l'aumento è illegittimo (es. il sinistro era senza colpa) e lancia un'eccezione. La transazione T1 va in \textbf{ROLLBACK}. Il premio nel database torna istantaneamente a \textbf{500 €}.
+\end{enumerate}
+
+\textbf{Il Risultato Architetturale:} La transazione T2 ha addebitato 800 € sulla carta di credito del cliente basandosi su una "Lettura Sporca". Il database risulta perfettamente coerente (la polizza costa 500 €), ma l'azienda ha incassato una cifra illegale e inesistente, basata sull'allucinazione temporanea di un'altra transazione fallita.
+\end{example}
+
+Per un backend developer, la Lettura Sporca è considerata un'anomalia inaccettabile nella quasi totalità dei domini applicativi (fanno eccezione solo alcuni sistemi di reportistica statistica, dove un errore dello 0.1\% sui totali è tollerato pur di non bloccare le letture). Per questo motivo, la stragrande maggioranza dei DBMS moderni impedisce questa anomalia per impostazione predefinita.
+
+\subsection{Non-Repeatable Read (Lettura Non Ripetibile)}
+
+Mentre la Lettura Sporca riguarda dati "falsi" mai confermati, la \textbf{Lettura Non Ripetibile} (\textit{Non-Repeatable Read}) riguarda dati assolutamente validi e confermati, ma che \textbf{mutano sotto i tuoi occhi} durante l'esecuzione della tua logica di business.
+
+Questa anomalia si verifica quando la tua transazione (\textbf{T1}) legge la stessa identica riga del database due volte in momenti diversi della sua esecuzione. Nel lasso di tempo che intercorre tra la prima e la seconda lettura, un'altra transazione concorrente (\textbf{T2}) modifica quella stessa riga e fa un \texttt{COMMIT} con successo. 
+Il risultato è che la tua transazione, pur avendo richiesto lo stesso dato, ottiene due valori diversi. La "ripetibilità" della lettura è stata compromessa.
+
+\begin{example}[Il report PDF con dati incoerenti]
+Nel gestionale \textit{SafeDrive}, un'operazione \textit{batch} notturna scritta in Java deve generare un report PDF riassuntivo per un cliente \textit{Corporate} (Flotta Aziendale).
+\begin{enumerate}
+    \item \textbf{T1 (Generatore PDF):} Inizia la transazione. Esegue una prima \texttt{SELECT} per estrarre i dati del Cliente 83 e stampare l'intestazione del documento. Il premio totale annuale risulta \textbf{5.000 €}.
+    \item \textbf{T2 (Backoffice):} Nello stesso istante, un operatore lavorando in un fuso orario diverso approva uno sconto per il Cliente 83, aggiornando il premio totale a \textbf{4.500 €}. L'operatore esegue regolarmente il \texttt{COMMIT}.
+    \item \textbf{T1 (Generatore PDF):} T1 ha continuato a elaborare il corpo del documento. Arrivato alla fine dell'elaborazione (magari pochi decimi di secondo dopo), esegue una seconda \texttt{SELECT} sul Cliente 83 per stampare il riepilogo a piè di pagina. Trova il nuovo valore confermato da T2: \textbf{4.500 €}.
+\end{enumerate}
+
+\textbf{Il Risultato Architetturale:} Il database ha agito in modo legalmente ineccepibile (T2 ha fatto un aggiornamento valido). Tuttavia, l'applicativo Java ha generato un documento ufficiale corrotto: l'intestazione riporta "Premio: 5.000 €", mentre il riepilogo finale dello stesso documento riporta "Totale: 4.500 €". Per il business, questo è un bug critico.
+\end{example}
+
+\begin{observation}[La differenza con il Livello di Default]
+A differenza della Lettura Sporca, la Lettura Non Ripetibile \textbf{è un'anomalia perfettamente legale e attiva nel livello di isolamento predefinito di PostgreSQL e SQL Server} (\texttt{READ COMMITTED}). 
+Poiché bloccare un record per impedirne la modifica in lettura paralizzerebbe le prestazioni del sistema, il DBMS accetta il compromesso: ti garantisce che leggerai sempre dati veri e confermati, ma non ti garantisce che, se li rileggi un secondo dopo, saranno rimasti identici.
+Se la logica di business di un'API richiede coerenza assoluta tra due letture sequenziali, spetta al programmatore innalzare esplicitamente il livello di isolamento della transazione.
 \end{observation}
+
+\subsection{Phantom Read (Lettura Fantasma)}
+
+La \textbf{Lettura Fantasma} (\textit{Phantom Read}) è l'anomalia più subdola in assoluto, perché si verifica anche quando il database ha protetto con successo tutte le righe che stai leggendo. 
+
+Mentre la Lettura Non Ripetibile riguarda la modifica di record \textit{già esistenti}, la Lettura Fantasma riguarda l'alterazione di un \textbf{insieme di risultati}. 
+Si verifica quando la tua transazione (\textbf{T1}) esegue una \texttt{SELECT} con una clausola \texttt{WHERE} (es. "estrai tutti i sinistri di Roma") e, prima che T1 finisca, una transazione concorrente (\textbf{T2}) esegue una \texttt{INSERT} o una \texttt{DELETE} che aggiunge o rimuove una riga che soddisfa proprio quella condizione.
+Se T1 ripete l'interrogazione, vedrà comparire dal nulla una riga "fantasma" (o ne vedrà sparire una), sballando completamente eventuali conteggi o aggregazioni in corso.
+
+\begin{example}[Lo sconto flotta e il veicolo fantasma]
+Il gestionale \textit{SafeDrive} possiede una logica aziendale (scritta in Java) per i clienti \textit{Corporate}: se un'azienda assicura 10 o più veicoli, scatta automaticamente uno sconto "Maxi-Flotta" del 20\% sul totale della fattura.
+\begin{enumerate}
+    \item \textbf{T1 (Fatturazione Mensile):} Il batch notturno in Java calcola la fattura per l'Azienda trasporti "Logistica SpA". Esegue: \texttt{SELECT COUNT(*) FROM veicolo WHERE id\_cliente = 83}. Il risultato è \textbf{9 veicoli}.
+    \item \textbf{T1 (Fatturazione Mensile):} Java valuta la condizione: $9 < 10$. Niente sconto flotta.
+    \item \textbf{T2 (Operatore Concessionaria):} Nello stesso istante lavorativo, un concessionario convenzionato vende un nuovo furgone a "Logistica SpA". Esegue una \texttt{INSERT INTO veicolo} associata al cliente 83 e fa \texttt{COMMIT}.
+    \item \textbf{T1 (Fatturazione Mensile):} Il codice Java di T1 procede a generare le righe della fattura. Esegue: \texttt{SELECT * FROM veicolo WHERE id\_cliente = 83} per calcolare il prezzo di ogni singolo mezzo e sommarlo. Questa volta, il database restituisce \textbf{10 veicoli} (il nuovo furgone fantasma è appena apparso).
+\end{enumerate}
+
+\textbf{Il Risultato Architetturale:} Il sistema fattura 10 veicoli a prezzo pieno. Il cliente va su tutte le furie perché, avendo 10 veicoli assicurati, aveva legalmente diritto allo sconto del 20\% sull'intera flotta. Il report ha agito in modo schizofrenico: ha applicato la logica decisionale su un insieme di 9 elementi, ma ha eseguito la matematica su un insieme di 10 elementi.
+\end{example}
+
+\begin{observation}[Il limite meccanico dei Lock tradizionali]
+Perché la Lettura Fantasma è così difficile da sconfiggere per un DBMS? 
+Nel caso della Lettura Non Ripetibile, il database risolve il problema mettendo un lucchetto (\textit{Row Lock}) sulle righe che stai leggendo, impedendo agli altri di modificarle. 
+Ma nel caso della Lettura Fantasma, l'operatore \textbf{T2} sta inserendo una riga \textit{nuova}. \textbf{Il database non può mettere un lucchetto fisico su una riga che sul disco ancora non esiste.} 
+
+Per prevenire i fantasmi, il motore relazionale è costretto a utilizzare meccanismi estremamente pesanti, come i \textbf{Range Locks} (bloccare l'intero indice o l'intera tabella per impedire qualsiasi inserimento in quell'intervallo). Questo livello di paranoia assoluta corrisponde al livello di isolamento massimo: \texttt{SERIALIZABLE}.
+\end{observation}
+
+\begin{tip}[Riepilogo: le anomalie della Concorrenza]
+
+    \begin{itemize}
+        \item \textbf{Lost Update}: tra modifiche concorrenti, una sovrascrive tutte le altre. 
+        
+        \item \textbf{Dirty Read}: Leggi dati che non sono mai stati confermati. Evitato di default dai DBMS. 
+
+        \item \textbf{Non-Repeatable Read}: Un dato che hai letto cambia prima che tu abbia finito.
+        
+        \item \textbf{Phantom Read}: L'insieme di righe su cui stai lavorando si allarga o si restringe a tua insaputa.
+    \end{itemize}
+    
+\end{tip}
+
+\section{I Livelli di Isolamento}
+
+Il motore relazionale non impone un approccio assolutista alla concorrenza. Lo standard SQL definisce quattro \textbf{Livelli di Isolamento} (\textit{Isolation Levels}), ovvero quattro configurazioni che il programmatore può impostare per bilanciare l'eterno compromesso dell'ingegneria dei dati: \textbf{Integrità Assoluta vs Prestazioni/Scalabilità}.
+
+Aumentare il livello di isolamento significa chiedere al database di utilizzare meccanismi di \textit{Locking} sempre più aggressivi (lucchetti sulle righe o sulle tabelle). Più lucchetti ci sono, più le transazioni degli altri utenti dovranno mettersi in coda ad aspettare, causando rallentamenti applicativi (\textit{Latenza}) o, nei casi peggiori, il blocco totale del sistema (\textit{Deadlock}).
+
+Il \textit{Lost Update} (Aggiornamento Perduto) sarà omesso nella trattazione a seguire: si tratta di un'anomalia di \textbf{scrittura}, non di lettura. Qualsiasi database moderno previene la sovrascrittura distruttiva già a partire dal primo livello \texttt{READ COMMITTED}, imponendo l'uso dei \textit{Row Lock} esclusivi ogni volta che si esegue un'istruzione di \texttt{UPDATE}.
+
+\paragraph{1. READ UNCOMMITTED (Prestazioni massime, integrità zero)}
+È il livello più basso e anarchico. Il database non applica alcun lucchetto in lettura. Le transazioni leggono i dati alla massima velocità possibile, ma sono esposte a \textbf{tutte} le anomalie, inclusa la distruttiva \textit{Dirty Read} (Lettura Sporca). 
+Nell'architettura backend moderna non si usa quasi mai, se non per generare report statistici di massa dove un margine di errore è tollerato pur di non bloccare il database lavorativo.
+\textit{(Nota: PostgreSQL considera questo livello talmente insicuro che lo ignora. Se lo si imposta, PostgreSQL applica silenziosamente il livello superiore).}
+
+\paragraph{2. READ COMMITTED (Il default di PostgreSQL e Oracle)}
+È il livello di compromesso per eccellenza e rappresenta il comportamento predefinito della stragrande maggioranza dei database relazionali. 
+Una transazione può leggere solo dati che sono stati ufficialmente confermati da un \texttt{COMMIT}.
+\begin{itemize}
+    \item \textbf{Cosa previene:} Sconfigge la \textit{Dirty Read}. Non leggerai mai "allucinazioni" o dati di transazioni fallite.
+    \item \textbf{Cosa permette:} Lascia passare le \textit{Non-Repeatable Reads} e le \textit{Phantom Reads}. I dati che leggi sono veri, ma possono mutare o moltiplicarsi se li rileggi un istante dopo.
+\end{itemize}
+
+\paragraph{3. REPEATABLE READ (Il default di MySQL/InnoDB)}
+Questo livello alza la barriera difensiva per garantire che, una volta letto un record, esso rimanga invariato per tutta la durata della tua transazione. Il database lo ottiene mettendo un lucchetto in lettura (\textit{Read Lock}) sulle righe interrogate, oppure (nei DBMS più moderni) scattando una vera e propria "fotografia" invisibile dei dati al momento dell'inizio della transazione (\textit{Snapshot Isolation / MVCC}).
+\begin{itemize}
+    \item \textbf{Cosa previene:} Sconfigge le \textit{Non-Repeatable Reads}. Se leggi la polizza 1050 dieci volte, otterrai sempre lo stesso premio, anche se un collega lo ha appena modificato.
+    \item \textbf{Cosa permette:} Storicamente, non protegge dalle \textit{Phantom Reads}. Il database ha "congelato" le righe esistenti, ma un collega può ancora inserirne di nuove nel tuo perimetro di ricerca.
+\end{itemize}
+
+\paragraph{4. SERIALIZABLE (Integrità assoluta, crollo prestazionale)}
+È il livello di paranoia massima. Il database garantisce che il risultato dell'esecuzione concorrente sia matematicamente identico all'eseguire le transazioni in serie (una rigorosamente dopo l'altra). 
+Per ottenere questo, il motore relazionale applica aggressivi \textbf{Range Locks}: se cerchi "i clienti di Roma", il database blocca in scrittura l'intera tabella (o l'indice) per la città di Roma, impedendo a chiunque di inserire, modificare o cancellare record in quel perimetro.
+\begin{itemize}
+    \item \textbf{Cosa previene:} Sconfigge tutte le anomalie, inclusa la \textit{Phantom Read}.
+    \item \textbf{Lo svantaggio:} Rovina letteralmente la scalabilità orizzontale. Se applicato sistematicamente in un'API con molto traffico, il backend va in \textit{Timeout} perché le transazioni passano il 90\% del tempo in coda ad aspettare che le tabelle si sblocchino.
+\end{itemize}
+
+\paragraph{Tabella Riassuntiva: Livelli vs Anomalie}
+
+La seguente matrice rappresenta lo standard SQL universale. Memorizzarla è uno step obbligato per chiunque voglia definire l'architettura di un livello di persistenza.
+
+\begin{table}[h!]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Livello di Isolamento} & \textbf{Dirty Read} & \textbf{Non-Repeatable Read} & \textbf{Phantom Read} \\ \hline
+\texttt{READ UNCOMMITTED} & Possibile & Possibile & Possibile \\ \hline
+\texttt{READ COMMITTED} & \textbf{Impedita} & Possibile & Possibile \\ \hline
+\texttt{REPEATABLE READ} & \textbf{Impedita} & \textbf{Impedita} & Possibile \\ \hline
+\texttt{SERIALIZABLE} & \textbf{Impedita} & \textbf{Impedita} & \textbf{Impedita} \\ \hline
+\end{tabular}%
+}
+\end{table}
