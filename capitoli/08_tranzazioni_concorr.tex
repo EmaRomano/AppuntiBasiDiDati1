@@ -91,7 +91,7 @@ Come sviluppatore Java, la Durabilità è un problema che deleghi totalmente all
 Per comprendere la reale necessità del controllo transazionale esplicito (tramite \texttt{BEGIN}, \texttt{COMMIT} e \texttt{ROLLBACK}), è necessario chiarire il comportamento predefinito del database relazionale.
 
 La verità meccanica è che \textbf{ogni singola istruzione SQL è già, di per sé, una transazione atomica}. 
-Questo comportamento è noto come \textbf{Auto-Commit}. Se il backend invia una singola query come \texttt{UPDATE cliente SET email = 'nuova@email.com' WHERE id = 83}, il database garantisce matematicamente che questa operazione non rimarrà mai a metà: o l'email viene aggiornata completamente, o, in caso di errore di rete durante la query, l'aggiornamento fallisce senza lasciare tracce.
+Questo comportamento è noto come \textbf{Auto-Commit}. Se il backend invia una singola query come \texttt{UPDATE cliente SET email = 'nuova@email.com' WHERE id = 83}, il database garantisce che questa operazione non rimarrà mai a metà: o l'email viene aggiornata completamente, o, in caso di errore di rete durante la query, l'aggiornamento fallisce senza lasciare tracce.
 
 Se il database è già atomico per natura, perché i programmatori Java devono preoccuparsi di gestire esplicitamente le transazioni?
 La risposta risiede nella \textbf{frammentazione del dominio di business}.
@@ -121,7 +121,7 @@ Il cliente ha pagato ma risulta non assicurato. Dal punto di vista del business 
 
 Il limite del singolo statement rende obbligatorio l'intervento del programmatore. Utilizzando una transazione esplicita, il backend Java ordina al database di sopprimere l'Auto-Commit e di trattare le molteplici operazioni fisiche (\texttt{INSERT} e \texttt{UPDATE}) come un singolo blocco logico, estendendo la protezione dell'Atomicità sull'intero processo di business.
 
-\section{Le Anomalie della Concorrenza (Il Caos del Multi-threading)}
+\section{Le Anomalie della Concorrenza}
 
 Nel paragrafo precedente abbiamo stabilito che la proprietà di \textbf{Isolamento} (la 'I' di ACID) ha il compito di impedire che le transazioni simultanee si influenzino a vicenda in modo imprevedibile. Tuttavia, a differenza dell'Atomicità o della Coerenza, l'Isolamento non è una proprietà "binaria" (attiva o spenta). 
 
@@ -245,20 +245,19 @@ Il gestionale \textit{SafeDrive} possiede una logica aziendale (scritta in Java)
 \textbf{Il Risultato Architetturale:} Il sistema fattura 10 veicoli a prezzo pieno. Il cliente va su tutte le furie perché, avendo 10 veicoli assicurati, aveva legalmente diritto allo sconto del 20\% sull'intera flotta. Il report ha agito in modo schizofrenico: ha applicato la logica decisionale su un insieme di 9 elementi, ma ha eseguito la matematica su un insieme di 10 elementi.
 \end{example}
 
-\begin{observation}[Il limite meccanico dei Lock tradizionali]
 Perché la Lettura Fantasma è così difficile da sconfiggere per un DBMS? 
-Nel caso della Lettura Non Ripetibile, il database risolve il problema mettendo un lucchetto (\textit{Row Lock}) sulle righe che stai leggendo, impedendo agli altri di modificarle. 
+Come vedremo in dettaglio a breve, nel caso della Lettura Non Ripetibile, il database risolve il problema mettendo un lucchetto (\textit{Row Lock}) sulle righe che stai leggendo, impedendo agli altri di modificarle. 
 Ma nel caso della Lettura Fantasma, l'operatore \textbf{T2} sta inserendo una riga \textit{nuova}. \textbf{Il database non può mettere un lucchetto fisico su una riga che sul disco ancora non esiste.} 
 
 Per prevenire i fantasmi, il motore relazionale è costretto a utilizzare meccanismi estremamente pesanti, come i \textbf{Range Locks} (bloccare l'intero indice o l'intera tabella per impedire qualsiasi inserimento in quell'intervallo). Questo livello di paranoia assoluta corrisponde al livello di isolamento massimo: \texttt{SERIALIZABLE}.
-\end{observation}
+
 
 \begin{tip}[Riepilogo: le anomalie della Concorrenza]
 
     \begin{itemize}
-        \item \textbf{Lost Update}: tra modifiche concorrenti, una sovrascrive tutte le altre. 
+        \item \textbf{Lost Update}: tra modifiche concorrenti, una sovrascrive tutte le altre. È l'unica anomalia in scrittura ed è evitato di default da tutti i DBMS.  
         
-        \item \textbf{Dirty Read}: Leggi dati che non sono mai stati confermati. Evitato di default dai DBMS. 
+        \item \textbf{Dirty Read}: Leggi dati che non sono mai stati confermati.
 
         \item \textbf{Non-Repeatable Read}: Un dato che hai letto cambia prima che tu abbia finito.
         
@@ -291,12 +290,12 @@ Una transazione può leggere solo dati che sono stati ufficialmente confermati d
 \paragraph{3. REPEATABLE READ (Il default di MySQL/InnoDB)}
 Questo livello alza la barriera difensiva per garantire che, una volta letto un record, esso rimanga invariato per tutta la durata della tua transazione. Il database lo ottiene mettendo un lucchetto in lettura (\textit{Read Lock}) sulle righe interrogate, oppure (nei DBMS più moderni) scattando una vera e propria "fotografia" invisibile dei dati al momento dell'inizio della transazione (\textit{Snapshot Isolation / MVCC}).
 \begin{itemize}
-    \item \textbf{Cosa previene:} Sconfigge le \textit{Non-Repeatable Reads}. Se leggi la polizza 1050 dieci volte, otterrai sempre lo stesso premio, anche se un collega lo ha appena modificato.
+    \item \textbf{Cosa previene:} Sconfigge le \textit{Non-Repeatable Reads}. Se leggi la polizza 1050 dieci volte nel ciclo di vita di una stessa transazione, otterrai sempre lo stesso premio, anche se un collega lo ha appena modificato.
     \item \textbf{Cosa permette:} Storicamente, non protegge dalle \textit{Phantom Reads}. Il database ha "congelato" le righe esistenti, ma un collega può ancora inserirne di nuove nel tuo perimetro di ricerca.
 \end{itemize}
 
 \paragraph{4. SERIALIZABLE (Integrità assoluta, crollo prestazionale)}
-È il livello di paranoia massima. Il database garantisce che il risultato dell'esecuzione concorrente sia matematicamente identico all'eseguire le transazioni in serie (una rigorosamente dopo l'altra). 
+È il livello di paranoia massima. Il database garantisce che il risultato dell'esecuzione concorrente sia identico all'eseguire le transazioni in serie (una rigorosamente dopo l'altra). 
 Per ottenere questo, il motore relazionale applica aggressivi \textbf{Range Locks}: se cerchi "i clienti di Roma", il database blocca in scrittura l'intera tabella (o l'indice) per la città di Roma, impedendo a chiunque di inserire, modificare o cancellare record in quel perimetro.
 \begin{itemize}
     \item \textbf{Cosa previene:} Sconfigge tutte le anomalie, inclusa la \textit{Phantom Read}.
@@ -320,3 +319,256 @@ La seguente matrice rappresenta lo standard SQL universale. Memorizzarla è uno 
 \end{tabular}%
 }
 \end{table}
+
+\section{Lock Pessimistico vs Lock Ottimistico}
+
+I DBMS relazionali offrono garanzie matematiche sull'isolamento dei dati, ma i loro meccanismi nativi (i \textit{Lock} fisici sulle righe o sulle tabelle) sono strumenti a "forza bruta", pensati per transazioni che durano frazioni di secondo. 
+Quando l'interazione coinvolge i tempi di reazione umani (es. un utente che legge un modulo a schermo, compila i campi in 5 minuti e poi preme "Salva"), il backend Java non può mantenere aperta la transazione sul database per tutto quel tempo: il server crollerebbe al terzo utente connesso a causa dei troppi lucchetti attivi.
+
+Per gestire la concorrenza in architetture \textit{stateless} (come le moderne API REST), l'ingegneria del software ha standardizzato due pattern architetturali diametralmente opposti da implementare a livello applicativo.
+
+\subsection{Lock Pessimistico: La Forza Bruta (FOR UPDATE)}
+
+L'approccio pessimistico si basa sulla totale sfiducia logica: \textit{"Sono certo che qualcuno cercherà di modificare questo dato mentre ci sto lavorando, quindi lo blocco preventivamente per tutti"}.
+
+A livello SQL, questo si ottiene aggiungendo la clausola \texttt{FOR UPDATE} alla fine di una normale query di lettura:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+SELECT * FROM sinistro WHERE id = 42 FOR UPDATE;
+\end{lstlisting}
+
+Quando il database riceve questa istruzione, applica un \textit{Row Lock} esclusivo e immediato sulla riga del sinistro 42. Finché la tua transazione non esegue un \texttt{COMMIT} o un \texttt{ROLLBACK}, nessun altro utente nel sistema potrà modificare o leggere (se richiede a sua volta un lock) quel record. 
+
+\begin{warningbox}[L'Anti-Pattern nelle API REST]
+Nel mondo delle applicazioni web, il Lock Pessimistico è considerato quasi sempre un \textit{anti-pattern}. Se un operatore apre la pratica di un sinistro (bloccando la riga) e poi va a prendersi un caffè dimenticandosi la schermata aperta, o se la connessione di rete cade lasciando la transazione "appesa", l'intero ufficio sinistri si paralizza. Il Lock Pessimistico va riservato esclusivamente a operazioni di \textit{batch processing} notturno o transazioni finanziarie totalmente automatizzate e invisibili all'utente.
+\end{warningbox}
+
+\subsection{Lock Ottimistico: L'Astuzia del Versioning (Lo Standard)}
+
+L'approccio ottimistico si basa sulla statistica: \textit{"È altamente improbabile che due operatori modifichino lo stesso esatto record nello stesso identico millisecondo. Quindi non blocco nulla, ma prima di salvare verifico che nessuno mi abbia preceduto"}.
+
+Non essendoci alcun lucchetto fisico, le prestazioni del database sono massimizzate. Questo meccanismo, standard assoluto nell'ecosistema Spring Boot/Hibernate, si implementa aggiungendo una colonna tecnica in quasi tutte le tabelle del database, solitamente chiamata \texttt{versione} (di tipo numerico intero).
+
+\begin{example}[La meccanica del Lock Ottimistico e la prevenzione del Lost Update]
+Riprendiamo l'esempio del massimale della polizza 1050, conteso tra il Perito A e il Perito B che usano il gestionale \textit{SafeDrive}.
+\begin{enumerate}
+    \item \textbf{Lettura Concorrente:} Entrambi i periti interrogano la polizza tramite l'API. Il database restituisce i dati e \texttt{versione = 1}. Le transazioni di lettura si chiudono immediatamente (il DB è libero).
+    \item \textbf{Primo Aggiornamento (Perito A):} Il Perito A modifica il massimale e preme "Salva". Il livello di persistenza Java invia un \texttt{UPDATE} condizionale che incrementa la versione:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE polizza SET massimale = 8000, versione = 2 
+WHERE id = 1050 AND versione = 1;
+\end{lstlisting}
+    La condizione \texttt{versione = 1} è vera. Il database aggiorna la riga e restituisce \textbf{"1 riga aggiornata"}.
+    \item \textbf{La Trappola per il Perito B:} Il Perito B preme "Salva" pochi secondi dopo. Java invia il suo aggiornamento basato sui dati vecchi che aveva in memoria locale:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+UPDATE polizza SET massimale = 7000, versione = 2 
+WHERE id = 1050 AND versione = 1;
+\end{lstlisting}
+    \item \textbf{Il Blocco Logico:} Il database cerca la polizza 1050 con \texttt{versione = 1}, ma non la trova più (il Perito A l'ha appena portata a 2). La query non va in errore sintattico, ma il DBMS risponde all'applicativo: \textbf{"0 righe aggiornate"}.
+\end{enumerate}
+
+Quando il framework ORM rileva "0 righe aggiornate" su un aggiornamento per ID primario, capisce istantaneamente di aver subito una collisione concorrente. Esegue un \texttt{ROLLBACK} di sicurezza e lancia un'eccezione interna (\texttt{OptimisticLockException} in Java). L'API REST cattura l'eccezione e restituisce un errore HTTP 409 (\textit{Conflict}) all'utente, segnalando che il record è stato modificato da un collega e invitandolo a ricaricare la pagina con i dati aggiornati.
+\end{example}
+
+\subsection{Implementazione in JPA/Hibernate: L'annotazione @Version}
+
+Nel mondo dello sviluppo Java Enterprise (Spring Boot), la specifica JPA (\textit{Java Persistence API}) e la sua implementazione più famosa (Hibernate) offrono un supporto nativo, trasparente e totalmente automatizzato per il Lock Ottimistico.
+
+Invece di dover scrivere manualmente le interrogazioni SQL condizionali per controllare la versione del record, lo sviluppatore deve semplicemente aggiungere una proprietà tecnica alla sua classe \textit{Entity} (il modello Java che mappa la tabella) e decorarla con l'annotazione \texttt{@Version}.
+
+\begin{example}[La mappatura dell'Entità Polizza in Java]
+Ecco come si presenta il codice reale dell'entità \texttt{Polizza} nel progetto \textit{SafeDrive}:
+\begin{lstlisting}[language=Java, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Version;
+import java.math.BigDecimal;
+
+@Entity
+public class Polizza {
+
+    @Id
+    private Long id;
+    
+    private BigDecimal massimaleResiduo;
+    
+    // Il "Lucchetto Logico" automatizzato
+    @Version
+    private Integer versione;
+    
+    // ... getter e setter ...
+}
+\end{lstlisting}
+\end{example}
+
+\textbf{Cosa succede "dietro le quinte" (La Magia dell'ORM):}
+Quando il codice applicativo invoca il salvataggio dell'oggetto (\texttt{polizzaRepository.save(polizza)}), Hibernate intercetta la chiamata e compie tre azioni in totale autonomia:
+\begin{enumerate}
+    \item Genera la query SQL inserendo automaticamente la clausola \texttt{WHERE id = ? AND versione = ?}.
+    \item Incrementa automaticamente di 1 il valore del campo \texttt{versione} da salvare sul database.
+    \item Analizza il numero di righe modificate restituito dal driver JDBC.
+\end{enumerate}
+
+Se il driver del database risponde "0 righe aggiornate" (segno inequivocabile che un'altra transazione ha modificato il record nel frattempo), Hibernate interrompe immediatamente il processo ed esegue un \texttt{ROLLBACK} della transazione corrente.
+
+\begin{observation}[La gestione dell'Eccezione nel Controller]
+Quando si verifica una collisione concorrente, Hibernate lancia una \texttt{OptimisticLockException} (che Spring avvolge nella sua \texttt{ObjectOptimisticLockingFailureException}). 
+Il compito del programmatore backend è catturare questa eccezione a livello di Controller REST (spesso utilizzando un \texttt{@RestControllerAdvice} globale) e tradurla in una risposta HTTP standardizzata per il client (Front-end o App Mobile).
+La prassi architetturale impone di restituire lo status code \textbf{HTTP 409 Conflict}, accompagnato da un messaggio amichevole per l'utente, come: \textit{"Attenzione: i dati che stai cercando di salvare sono stati appena modificati da un altro operatore. Ti preghiamo di ricaricare la pagina per visualizzare le ultime modifiche."}
+\end{observation}
+
+\begin{tip}
+\textbf{Tipi di dato supportati:} L'annotazione \texttt{@Version} supporta numeri interi (\texttt{Integer}, \texttt{Short}, \texttt{Long}) e \texttt{Timestamp}. L'uso dei tipi numerici (come \texttt{Integer}) è universalmente preferito per questioni di portabilità tra database diversi, poiché alcuni DBMS hanno risoluzioni dei millisecondi sui \texttt{Timestamp} differenti, il che potrebbe causare falsi positivi nei controlli di collisione.
+\end{tip}
+
+\section{La Pratica in Spring Boot: L'annotazione @Transactional}
+
+L'architettura moderna del backend Java delega la gestione del livello relazionale a framework potenti come Spring Data JPA e Hibernate. L'orchestrazione delle transazioni non avviene più scrivendo manualmente istruzioni SQL, ma in modo \textbf{dichiarativo}. 
+Lo sviluppatore si limita ad apporre l'annotazione \texttt{@Transactional} sopra un metodo di business (solitamente nel \textit{Service Layer}), delegando al framework il compito di inviare i comandi di \texttt{BEGIN}, \texttt{COMMIT} o \texttt{ROLLBACK} al momento giusto.
+
+Tuttavia, utilizzare un costrutto astratto ignorandone il funzionamento meccanico sottostante è la causa principale dei difetti di persistenza nei sistemi Enterprise.
+
+\subsection{Il pattern Proxy di Spring: cosa succede "sotto il cofano"}
+
+In Java, un'annotazione (\texttt{@...}) è di per sé completamente inerte. È semplicemente un metadato, un pezzo di testo appiccicato a una classe o a un metodo; non contiene e non esegue alcun codice esplicito.
+Come fa allora Spring Boot a tradurre questa etichetta in un controllo ferreo sul database PostgreSQL? La risposta risiede in uno dei design pattern più importanti del framework: il \textbf{Pattern Proxy}.
+
+Quando si avvia l'applicazione, Spring ispeziona le classi Java. Se trova una classe (o un metodo) annotata con \texttt{@Transactional}, il framework \textbf{non} restituisce al server web l'oggetto originale. Invece, interviene dinamicamente generando in memoria un "clone avvolgente", un intermediario chiamato, appunto, \textbf{Proxy}.
+
+\begin{example}[L'Anatomia di una chiamata @Transactional]
+Analizziamo il flusso logico quando un utente richiede il pagamento di un sinistro nel gestionale \textit{SafeDrive}.
+\begin{lstlisting}[language=Java, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+@Service
+public class SinistroService {
+
+    @Transactional
+    public void pagaSinistro(Long id) {
+        // 1. Esegue UPDATE sul saldo
+        // 2. Esegue INSERT nello storico bonifici
+    }
+}
+\end{lstlisting}
+
+Quando il \textit{Controller} riceve la richiesta HTTP e invoca:
+\begin{center}
+    \texttt{sinistroService.pagaSinistro(42)}
+\end{center}
+
+la chiamata non finisce direttamente nel tuo codice. Viene intercettata dal \textbf{Proxy} di Spring, che esegue questa rigida sequenza meccanica invisibile:
+\begin{enumerate}
+    \item \textbf{Apertura:} Il Proxy richiede una connessione al database e invia fisicamente il comando SQL \texttt{BEGIN;}.
+    \item \textbf{Delega:} Il Proxy passa l'esecuzione al tuo vero metodo Java \texttt{pagaSinistro(42)}, che esegue la logica di business.
+    \item \textbf{Chiusura (Successo):} Se il tuo metodo termina regolarmente senza intoppi, il Proxy riprende il controllo e invia il comando SQL \texttt{COMMIT;}.
+    \item \textbf{Chiusura (Emergenza):} Se il tuo metodo si rompe e lancia un'Eccezione (\textit{Exception}), il Proxy intercetta l'errore, capisce che la logica è fallita e invia istantaneamente un \texttt{ROLLBACK;}, annullando qualsiasi modifica a metà.
+\end{enumerate}
+\end{example}
+
+\begin{warningbox}[La Trappola Mortale della Self-Invocation]
+Comprendere l'esistenza del Proxy è vitale per evitare il bug transazionale più insidioso nello sviluppo Spring: la \textit{Self-Invocation} (Auto-invocazione).
+
+Se all'interno della classe \texttt{SinistroService} scrivi un metodo secondario (privo di annotazione) che \textbf{al suo interno} chiama il metodo \texttt{pagaSinistro()}, \textbf{la transazione sul database non verrà mai aperta}.
+Questo avviene perché stai effettuando una chiamata interna all'istanza dell'oggetto (equivalente a \texttt{this.pagaSinistro()}). Facendo ciò, la chiamata rimane confinata dentro l'oggetto reale e bypassa completamente l'involucro esterno (il Proxy) che Spring aveva preparato. 
+Senza il passaggio dal Proxy, i comandi \texttt{BEGIN} e \texttt{COMMIT} non vengono emessi. Il metodo verrà eseguito in puro e pericoloso \textit{Auto-Commit}: ogni singola riga SQL sarà scolpita sul disco immediatamente, e al primo errore il sistema si ritroverà corrotto, senza alcuna possibilità di fare Rollback.
+
+\textbf{Regola Architetturale d'Oro:} L'annotazione \texttt{@Transactional} ha effetto \textbf{solo ed esclusivamente} se il metodo viene invocato dall'esterno della classe (es. da un Controller o da un Service di dominio differente).
+\end{warningbox}
+
+\subsection{La trappola del Rollback: Eccezioni Checked vs Unchecked}
+
+Abbiamo visto che il Proxy di Spring intercetta qualsiasi eccezione sollevata dal tuo metodo annotato con \texttt{@Transactional}. Tuttavia, il comportamento decisionale del Proxy non è uniforme, ma si basa su una rigida convenzione ereditata dai primi anni di vita di Java: la differenza tra eccezioni \textit{Checked} e \textit{Unchecked}.
+
+Il comportamento predefinito (e spesso fatale per i neofiti) di Spring Boot è il seguente:
+\begin{itemize}
+    \item \textbf{ROLLBACK automatico:} Avviene \textbf{solo} se il metodo lancia una \textbf{Unchecked Exception} (ovvero classi che estendono \texttt{RuntimeException}o errori di sistema non recuperabili).
+    \item \textbf{COMMIT letale:} Se il metodo lancia una \textbf{Checked Exception} (ovvero classi che estendono la classe base \texttt{Exception} ma non \texttt{RuntimeException}, come un'eccezione personalizzata di business o una \texttt{IOException}), \textbf{Spring non esegue il Rollback. Esegue un COMMIT.}
+\end{itemize}
+
+La giustificazione storica di questo comportamento è che le eccezioni \textit{Checked} erano considerate "situazioni anomale ma recuperabili" (es. "File non trovato, chiedi all'utente un altro file"). Spring assume quindi che, nonostante l'errore, tu voglia preservare sul database il lavoro fatto fino a quel momento.
+
+\begin{example}[Il disastro del COMMIT su un'eccezione di Business]
+Immaginiamo che il gestionale \textit{SafeDrive} abbia una regola di business: non si può rinnovare una polizza se il cliente non ha allegato il documento d'identità aggiornato. Il programmatore Junior crea un'eccezione personalizzata \texttt{DocumentoMancanteException extends Exception} (una \textit{Checked Exception}).
+
+\begin{lstlisting}[language=Java, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+@Transactional
+public void rinnovaPolizza(Long idPolizza) throws DocumentoMancanteException {
+    // 1. Il DB esegue un UPDATE: Sposta in avanti la scadenza (SUCCESSO)
+    polizzaRepository.estendiScadenza(idPolizza);
+    
+    // 2. Controllo di Business
+    if (!clienteHaDocumentoValido(idPolizza)) {
+        // Questa e' una Checked Exception!
+        throw new DocumentoMancanteException("Documento scaduto");
+    }
+    
+    // 3. Generazione del PDF contrattuale (non verra' mai raggiunto)
+}
+\end{lstlisting}
+
+\textbf{Cosa succede in produzione:}
+L'utente invoca il metodo. La riga 1 viene eseguita con successo. La riga 2 fallisce e lancia l'eccezione. Il Proxy di Spring la intercetta, analizza l'albero genealogico della classe e scopre che è una \textit{Checked Exception}. 
+Di conseguenza, il Proxy \textbf{esegue il COMMIT} della transazione.
+Risultato: la polizza è stata rinnovata legalmente sul database, ma il processo si è interrotto a metà, il documento contrattuale non è mai stato generato e l'eccezione è stata restituita all'utente. Il database è logicamente corrotto.
+\end{example}
+
+\paragraph{Come risolvere la trappola: Le due vie Architetturali}
+Per impedire questo comportamento, l'ingegneria del backend moderno adotta due possibili difese:
+\begin{enumerate}
+    \item \textbf{La via moderna (Preferita):} Creare eccezioni di business personalizzate facendole estendere sempre e solo \texttt{RuntimeException}. In questo modo, Spring eseguirà sempre il Rollback di default.
+    \item \textbf{La via esplicita:} Modificare il parametro dell'annotazione costringendo il Proxy a ribaltare la sua logica storica e a eseguire il Rollback per qualsiasi anomalia, usando la sintassi: \texttt{@Transactional(rollbackFor = Exception.class)}.
+\end{enumerate}
+
+\subsection{Propagazione delle Transazioni: REQUIRED vs REQUIRES\_NEW}
+
+Nelle architetture Enterprise modulari, è frequente che un metodo transazionale (il "Chiamante") invochi un altro metodo transazionale (il "Chiamato"), magari situato in una classe \textit{Service} differente. 
+La \textbf{Propagazione} definisce il comportamento del Proxy di Spring quando si verifica questa sovrapposizione logica.
+
+\paragraph{1. Propagation.REQUIRED (Il comportamento di Default)}
+Se non specifichi nulla, Spring applica automaticamente il livello \texttt{REQUIRED}. 
+La regola di questo livello è semplice: \textit{"Se esiste già una transazione fisica aperta, unisciti a quella. Altrimenti, creane una nuova"}.
+\begin{itemize}
+    \item \textbf{Meccanica:} Il metodo Chiamato non apre una nuova connessione al database, ma si "aggancia" alla transazione del Chiamante. Esiste \textbf{una sola transazione fisica} con un solo \texttt{COMMIT} finale.
+    \item \textbf{Il Rischio Architetturale:} Poiché condividono lo stesso spazio fisico, se il metodo Chiamato fallisce e lancia un'eccezione, "sporca" irrimediabilmente l'intera transazione contrassegnandola come \textit{Rollback-Only}. Anche se il Chiamante catturasse l'eccezione con un \texttt{try-catch} nel tentativo di salvarsi e proseguire, al momento del \texttt{COMMIT} finale Spring lancerà un errore fatale (\texttt{UnexpectedRollbackException}) e annullerà tutto.
+\end{itemize}
+
+\paragraph{2. Propagation.REQUIRES\_NEW (L'Isolamento Indipendente)}
+Questo livello si imposta esplicitamente con l'annotazione: 
+
+\begin{center}
+    \texttt{@Transactional(propagation = Propagation.REQUIRES\_NEW)}
+\end{center}
+
+La regola impone: \textit{"Sospendi qualsiasi transazione in corso e aprine sempre una fisicamente nuova e indipendente"}.
+\begin{itemize}
+    \item \textbf{Meccanica:} Quando il Chiamante invoca il Chiamato, il Proxy di Spring "mette in pausa" la connessione del Chiamante, richiede una \textbf{seconda connessione separata} al database, ed esegue il metodo Chiamato.
+    \item \textbf{Il Vantaggio Architetturale:} Le due transazioni sono fisicamente isolate. Se il metodo Chiamato fallisce e fa \texttt{ROLLBACK}, il Chiamante può catturare l'eccezione e continuare a lavorare, eseguendo infine il suo \texttt{COMMIT} con successo.
+\end{itemize}
+
+\begin{example}[L'uso vitale di REQUIRES\_NEW: Il Log di Audit]
+Nel gestionale \textit{SafeDrive}, per motivi legali, ogni tentativo di pagamento di un sinistro (sia che vada a buon fine, sia che fallisca) deve essere registrato in una tabella di \textit{Audit Log}.
+
+\begin{lstlisting}[language=Java, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+@Service
+public class AuditService {
+    // Deve salvare il log a prescindere da cosa succeda fuori!
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void salvaLog(String messaggio) {
+        auditRepository.save(new Log(messaggio));
+    }
+}
+
+@Service
+public class SinistroService {
+    @Autowired private AuditService auditService;
+    
+    @Transactional // Default: REQUIRED
+    public void tentaPagamento(Long idSinistro) {
+        auditService.salvaLog("Inizio pagamento per sinistro " + idSinistro);
+        
+        // ... logica complessa che potrebbe fallire lanciando un'eccezione ...
+    }
+}
+\end{lstlisting}
+
+\textbf{Perché \texttt{REQUIRES\_NEW} è l'unica soluzione:}
+Se l'\texttt{AuditService} usasse il default (\texttt{REQUIRED}), si aggancerebbe alla transazione di \texttt{tentaPagamento}. Se il pagamento fallisse (es. fondi insufficienti), il conseguente \texttt{ROLLBACK} cancellerebbe dal database non solo il tentativo di pagamento, ma anche il Log appena inserito! L'azienda perderebbe le tracce legali dell'operazione fallita.
+Utilizzando \texttt{REQUIRES\_NEW}, l'inserimento del log avviene in una "bolla" indipendente: viene \textit{committato} sul disco istantaneamente, prima ancora che il metodo del pagamento inizi a fare i suoi calcoli a rischio fallimento.
+\end{example}
