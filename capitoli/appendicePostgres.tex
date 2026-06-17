@@ -1,0 +1,74 @@
+\chapter{Pratica Operativa con PostgreSQL}
+\label{app:postgres_pratica}
+
+Questa appendice raccoglie i comandi essenziali per l'interazione diretta con il database tramite l'interfaccia a riga di comando \texttt{psql}. Risulta fondamentale per il debugging rapido e la configurazione manuale dell'ambiente di sviluppo backend su macchine locali (come Fedora Workstation).
+
+\section{Gestione del Servizio e Accesso}
+
+Per iniziare a lavorare con PostgreSQL, è necessario assicurarsi che il demone sia attivo in background sul sistema operativo.
+
+\begin{lstlisting}[language=bash, title=Comandi Systemd (Fedora/Linux)]
+# Avvio del servizio
+sudo systemctl start postgresql
+
+# Accesso all'interfaccia interattiva come utente postgres
+sudo -u postgres psql
+\end{lstlisting}
+
+\begin{tip}[Avvio Automatico]
+Se utilizzi frequentemente il database durante lo studio, puoi abilitare l'avvio automatico del servizio all'accensione del sistema con il comando \texttt{sudo systemctl enable postgresql}.
+\end{tip}
+
+\begin{warningbox}[L'utente di sistema postgres]
+Di default, PostgreSQL in ambiente Linux crea un utente di sistema chiamato \texttt{postgres}. L'autenticazione locale si basa spesso sul metodo \textit{peer}, il che significa che devi assumere temporaneamente l'identità di quell'utente di sistema (tramite \texttt{sudo -u}) per poter accedere come superuser al database senza fornire una password.
+\end{warningbox}
+
+\section{Meta-comandi \texttt{psql} Fondamentali}
+
+Una volta dentro l'interfaccia, i comandi che iniziano con il backslash (\texttt{\textbackslash}) sono istruzioni dirette al client \texttt{psql} e non query SQL. Non richiedono il punto e virgola finale.
+
+\begin{itemize}
+    \item \textbf{Uscita dall'interfaccia:} \texttt{\textbackslash q}
+    \item \textbf{Connessione a un db:} \texttt{\textbackslash c nome\_db}
+    \item \textbf{Elenco tabelle (nel db corrente):} \texttt{\textbackslash dt}
+    \item \textbf{Descrizione della struttura di una tabella:} \texttt{\textbackslash d nome\_tabella}
+\end{itemize}
+
+\section{Creazione dell'Ambiente e Operazioni CRUD}
+
+Vediamo ora come strutturare un database di test e popolare i primi dati per verificare che tutto il flusso DDL e DML funzioni correttamente.
+
+\begin{lstlisting}[language=SQL, title=Creazione Database e Connessione]
+CREATE DATABASE java_backend_dev;
+\c java_backend_dev
+\end{lstlisting}
+
+Creazione di una tabella utenti, tipica di un'applicazione web reale:
+
+\begin{lstlisting}[language=SQL, title=DDL: Creazione Tabella Users]
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\end{lstlisting}
+
+\begin{dettagli}[Il tipo SERIAL in PostgreSQL]
+In PostgreSQL, \texttt{SERIAL} non è un vero e proprio tipo di dato, ma una "comodità sintattica". Dietro le quinte crea una sequenza (\textit{sequence}) associata alla colonna e imposta automaticamente il valore di default con il prossimo numero disponibile, rendendolo perfetto per le chiavi primarie auto-incrementanti.
+\end{dettagli}
+
+Popolamento e interrogazione della tabella per validare l'inserimento:
+
+\begin{lstlisting}[language=SQL, title=DML: Insert e Select di Base]
+-- Inserimento di un nuovo record
+INSERT INTO users (username, email) 
+VALUES ('rookie_dev', 'rookie@example.com');
+
+-- Estrazione dei dati per verifica
+SELECT * FROM users;
+\end{lstlisting}
+
+\begin{bestpractice}[Dati di test e validazione]
+Quando popoli un database per testare un'applicazione Java, assicurati di inserire successivamente anche casi limite o dati non validi. Questo ti permetterà di verificare che le eccezioni generate dai constraint del database (come \texttt{UNIQUE} o \texttt{NOT NULL}) vengano intercettate e gestite correttamente a livello applicativo (es. tramite JDBC o Hibernate).
+\end{bestpractice}
