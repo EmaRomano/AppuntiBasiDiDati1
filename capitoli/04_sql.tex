@@ -186,13 +186,55 @@ Il Data Definition Language (DDL) permette di definire la struttura fisica del d
 Lo standard SQL è \textit{case-insensitive} per quanto riguarda le parole chiave del linguaggio. Tuttavia, è convenzione universale nell'ingegneria del software scrivere le keyword in \textbf{MAIUSCOLO} (es. \texttt{CREATE TABLE}, \texttt{VARCHAR}) e gli identificatori definiti dall'utente in \textbf{minuscolo} (es. \texttt{studenti}, \texttt{matricola}). Questo garantisce la massima leggibilità del codice.
 \end{bestpractice}
 
-\subsection{Creazione di uno schema logico}
-\texttt{CREATE SCHEMA} crea quello che in informatica viene chiamato un \textit{namespace} o, più semplicemente, un contenitore logico (un "recinto"). Serve a raggruppare un insieme di tabelle, viste e vincoli che appartengono alla stessa applicazione, separandoli da altri progetti presenti nello stesso server database. È importante notare che una tabella non può fluttuare nel vuoto: deve sempre risiedere all'interno di uno schema. Se non si specifica uno schema personalizzato con \texttt{CREATE SCHEMA}, molti DBMS inseriscono automaticamente le tabelle in uno schema di default chiamato comunemente \texttt{public} o \texttt{dbo}.
+\subsection{Gli Schemi Logici: Architettura, Namespacing e Modularità}
 
-La sintassi di base è:
-\begin{lstlisting}[language=SQL]
-CREATE SCHEMA <nome_schema>;
+Nel contesto dei sistemi di gestione di basi di dati relazionali (RDBMS), e in particolare in PostgreSQL, un database non è una collezione piatta di tabelle. Esiste un livello di astrazione intermedio fondamentale: lo \textbf{schema}.
+
+Per comprendere l'architettura logica del database, il parallelismo più efficace è quello con il file system del sistema operativo Linux:
+\begin{itemize}
+    \item Il \textbf{Database} rappresenta l'intero disco rigido (o una partizione logica isolata).
+    \item Lo \textbf{Schema} equivale a una \textbf{cartella (directory)} all'interno di quel disco.
+    \item Le \textbf{Tabelle}, le viste, gli indici e i tipi personalizzati sono i singoli \textbf{file} memorizzati dentro quella specifica cartella.
+\end{itemize}
+
+Una tabella non può esistere nel vuoto cosmico del database; deve risiedere tassativamente all'interno di uno schema. Se non viene configurato uno schema personalizzato durante la creazione delle strutture, il DBMS inserisce automaticamente le entità in uno schema di default denominato \texttt{public}.
+
+\begin{lstlisting}[language=SQL, title=Sintassi di Creazione di uno Schema]
+-- Creazione di un nuovo contenitore logico isolato
+CREATE SCHEMA ecommerce;
 \end{lstlisting}
+
+Mantenere l'intera applicazione all'interno dello schema \texttt{public} è una scelta accettabile in contesti didattici. Nello sviluppo di sistemi enterprise e architetture software reali, tuttavia, la suddivisione del database in molteplici schemi risponde a precise necessità ingegneristiche:
+
+\begin{enumerate}
+    \item \textbf{Namespacing (Risoluzione dei conflitti):} Esattamente come in Java si utilizzano i \textit{package} per evitare conflitti tra classi aventi lo stesso nome, nel database gli schemi isolano gli identificatori. È possibile definire una tabella \texttt{products} nello schema \texttt{sales} (ottimizzata per il catalogo) e un'altra tabella \texttt{products} nello schema \texttt{inventory} (ottimizzata per la logistica di magazzino).
+    \item \textbf{Isolamento dei Privilegi (Sicurezza):} Dal punto di vista del backend, diversi moduli o microservizi si connettono al medesimo database tramite utenti (\textit{database roles}) differenti. È possibile configurare i permessi affinché l'utente del servizio di fatturazione abbia privilegi di lettura/scrittura esclusivamente nello schema \texttt{billing}, rimanendo completamente cieco e privo di accessi nei confronti dello schema \texttt{human\_resources}.
+    \item \textbf{Modularità del Dominio (Monoliti Modulari):} Permette di mappare i confini logici del software (\textit{Bounded Contexts} del Domain-Driven Design) direttamente a livello di persistenza, mantenendo separati i moduli di business (es. uno schema \texttt{auth} per le credenziali, uno schema \texttt{tickets} per l'assistenza, uno schema \texttt{core} per le logiche principali).
+    \item \textbf{Architetture Multi-Tenant (SaaS):} Nello sviluppo di software Cloud in cui più aziende clienti (\textit{tenant}) condividono la stessa infrastruttura, lo schema rappresenta una soluzione ottimale per l'isolamento dei dati. Per evitare il consumo asimmetrico di risorse dovuto all'accensione di database multipli, si utilizza un unico database centralizzato in cui ogni cliente possiede il proprio schema dedicato (\texttt{tenant\_a.orders}, \texttt{tenant\_b.orders}).
+\end{enumerate}
+
+\paragraph{Risoluzione dei nomi e il \texttt{search\_path}}
+
+Quando il backend esegue una query priva di riferimenti espliciti come \texttt{SELECT * FROM users;}, il motore di PostgreSQL deve determinare in quale "cartella" cercare la tabella. Per fare questo, consulta una variabile di configurazione di sessione denominata \textbf{\texttt{search\_path}}, il cui comportamento ricalca fedelmente la variabile d'ambiente \texttt{PATH} dei sistemi operativi.
+
+Di default, il percorso è impostato per scansionare prima lo schema omonimo dell'utente connesso e, subito dopo, lo schema \texttt{public}. Se una tabella si trova in uno schema non incluso nel \texttt{search\_path}, il codice applicativo è obbligato a invocare l'oggetto tramite il suo \textbf{nome qualificato completo} (\textit{Fully Qualified Name}), anteponendo il nome dello schema separato da un punto:
+
+\begin{lstlisting}[language=SQL, title=Utilizzo dei Nomi Qualificati]
+-- Accesso esplicito bypassando il search_path di default
+SELECT * FROM billing.invoices WHERE id = 10540;
+\end{lstlisting}
+
+\begin{tip}[Modifica dinamica del percorso di ricerca]
+È possibile alterare il percorso di ricerca per la sessione corrente tramite il comando \texttt{SET}. Questo evita di dover digitare i nomi qualificati per ogni singola query:
+\texttt{SET search\_path TO ecommerce, public;}
+\end{tip}
+
+\begin{dettagli}[Ispezione degli Schemi tramite SQL standard]
+Tutti i metadati relativi alla struttura logica del database sono memorizzati nei dizionari di sistema. Per ricavare l'elenco completo degli schemi configurati senza dipendere dai meta-comandi del client \texttt{psql}, si può interrogare la vista standard:
+\begin{verbatim}
+SELECT schema_name FROM information_schema.schemata;
+\end{verbatim}
+\end{dettagli}
 
 \subsection{Creazione di una tabella}
 Il comando \texttt{CREATE TABLE} istanzia fisicamente uno schema relazionale $S(A_1, \dots, A_k)$ associando a ciascun attributo $A_i$ il proprio dominio $dom(A_i)$.

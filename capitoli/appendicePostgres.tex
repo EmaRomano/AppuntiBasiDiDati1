@@ -15,6 +15,12 @@ sudo systemctl start postgresql
 sudo -u postgres psql
 \end{lstlisting}
 
+\begin{itemize}
+    \item \texttt{sudo systemctl start postgresql}: significa "usa i privilegi di amministratore (\texttt{sudo}) per ordinare al gestore del sistema e dei servizi (\texttt{systemctl}, "system control") di avviare (\texttt{start}) il demone PostgreSQL, ovvero il server del database che gira in background".
+
+    \item \texttt{sudo -u postgres psql}: significa "usa i privilegi di amministratore (\texttt{sudo}) per assumere l'identità dell'utente di sistema chiamato \texttt{postgres} (\texttt{-u postgres}) e, con quell'identità, avvia il programma client di utility terminale (\texttt{psql}) per stabilire una connessione interattiva con il server database".
+\end{itemize}
+
 \begin{tip}[Avvio Automatico]
 Se utilizzi frequentemente il database durante lo studio, puoi abilitare l'avvio automatico del servizio all'accensione del sistema con il comando \texttt{sudo systemctl enable postgresql}.
 \end{tip}
@@ -22,6 +28,36 @@ Se utilizzi frequentemente il database durante lo studio, puoi abilitare l'avvio
 \begin{warningbox}[L'utente di sistema postgres]
 Di default, PostgreSQL in ambiente Linux crea un utente di sistema chiamato \texttt{postgres}. L'autenticazione locale si basa spesso sul metodo \textit{peer}, il che significa che devi assumere temporaneamente l'identità di quell'utente di sistema (tramite \texttt{sudo -u}) per poter accedere come superuser al database senza fornire una password.
 \end{warningbox}
+
+\section{Visualizzare i Database Esistenti}
+
+All'interno dell'istanza di PostgreSQL, è possibile elencare tutti i database creati seguendo due approcci differenti: l'utilizzo di un meta-comando specifico del client \texttt{psql} oppure l'esecuzione di una query SQL standard sul catalogo di sistema.
+
+\paragraph{Metodo Rapido: Meta-comandi di \texttt{psql}}
+
+Il modo più immediato per ottenere la lista dei database consiste nell'utilizzare il comando nativo del terminale interattivo (che non richiede il punto e virgola finale):
+
+\begin{lstlisting}[language=bash, title=Meta-comando psql]
+\l
+# Oppure in forma estesa:
+\list
+\end{lstlisting}
+
+Questo comando mostra un riepilogo tabellare contenente dettagli fondamentali quali il nome del database (\textit{Name}), l'utente proprietario (\textit{Owner}), la codifica dei caratteri (\textit{Encoding}) e le regole di localizzazione linguistica (\textit{Collate} e \textit{Ctype}).
+
+\begin{dettagli}[Gestione del Paginatore]
+Se l'elenco dei database è troppo lungo per la schermata del terminale, \texttt{psql} reindirizzerà l'output a un paginatore di sistema (solitamente l'utility \texttt{less}). Se l'interfaccia mostra il simbolo dei due punti (\texttt{:}) o la dicitura \texttt{END} in basso, dando l'impressione che il terminale sia bloccato, è sufficiente premere il tasto \texttt{q} sulla tastiera per interrompere la visualizzazione e tornare al prompt interattivo \texttt{postgres=\#}.
+\end{dettagli}
+
+\paragraph{Metodo Standard: SQL Puro}
+
+Nel caso in cui si stia operando dall'interno di un'applicazione (ad esempio un backend Java tramite driver JDBC) o non si stia usando il client interattivo \texttt{psql}, è necessario interrogare direttamente le tabelle dizionario del database utilizzando l'SQL standard:
+
+\begin{lstlisting}[language=SQL, title=Query sul Catalogo di Sistema]
+SELECT datname FROM pg_database;
+\end{lstlisting}
+
+La tabella di sistema \texttt{pg\_database} memorizza i metadati globali relativi a ogni singolo database presente e gestito all'interno dell'intera istanza (\textit{cluster}) di PostgreSQL.
 
 \section{Meta-comandi \texttt{psql} Fondamentali}
 
@@ -33,6 +69,28 @@ Una volta dentro l'interfaccia, i comandi che iniziano con il backslash (\texttt
     \item \textbf{Elenco tabelle (nel db corrente):} \texttt{\textbackslash dt}
     \item \textbf{Descrizione della struttura di una tabella:} \texttt{\textbackslash d nome\_tabella}
 \end{itemize}
+
+\section{Pulizia dell'Interfaccia e Comandi di Sistema}
+
+Durante sessioni di lavoro prolungate, l'output delle query può saturare rapidamente lo spazio visivo del terminale. È possibile pulire la schermata senza disconnettersi dal database utilizzando due approcci.
+
+\begin{tip}[Scorciatoia Rapida]
+Il metodo più immediato ed efficiente per pulire lo schermo all'interno di \texttt{psql} consiste nell'utilizzare la combinazione di tasti universale dei terminali Linux: \textbf{\texttt{Ctrl + L}}.
+\end{tip}
+
+In alternativa, è possibile delegare l'operazione direttamente al sistema operativo ospite (nel nostro caso, Fedora) sfruttando una funzionalità avanzata del client.
+
+\begin{lstlisting}[language=bash, title=Esecuzione di comandi shell da psql]
+-- Pulisce lo schermo richiamando l'utility di sistema
+\! clear
+
+-- Esempio aggiuntivo: elenca i file nella directory corrente di Linux
+\! ls
+\end{lstlisting}
+
+\begin{dettagli}[Il meta-comando di escape \texttt{\textbackslash!}]
+Il meta-comando \texttt{\textbackslash!} permette di creare un "ponte" temporaneo verso la shell del sistema operativo sottostante. Tutto ciò che viene digitato dopo il punto esclamativo non viene interpretato dal motore SQL, ma viene passato direttamente a Bash ed eseguito. Una volta terminata l'esecuzione del comando di sistema, il controllo torna istantaneamente all'interfaccia interattiva del database.
+\end{dettagli}
 
 \section{Creazione dell'Ambiente e Operazioni CRUD}
 
