@@ -2,12 +2,12 @@
 \label{app:postgres_pratica}
 
 Questa appendice raccoglie i comandi essenziali per l'interazione diretta con il database tramite l'interfaccia a riga di comando \texttt{psql}. Risulta fondamentale per il debugging rapido e la configurazione manuale dell'ambiente di sviluppo backend su macchine locali (come Fedora Workstation).
-
-\section{Gestione del Servizio e Accesso}
+\section{Accesso, Databases e Schemi}
+\subsection{Gestione del Servizio e Accesso}
 
 Per iniziare a lavorare con PostgreSQL, è necessario assicurarsi che il demone sia attivo in background sul sistema operativo.
 
-\begin{lstlisting}[language=bash, title=Comandi Systemd (Fedora/Linux)]
+\begin{lstlisting}[language=TerminalBash, title=Comandi Systemd (Fedora/Linux)]
 # Avvio del servizio
 sudo systemctl start postgresql
 
@@ -29,7 +29,7 @@ Se utilizzi frequentemente il database durante lo studio, puoi abilitare l'avvio
 Di default, PostgreSQL in ambiente Linux crea un utente di sistema chiamato \texttt{postgres}. L'autenticazione locale si basa spesso sul metodo \textit{peer}, il che significa che devi assumere temporaneamente l'identità di quell'utente di sistema (tramite \texttt{sudo -u}) per poter accedere come superuser al database senza fornire una password.
 \end{warningbox}
 
-\section{Visualizzare i Database Esistenti}
+\subsection{Visualizzare i Database Esistenti}
 
 All'interno dell'istanza di PostgreSQL, è possibile elencare tutti i database creati seguendo due approcci differenti: l'utilizzo di un meta-comando specifico del client \texttt{psql} oppure l'esecuzione di una query SQL standard sul catalogo di sistema.
 
@@ -59,7 +59,7 @@ SELECT datname FROM pg_database;
 
 La tabella di sistema \texttt{pg\_database} memorizza i metadati globali relativi a ogni singolo database presente e gestito all'interno dell'intera istanza (\textit{cluster}) di PostgreSQL.
 
-\section{Ispezione e Visualizzazione degli Schemi}
+\subsection{Ispezione e Visualizzazione degli Schemi}
 
 Dopo aver configurato nuovi schemi all'interno del database, è fondamentale poterne verificare l'esistenza e analizzarne i metadati. Questa operazione può essere eseguita rapidamente tramite le utility del client \texttt{psql} oppure in modo programmatico con l'SQL standard.
 
@@ -97,7 +97,7 @@ Analizzando l'output della query sulla vista \texttt{information\_schema.schemat
 \end{itemize}
 \end{dettagli}
 
-\section{Operare con Schemi Multipli}
+\subsection{Operare con Schemi Multipli}
 
 Una volta definiti più schemi all'interno dello stesso database, sorge la necessità di istruire il motore SQL su quale "cartella logica" utilizzare per la creazione o l'interrogazione delle tabelle. Esistono due metodologie principali per operare in un ambiente multi-schema.
 
@@ -107,18 +107,22 @@ Il metodo più rigoroso e indipendente dal contesto consiste nell'utilizzare il 
 
 Questo approccio garantisce che la tabella venga creata o interrogata esattamente nel contenitore desiderato, a prescindere da come è configurata la sessione corrente.
 
-\begin{lstlisting}[language=SQL, title=Creazione tabelle con Nomi Qualificati]
+\begin{lstlisting}[language=PostgreSQL, title=Creazione tabelle con Nomi Qualificati]
 -- Creazione di tabelle in schemi differenti
-CREATE TABLE schemaProva1.utenti (
+CREATE TABLE schema1.utenti (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL
 );
 
-CREATE TABLE schemaProva2.ordini (
+CREATE TABLE schema2.ordini (
     id SERIAL PRIMARY KEY,
     totale NUMERIC(10, 2) NOT NULL
 );
 \end{lstlisting}
+
+\begin{warningbox}[Nota Tecnica su SERIAL vs IDENTITY]
+In questi primi esempi esplorativi è stato utilizzato il tipo \texttt{SERIAL} per la generazione degli identificativi. È importante precisare che \texttt{SERIAL} non è un vero e proprio dominio, ma una comodità sintattica storica e proprietaria di PostgreSQL, oggi considerata \textit{legacy}. Per garantire la massima portabilità e aderenza allo standard ANSI SQL, nelle sezioni successive dedicate al DDL si abbandonerà \texttt{SERIAL} in favore della clausola standard \texttt{GENERATED ALWAYS AS IDENTITY}.
+\end{warningbox}
 
 \begin{bestpractice}[Infrastruttura come Codice (IaC)]
 Nello sviluppo backend professionale, la struttura del database viene gestita tramite script automatizzati di "migrazione" (utilizzando librerie Java come Flyway o Liquibase). In questi script si preferisce sempre l'approccio esplicito (\texttt{schema.tabella}) per garantire che l'esecuzione sia deterministica e che le tabelle vengano generate nell'ambiente corretto, a prescindere dalle configurazioni del server di produzione.
@@ -131,10 +135,10 @@ Se è necessario eseguire una lunga sequenza di operazioni (es. script di popola
 È possibile alterare la variabile \texttt{search\_path} per indicare a PostgreSQL di puntare automaticamente a uno schema specifico qualora non venga fornito un prefisso.
 
 \begin{lstlisting}[language=PostgreSQL, title=Modifica del search\_path]
--- Sposta il focus esclusivo della sessione corrente su "schemaProva3"
-SET search_path TO schemaProva3;
+-- Sposta il focus esclusivo della sessione corrente su "schema3"
+SET search_path TO schema3;
 
--- Questa tabella verra creata implicitamente dentro "schemaProva3"
+-- Questa tabella verra creata implicitamente dentro "schema3"
 CREATE TABLE prodotti (
     id SERIAL PRIMARY KEY,
     nome_prodotto VARCHAR(100) NOT NULL
@@ -171,7 +175,7 @@ Il comando \texttt{SHOW} è un'istruzione amministrativa di PostgreSQL utilizzat
 La funzione \texttt{current\_schema()}, invece, è valutata a runtime e restituisce un singolo valore testuale. Questa distinzione la rende fondamentale quando si scrivono procedure archiviate (Stored Procedures) o script applicativi in cui il codice deve interrogare dinamicamente il database per sapere in quale contenitore sta operando.
 \end{dettagli}
 
-\section{Riepilogo Operativo: Flusso di Lavoro in \texttt{psql}}
+\subsection{Riepilogo Operativo: Flusso di Lavoro in \texttt{psql}}
 
 Questo paragrafo sintetizza il ciclo di lavoro standard all'interno del terminale interattivo. Partendo dall'accesso iniziale, ecco la sequenza dei comandi più diretti e comunemente impiegati nel lavoro quotidiano per navigare tra le strutture logiche in modo rapido.
 
@@ -212,74 +216,98 @@ SHOW search_path;
 Come si evince dal riepilogo, nel lavoro quotidiano si alternano continuamente i meta-comandi del client (es. \texttt{\textbackslash c} o \texttt{\textbackslash dn}, che non richiedono il punto e virgola finale) e le istruzioni SQL standard (come \texttt{SET} e \texttt{SHOW}, che invece lo esigono tassativamente per essere eseguite dal motore).
 \end{warningbox}
 
-% \section{Meta-comandi \texttt{psql} Fondamentali}
+\section{Definizione e Manipolazione dei Dati (DDL e DML)}
 
-% Una volta dentro l'interfaccia, i comandi che iniziano con il backslash (\texttt{\textbackslash}) sono istruzioni dirette al client \texttt{psql} e non query SQL. Non richiedono il punto e virgola finale.
+Una volta configurato l'ambiente e posizionato il \texttt{search\_path} sullo schema desiderato, il flusso di lavoro si sposta sulla definizione e sull'utilizzo delle strutture fisiche.
 
-% \begin{itemize}
-%     \item \textbf{Uscita dall'interfaccia:} \texttt{\textbackslash q}
-%     \item \textbf{Connessione a un db:} \texttt{\textbackslash c nome\_db}
-%     \item \textbf{Elenco tabelle (nel db corrente):} \texttt{\textbackslash dt}
-%     \item \textbf{Descrizione della struttura di una tabella:} \texttt{\textbackslash d nome\_tabella}
-% \end{itemize}
+\subsection{Esplorazione del Contenitore Logico}
 
-% \section{Pulizia dell'Interfaccia e Comandi di Sistema}
+Prima di definire nuove tabelle o manipolare dati esistenti, è ragionevole verificare lo stato attuale dello schema di lavoro. Il client \texttt{psql} offre meta-comandi specifici per ispezionare le entità senza dover interrogare manualmente i dizionari di sistema.
 
-% Durante sessioni di lavoro prolungate, l'output delle query può saturare rapidamente lo spazio visivo del terminale. È possibile pulire la schermata senza disconnettersi dal database utilizzando due approcci.
+\begin{lstlisting}[language=TerminalBash, title=Meta-comandi di Ispezione delle Tabelle]
+# Elenca tutte le tabelle visibili nel search_path corrente
+\dt
 
-% \begin{tip}[Scorciatoia Rapida]
-% Il metodo più immediato ed efficiente per pulire lo schermo all'interno di \texttt{psql} consiste nell'utilizzare la combinazione di tasti universale dei terminali Linux: \textbf{\texttt{Ctrl + L}}.
-% \end{tip}
+# Elenca le tabelle di uno schema specifico (ignorando il search_path)
+\dt nome_schema.*
 
-% In alternativa, è possibile delegare l'operazione direttamente al sistema operativo ospite (nel nostro caso, Fedora) sfruttando una funzionalità avanzata del client.
+# Mostra l'anatomia dettagliata di una specifica tabella
+\d nome_tabella
+\end{lstlisting}
 
-% \begin{lstlisting}[language=bash, title=Esecuzione di comandi shell da psql]
-% -- Pulisce lo schermo richiamando l'utility di sistema
-% \! clear
+\begin{dettagli}[L'output diagnostico di \texttt{\textbackslash d}]
+Il comando \texttt{\textbackslash d} (senza la "t") è lo strumento diagnostico più prezioso durante la stesura del DDL. L'output generato disseziona la tabella mostrando:
+\begin{itemize}
+    \item L'elenco completo degli attributi (colonne).
+    \item I domini associati (tipi di dato come \texttt{integer}, \texttt{character varying}).
+    \item I modificatori strutturali (vincoli in-line come \texttt{NOT NULL} o regole di auto-incremento come \texttt{IDENTITY}).
+    \item In calce alla struttura, l'elenco esplicito degli indici, dei vincoli di chiave primaria (\texttt{PRIMARY KEY}) ed esterna (\texttt{FOREIGN KEY}), inclusi i riferimenti incrociati ad altre tabelle.
+\end{itemize}
+\end{dettagli}
 
-% -- Esempio aggiuntivo: elenca i file nella directory corrente di Linux
-% \! ls
-% \end{lstlisting}
+\subsection{Data Definition Language (DDL) Pratico}
 
-% \begin{dettagli}[Il meta-comando di escape \texttt{\textbackslash!}]
-% Il meta-comando \texttt{\textbackslash!} permette di creare un "ponte" temporaneo verso la shell del sistema operativo sottostante. Tutto ciò che viene digitato dopo il punto esclamativo non viene interpretato dal motore SQL, ma viene passato direttamente a Bash ed eseguito. Una volta terminata l'esecuzione del comando di sistema, il controllo torna istantaneamente all'interfaccia interattiva del database.
-% \end{dettagli}
+La sintassi di creazione delle tabelle su PostgreSQL rispecchia fedelmente lo standard SQL. Per la generazione delle chiavi surrogate, in ambiente moderno si predilige il costrutto standard \texttt{IDENTITY} anziché il vecchio tipo proprietario \texttt{SERIAL}.
 
-% \section{Creazione dell'Ambiente e Operazioni CRUD}
+\begin{lstlisting}[language=PostgreSQL, title=DDL: Creazione di Tabelle Relazionate]
+-- Creazione della tabella padre (Utenti)
+CREATE TABLE utenti (
+    id_utente INT GENERATED ALWAYS AS IDENTITY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    data_registrazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-% Vediamo ora come strutturare un database di test e popolare i primi dati per verificare che tutto il flusso DDL e DML funzioni correttamente.
+    -- Vincoli out-of-line
+    CONSTRAINT pk_utenti PRIMARY KEY (id_utente),
+    CONSTRAINT uq_utenti_email UNIQUE (email),
+    CONSTRAINT uq_utenti_username UNIQUE (username)
+);
 
-% \begin{lstlisting}[language=SQL, title=Creazione Database e Connessione]
-% CREATE DATABASE java_backend_dev;
-% \c java_backend_dev
-% \end{lstlisting}
+-- Creazione della tabella figlia (Ordini)
+CREATE TABLE ordini (
+    id_ordine INT GENERATED ALWAYS AS IDENTITY,
+    utente_id INT NOT NULL,
+    totale NUMERIC(10, 2) NOT NULL,
+    stato VARCHAR(20) DEFAULT 'IN_ELABORAZIONE',
 
-% Creazione di una tabella utenti, tipica di un'applicazione web reale:
+    -- Vincoli out-of-line
+    CONSTRAINT pk_ordini PRIMARY KEY (id_ordine),
+    CONSTRAINT chk_ordini_totale CHECK (totale > 0),
+    CONSTRAINT fk_ordini_utenti FOREIGN KEY (utente_id) 
+        REFERENCES utenti(id_utente)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+\end{lstlisting}
 
-% \begin{lstlisting}[language=SQL, title=DDL: Creazione Tabella Users]
-% CREATE TABLE users (
-%     id SERIAL PRIMARY KEY,
-%     username VARCHAR(50) UNIQUE NOT NULL,
-%     email VARCHAR(255) UNIQUE NOT NULL,
-%     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-% );
-% \end{lstlisting}
+\begin{tip}[Ispezione rapida dei vincoli]
+Dopo aver eseguito il DDL, per verificare che PostgreSQL abbia recepito correttamente i vincoli (inclusi i nomi assegnati come \texttt{pk\_utenti} o \texttt{fk\_ordini\_utenti}), è sufficiente utilizzare il meta-comando \texttt{\textbackslash d nome\_tabella} (es. \texttt{\textbackslash d ordini}). Il client interattivo mostrerà l'elenco delle colonne, seguito da una sezione dettagliata denominata "Indexes", "Check constraints" e "Foreign-key constraints".
+\end{tip}
 
-% \begin{dettagli}[Il tipo SERIAL in PostgreSQL]
-% In PostgreSQL, \texttt{SERIAL} non è un vero e proprio tipo di dato, ma una "comodità sintattica". Dietro le quinte crea una sequenza (\textit{sequence}) associata alla colonna e imposta automaticamente il valore di default con il prossimo numero disponibile, rendendolo perfetto per le chiavi primarie auto-incrementanti.
-% \end{dettagli}
+\subsection{Data Manipulation Language (DML) di Base}
 
-% Popolamento e interrogazione della tabella per validare l'inserimento:
+Una volta definita l'architettura relazionale, si procede con l'inserimento (\texttt{INSERT}) e l'interrogazione (\texttt{SELECT}) dei record per collaudare le logiche di business configurate sul motore di persistenza.
 
-% \begin{lstlisting}[language=SQL, title=DML: Insert e Select di Base]
-% -- Inserimento di un nuovo record
-% INSERT INTO users (username, email) 
-% VALUES ('rookie_dev', 'rookie@example.com');
+\begin{lstlisting}[language=PostgreSQL, title=DML: Inserimento e Interrogazione]
+-- Popolamento della tabella padre 
+-- (L'ID viene escluso dall'elenco perche' GENERATED ALWAYS)
+INSERT INTO utenti (username, email)
+VALUES ('rookie_dev', 'rookie@example.com'),
+       ('java_master', 'master@example.com');
 
-% -- Estrazione dei dati per verifica
-% SELECT * FROM users;
-% \end{lstlisting}
+-- Popolamento della tabella figlia
+-- (Assumiamo per ipotesi che i due utenti generati abbiano ID 1 e 2)
+INSERT INTO ordini (utente_id, totale)
+VALUES (1, 150.50),
+       (1, 45.00),
+       (2, 890.00);
 
-% \begin{bestpractice}[Dati di test e validazione]
-% Quando popoli un database per testare un'applicazione Java, assicurati di inserire successivamente anche casi limite o dati non validi. Questo ti permetterà di verificare che le eccezioni generate dai constraint del database (come \texttt{UNIQUE} o \texttt{NOT NULL}) vengano intercettate e gestite correttamente a livello applicativo (es. tramite JDBC o Hibernate).
-% \end{bestpractice}
+-- Query di verifica (DQL) con JOIN esplorativa
+SELECT u.username, o.totale, o.stato
+FROM utenti u
+JOIN ordini o ON u.id_utente = o.utente_id;
+\end{lstlisting}
+
+\begin{warningbox}[Test dei Vincoli (Destructive Testing)]
+In fase di sviluppo e debugging, prima di collegare il backend Java, è fondamentale testare attivamente la robustezza del database inviando query volutamente errate. Si consiglia di tentare forzature come: inserire un \texttt{utente\_id} inesistente nella tabella figli, inserire un ordine con totale negativo (violazione del \texttt{CHECK}), o tentare di bypassare l'inserimento manuale dell'ID. L'obiettivo è verificare che il DBMS respinga correttamente le transazioni non valide.
+\end{warningbox}

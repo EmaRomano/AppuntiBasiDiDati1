@@ -89,11 +89,17 @@
 \lstdefinelanguage{PostgreSQL}[]{SQL}{
     morekeywords={
         TO, SHOW, SET, SERIAL, search_path, current_schema, TIMESTAMP, 
-        VARCHAR, NUMERIC, DEFAULT, UNIQUE,
+        VARCHAR, NUMERIC, DEFAULT, UNIQUE, GENERATED, ALWAYS,
         datname, pg_database, schema_name, schema_owner, 
         information_schema, schemata
     },
     keywordstyle=\color{blue}\bfseries
+}
+
+% Definizione del dialetto Bash esteso per il terminale Linux
+\lstdefinelanguage{TerminalBash}[]{bash}{
+    morekeywords={sudo, systemctl, start, enable, stop, status, clear, ls, cd, psql},
+    keywordstyle=\color{purple}\bfseries
 }
 
 % --- 11. AMBIENTI GRAFICI (Tcolorbox) ---
