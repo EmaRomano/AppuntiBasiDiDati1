@@ -85,6 +85,17 @@
     tabsize=4
 }
 
+% Definizione del dialetto PostgreSQL esteso
+\lstdefinelanguage{PostgreSQL}[]{SQL}{
+    morekeywords={
+        TO, SHOW, SET, SERIAL, search_path, current_schema, TIMESTAMP, 
+        VARCHAR, NUMERIC, DEFAULT, UNIQUE,
+        datname, pg_database, schema_name, schema_owner, 
+        information_schema, schemata
+    },
+    keywordstyle=\color{blue}\bfseries
+}
+
 % --- 11. AMBIENTI GRAFICI (Tcolorbox) ---
 \usepackage[most]{tcolorbox}
 
