@@ -220,7 +220,7 @@ Come si evince dal riepilogo, nel lavoro quotidiano si alternano continuamente i
 
 Una volta configurato l'ambiente e posizionato il \texttt{search\_path} sullo schema desiderato, il flusso di lavoro si sposta sulla definizione e sull'utilizzo delle strutture fisiche.
 
-\subsection{Esplorazione del Contenitore Logico}
+\paragraph{Esplorazione del Contenitore Logico}
 
 Prima di definire nuove tabelle o manipolare dati esistenti, è ragionevole verificare lo stato attuale dello schema di lavoro. Il client \texttt{psql} offre meta-comandi specifici per ispezionare le entità senza dover interrogare manualmente i dizionari di sistema.
 
@@ -245,7 +245,7 @@ Il comando \texttt{\textbackslash d} (senza la "t") è lo strumento diagnostico 
 \end{itemize}
 \end{dettagli}
 
-\subsection{Data Definition Language (DDL) Pratico}
+\paragraph{Data Definition Language (DDL) Pratico}
 
 La sintassi di creazione delle tabelle su PostgreSQL rispecchia fedelmente lo standard SQL. Per la generazione delle chiavi surrogate, in ambiente moderno si predilige il costrutto standard \texttt{IDENTITY} anziché il vecchio tipo proprietario \texttt{SERIAL}.
 
@@ -284,7 +284,7 @@ CREATE TABLE ordini (
 Dopo aver eseguito il DDL, per verificare che PostgreSQL abbia recepito correttamente i vincoli (inclusi i nomi assegnati come \texttt{pk\_utenti} o \texttt{fk\_ordini\_utenti}), è sufficiente utilizzare il meta-comando \texttt{\textbackslash d nome\_tabella} (es. \texttt{\textbackslash d ordini}). Il client interattivo mostrerà l'elenco delle colonne, seguito da una sezione dettagliata denominata "Indexes", "Check constraints" e "Foreign-key constraints".
 \end{tip}
 
-\subsection{Data Manipulation Language (DML) di Base}
+\paragraph{Data Manipulation Language (DML) di Base}
 
 Una volta definita l'architettura relazionale, si procede con l'inserimento (\texttt{INSERT}) e l'interrogazione (\texttt{SELECT}) dei record per collaudare le logiche di business configurate sul motore di persistenza.
 
@@ -311,3 +311,72 @@ JOIN ordini o ON u.id_utente = o.utente_id;
 \begin{warningbox}[Test dei Vincoli (Destructive Testing)]
 In fase di sviluppo e debugging, prima di collegare il backend Java, è fondamentale testare attivamente la robustezza del database inviando query volutamente errate. Si consiglia di tentare forzature come: inserire un \texttt{utente\_id} inesistente nella tabella figli, inserire un ordine con totale negativo (violazione del \texttt{CHECK}), o tentare di bypassare l'inserimento manuale dell'ID. L'obiettivo è verificare che il DBMS respinga correttamente le transazioni non valide.
 \end{warningbox}
+
+\subsection{Sicurezza Operativa: Transazioni Manuali (TCL)}
+
+Quando si opera su un database, specialmente se in un ambiente condiviso (collaudo, pre-produzione o, nei casi di emergenza, produzione), l'esecuzione diretta di istruzioni di manipolazione distruttiva (\texttt{UPDATE} o \texttt{DELETE}) tramite terminale espone a un rischio critico. Una clausola \texttt{WHERE} dimenticata o logicamente errata può alterare l'intero contenuto di una tabella in modo irreversibile.
+
+Per scongiurare questo pericolo, ogni intervento manuale sui dati deve essere tassativamente avvolto in una \textbf{Transazione}. Il Transaction Control Language (TCL) fornisce i comandi per generare questo "spazio di sicurezza" temporaneo e isolato.
+
+\begin{itemize}
+    \item \textbf{\texttt{BEGIN;}} (o \texttt{BEGIN TRANSACTION;}): Apre la transazione. Da questo esatto millisecondo, qualsiasi modifica apportata ai dati è visibile solo all'interno del terminale corrente. Il resto del sistema (inclusi i backend Java in esecuzione) continuerà a leggere la versione precedente dei dati.
+    \item \textbf{\texttt{ROLLBACK;}}: Annulla l'intera transazione. Tutte le modifiche effettuate a valle del comando \texttt{BEGIN} vengono scartate istantaneamente, e il database ripristina lo stato originale.
+    \item \textbf{\texttt{COMMIT;}}: Conferma la transazione in modo definitivo. Le modifiche diventano permanenti e visibili a tutti gli applicativi.
+\end{itemize}
+
+\begin{lstlisting}[language=PostgreSQL, title=Flusso Sicuro per la Manipolazione dei Dati]
+-- 1. Si apre la rete di sicurezza
+BEGIN;
+
+-- 2. Si esegue l'operazione rischiosa (es. annullamento ordini)
+UPDATE ordini
+SET stato = 'ANNULLATO'
+WHERE utente_id = 1;
+
+-- 3. Si verifica l'esito controllando i record colpiti
+SELECT id_ordine, utente_id, stato 
+FROM ordini 
+WHERE stato = 'ANNULLATO';
+
+-- 4. Fase decisionale (si esegue SOLO UNO dei seguenti comandi):
+
+-- 4a. L'UPDATE ha colpito righe sbagliate: si annulla tutto!
+ROLLBACK;
+
+-- 4b. La verifica ha avuto esito positivo: si consolida la modifica
+COMMIT;
+\end{lstlisting}
+
+\begin{warningbox}[La trappola dell'Auto-Commit]
+Di default, il client \texttt{psql} e molti database operano in modalità \textbf{Auto-Commit}. Ciò significa che se si lancia un \texttt{UPDATE} isolato, omettendo il \texttt{BEGIN;}, il motore SQL applicherà un \texttt{COMMIT} automatico e invisibile non appena l'istruzione giungerà al termine. In assenza di transazioni esplicite, non esiste alcun pulsante "Indietro".
+\end{warningbox}
+
+\subsection{Esecuzione di Script SQL da File Esterno}
+
+Nello sviluppo software reale, le istruzioni DDL (creazione di architetture complesse) e DML (popolamento massivo o migrazioni) non vengono mai digitate riga per riga nel terminale interattivo. Il codice viene scritto, revisionato e versionato (es. tramite Git) all'interno di file con estensione \texttt{.sql}. 
+
+Per istruire PostgreSQL affinché legga ed esegua in blocco il contenuto di un file esterno, il backend developer dispone di due approcci fondamentali, a seconda del contesto operativo.
+
+\paragraph{Metodo 1: Esecuzione dall'interno di \texttt{psql}}
+Se la connessione al database è già aperta e la sessione interattiva è attiva, si utilizza il meta-comando \texttt{\textbackslash i} (include).
+
+\begin{lstlisting}[language=PostgreSQL, title=Esecuzione interattiva di un file SQL]
+-- Esegue lo script indicando il percorso (assoluto o relativo)
+\i /home/utente/progetti/ecommerce/init_schema.sql
+\end{lstlisting}
+
+\begin{tip}[Gestione dei percorsi in Linux]
+Quando si utilizza \texttt{\textbackslash i}, il client \texttt{psql} cerca il file partendo dalla directory in cui ci si trovava nel terminale Linux al momento dell'avvio di \texttt{psql} (la \textit{working directory}). In caso di errore "No such file or directory", è sempre preferibile fornire il \textbf{percorso assoluto} (che inizia con \texttt{/}) per garantire la risoluzione corretta del file.
+\end{tip}
+
+\paragraph{Metodo 2: Esecuzione non interattiva (Terminale Linux)}
+Quando si automatizza l'infrastruttura (ad esempio scrivendo script per avviare container Docker o pipeline di CI/CD), non è possibile entrare nell'interfaccia interattiva. In questo caso, si passa il file direttamente all'eseguibile \texttt{psql} tramite il flag \texttt{-f} (file) dalla riga di comando del sistema operativo.
+
+\begin{lstlisting}[language=TerminalBash, title=Esecuzione batch da riga di comando]
+# Sintassi standard: psql -U utente -d database -f file.sql
+sudo -u postgres psql -d java_backend_dev -f /tmp/popolamento.sql
+\end{lstlisting}
+
+\begin{tip}[Comportamento in caso di errore]
+Sia utilizzando \texttt{\textbackslash i} che il flag \texttt{-f}, se lo script contiene molteplici istruzioni SQL e una di queste fallisce (es. violazione di un vincolo o sintassi errata), PostgreSQL stamperà l'errore a schermo ma \textbf{continuerà a eseguire le istruzioni successive} presenti nel file. Per forzare l'interruzione immediata al primo errore (comportamento "fail-fast", consigliato in produzione), si deve avviare il client aggiungendo il flag \texttt{-v ON\_ERROR\_STOP=1}.
+\end{tip}

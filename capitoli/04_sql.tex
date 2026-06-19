@@ -592,7 +592,7 @@ Esistono due varianti sintattiche principali che ne determinano il comportamento
 
 \textbf{1. GENERATED ALWAYS AS IDENTITY}
 Questa è la forma più restrittiva e sicura. Il motore relazionale prende il controllo totale della colonna. 
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+\begin{lstlisting}[language=PostgreSQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
 CREATE TABLE utente (
     id_utente INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nome VARCHAR(50),

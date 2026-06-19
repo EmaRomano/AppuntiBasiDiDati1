@@ -1,0 +1,21 @@
+\chapter{To-Do List e Roadmap Operativa}
+\label{cap:todolist}
+
+Questo capitolo raccoglie le nozioni pratiche, i test e le esplorazioni tecniche che, per logica propedeutica, sono stati temporaneamente sospesi. Applicando il principio del \textit{Just-in-Time Learning}, questi argomenti verranno affrontati solo nel momento in cui il loro utilizzo diventerà strettamente necessario per risolvere un problema architetturale o di interfacciamento.
+
+\section{Destructive Testing su PostgreSQL}
+
+\paragraph{In cosa consiste}
+Il \textit{Destructive Testing} (in ambito database) è la pratica di forzare intenzionalmente errori di integrità relazionale tramite il terminale interattivo. Consiste nell'inviare query DML (\texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}) contenenti dati palesemente non validi, allo scopo di innescare e analizzare la reazione dei vincoli \texttt{NOT NULL}, \texttt{CHECK}, \texttt{UNIQUE} e \texttt{FOREIGN KEY} (\texttt{RESTRICT}).
+
+\paragraph{Perché è fondamentale per un Backend Developer}
+Sebbene la struttura del database venga solitamente creata da architetti o DBA, il programmatore backend è il responsabile finale della comunicazione tra l'applicazione e il dato. Conoscere le reazioni del motore SQL è vitale per tre motivi:
+
+\begin{enumerate}
+    \item \textbf{Traduzione delle Eccezioni (Exception Handling):} Quando un vincolo del database viene violato dai dati inseriti da un utente sul front-end, il framework Java (es. Hibernate o Spring Data) catturerà l'errore del database sollevando un'eccezione (spesso una \texttt{DataIntegrityViolationException}). Aver visto dal vivo come PostgreSQL genera quell'errore permette di capire istantaneamente se il crash è dovuto a un bug nel codice Java o a dati non conformi.
+    \item \textbf{Stesura dei Test di Integrazione:} Le suite di test automatizzati (come JUnit combinato con Testcontainers) non servono solo a verificare il "caso felice". Un buon programmatore deve scrivere test specifici per accertarsi che il sistema respinga correttamente entità invalide (es. un ordine con importo negativo o un utente senza email).
+    \item \textbf{Isolamento del Problema:} In un ambiente di produzione, di fronte a un'operazione fallita, forzare manualmente la query da terminale permette di capire in pochi secondi se la colpa risiede in una logica applicativa errata o nei vincoli stringenti del database.
+\end{enumerate}
+
+\paragraph{Collocazione nella Roadmap: Quando affrontarlo}
+Si raccomanda di riesumare questa pratica ed eseguire i test di violazione da terminale \textbf{durante lo studio del modulo Java relativo all'interazione con i database} (JDBC, JPA, Hibernate). Affrontare il \textit{destructive testing} avrà senso compiuto solo nel momento in cui si dovrà scrivere il codice Java incaricato di intercettare (\texttt{try-catch}) e gestire proprio quegli specifici errori restituiti da PostgreSQL.
