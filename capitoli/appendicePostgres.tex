@@ -380,3 +380,4 @@ sudo -u postgres psql -d java_backend_dev -f /tmp/popolamento.sql
 \begin{tip}[Comportamento in caso di errore]
 Sia utilizzando \texttt{\textbackslash i} che il flag \texttt{-f}, se lo script contiene molteplici istruzioni SQL e una di queste fallisce (es. violazione di un vincolo o sintassi errata), PostgreSQL stamperà l'errore a schermo ma \textbf{continuerà a eseguire le istruzioni successive} presenti nel file. Per forzare l'interruzione immediata al primo errore (comportamento "fail-fast", consigliato in produzione), si deve avviare il client aggiungendo il flag \texttt{-v ON\_ERROR\_STOP=1}.
 \end{tip}
+
