@@ -282,6 +282,17 @@ La reale complessità viene delegata alla fase operativa (interrogazione dei dat
 È chiaro che questo metodo per rendere le associazioni è del tutto generale e, in teoria, potrebbe essere usato per tutti i tipi di associazione; tuttavia, si tratta ovviamente di una cattiva pratica in virtù del costo computazionale che è stato appena discusso. 
 \end{observation}
 
+\begin{warningbox}[L'Obbligo Architetturale della Primary Key nelle Tabelle Ponte]
+Affrontando le associazioni Molti a Molti da un punto di vista puramente concettuale, un programmatore junior potrebbe essere tentato di omettere la dichiarazione della Chiave Primaria in una tabella ponte "pura" (ovvero priva di attributi propri), ritenendo che essa rappresenti solo un legame transitorio e non una vera e propria entità aziendale.
+
+Questa omissione è un errore strutturale fatale per due motivi inderogabili:
+\begin{enumerate}
+    \item \textbf{Integrità Relazionale (Teoria):} Il database si fonda sulla teoria degli insiemi, che vieta i duplicati. Senza dichiarare la coppia delle Foreign Key come \texttt{PRIMARY KEY}, il database permetterebbe l'inserimento di righe identiche (es. lo stesso studente associato due volte identiche allo stesso corso nello stesso istante), generando un'incoerenza logica.
+    \item \textbf{Ecosistema dei Framework (Pratica):} Nell'ingegneria del software moderna, il codice SQL è consumato da framework Object-Relational Mapping (come Hibernate in Spring Boot). Questi strumenti esigono matematicamente che \textit{ogni} entità gestita possieda un identificatore univoco per poterne tracciare lo stato nella RAM del server. Se una tabella ponte è sprovvista di Primary Key, l'ORM non sarà in grado di mappare le relazioni e l'avvio dell'applicazione andrà istantaneamente in \textit{Crash} (\texttt{AnnotationException} in Java).
+\end{enumerate}
+Pertanto, definire l'insieme delle chiavi esterne come Chiave Primaria (Composite Key) è un vincolo implementativo assoluto.
+\end{warningbox}
+
 \subsubsection*{Classi di Associazione}
 
 Nel modellamento concettuale tramite Class Diagram UML, capita frequentemente che un'associazione molti a molti possieda a sua volta degli attributi (formalizzati tramite una \textbf{Classe di Associazione}). Un esempio tipico è la relazione di superamento di un esame tra uno studente e un corso, la quale porta con sé attributi come il \textit{voto}, la \textit{data} e la \textit{lode}.
@@ -327,6 +338,20 @@ La traduzione genera tre schemi base e un quarto schema ponte per l'associazione
 Nello schema \texttt{FORNITURA}, la chiave primaria è la tripla di attributi (partitaIva, codiceProdotto, idProgetto). L'attributo \texttt{quantita} è un attributo dell'associazione che dipende funzionalmente dall'intera tripla, in quanto esprime quanti pezzi di quel prodotto specifico sono stati comprati da quel fornitore per quel preciso progetto.
 \end{example}
 
+\begin{tip}[Il Collasso delle Chiavi Composte e la Soluzione Surrogata]
+In modo perfettamente analogo al caso delle tabelle ponte binarie, anche in quelle n-rie ($n \ge 3$) sarebbe opportuno dichiarare la n-pla delle chiavi esterne come chiave primaria della tabella ponte. Tuttavia,  l'ingegneria del software moderna preferisce evitare questa pratica a causa di tre severi limiti operativi:
+\begin{enumerate}
+    \item \textbf{Complessità dell'ORM:} Mappare una chiave primaria composta da tre o più colonne in Java richiede la creazione di classi identificatrici separate (\texttt{@EmbeddedId} o \texttt{@IdClass}), complicando inutilmente il codice e la gestione della memoria.
+    \item \textbf{Propagazione Incontrollata:} Se la tabella ponte \texttt{FORNITURA} dovesse, in futuro, essere referenziata da una nuova tabella (es. \texttt{FATTURA}), quest'ultima dovrebbe importare tutte e tre le colonne per mantenere il legame, allargandosi a dismisura.
+    \item \textbf{Costo degli Indici:} Gli indici B-Tree basati su multiple colonne occupano molta più memoria e rallentano le operazioni di scrittura rispetto a un singolo intero sequenziale.
+\end{enumerate}
+
+\textbf{La Soluzione Pratica (Il Compromesso Architetturale):}
+Si introduce un attributo sintetico (es. \texttt{idFornitura}) di tipo intero auto-incrementante, eleggendolo a \texttt{PRIMARY KEY}. 
+Tuttavia, agendo in questo modo si distrugge l'integrità logica: il database userebbe il nuovo \texttt{id} per distinguere le righe, permettendo l'inserimento di due forniture identiche (stesso fornitore, stesso prodotto, stesso progetto).
+È pertanto \textbf{obbligatorio} ripristinare la regola di business applicando un vincolo \texttt{UNIQUE} composito sull'intero set delle chiavi esterne originarie (\texttt{partitaIva}, \texttt{codiceProdotto}, \texttt{idProgetto}).
+\end{tip}
+
 \section{Ristrutturazione dello Schema Concettuale}
 
 Il Class Diagram realizzato durante la progettazione concettuale ha l'unico scopo di modellare la semantica del dominio applicativo, ignorando i limiti tecnologici. Tuttavia, avvicinandosi alla progettazione logica, l'adozione dello specifico modello relazionale fa emergere vincoli strutturali e di performance che rendono il diagramma originario inefficiente o inapplicabile. 
@@ -361,8 +386,21 @@ Ora, le tabelle collegate (come \texttt{CORSO}) dovranno importare solamente la 
 
 \begin{warningbox}[Attenzione alla perdita di integrità]
 Quando si sostituisce una chiave naturale con una chiave surrogata, il database userà il nuovo \texttt{id} per distinguere le righe. Questo crea un potenziale rischio: il database permetterà di inserire due righe con \texttt{id} diversi ma con gli \textbf{stessi identici dati naturali} (es. due stanze diverse assegnate allo stesso edificio, stesso piano e stesso numero). 
-Per evitare dati duplicati, è \textbf{obbligatorio} imporre un vincolo di univocità (\texttt{UNIQUE}) sull'insieme degli attributi che formavano l'originaria chiave naturale composita.
+Per evitare dati duplicati, è \textbf{obbligatorio} imporre un vincolo di univocità (\texttt{UNIQUE}) e uno di obbligatorietà (\texttt{NOT NULL}) sull'insieme degli attributi che formavano l'originaria chiave naturale composita.
 \end{warningbox}
+
+\begin{tip}[Lo Standard di Settore: L'egemonia delle Chiavi Surrogate]
+Nel moderno sviluppo backend (specialmente all'interno di ecosistemi come Java/Spring Boot con framework ORM come Hibernate), l'uso di \textbf{Chiavi Surrogate auto-generate è diventato lo standard architetturale assoluto}, rendendo l'impiego di Chiavi Naturali come Primary Key un approccio generalmente considerato obsoleto e sconsigliato.
+
+I motivi ingegneristici di questa supremazia sono tre:
+\begin{enumerate}
+    \item \textbf{Immutabilità Assoluta:} Gli attributi naturali appartengono al dominio di business (es. un'email, un Codice Fiscale, una targa) e possono subire variazioni o correzioni per errori di inserimento. Modificare una Primary Key naturale innesca un aggiornamento a cascata su tutte le Foreign Key delle tabelle figlie. Una chiave surrogata, essendo priva di significato di business, è invisibile all'utente e non cambia mai durante l'intero ciclo di vita del record.
+    \item \textbf{Prestazioni Meccaniche:} Il motore relazionale confronta e indicizza numeri interi sequenziali a 64-bit (\texttt{BIGINT}) in modo immensamente più veloce e compatto rispetto a stringhe di testo a lunghezza variabile, abbattendo i tempi dei \texttt{JOIN}.
+    \item \textbf{Compatibilità con i Framework:} I moderni sistemi di persistenza a oggetti (ORM) sono progettati per ottimizzare la gestione della memoria, le cache e la paginazione basandosi su identificatori sintetici a singola colonna.
+\end{enumerate}
+
+La generazione di questi identificatori non viene mai lasciata all'applicativo, ma delegata al motore del database. Come vedremo nel capitolo introduttivo allo standard SQL, i moderni DBMS offrono costrutti fisici appositi (come sequenze \texttt{SEQUENCE} o attributi \texttt{IDENTITY}/\texttt{AUTO\_INCREMENT}) per generare numeri univoci crescenti in totale sicurezza e concorrenza.
+\end{tip}
 
 \subsection{Analisi degli Attributi Derivati e delle Ridondanze}
 

@@ -154,6 +154,21 @@ FOR EACH ROW                  -- Granularita': deve valutare ogni riga modificat
 EXECUTE FUNCTION traccia_cambio_voto();
 \end{lstlisting}
 
+\subsection{Integrità Referenziale: La gestione di ON UPDATE e le Chiavi Surrogate}
+
+Nello standard SQL (e specificamente in PostgreSQL), se la direttiva \texttt{ON UPDATE} viene omessa durante la definizione di un vincolo di chiave esterna (Foreign Key), il motore del database applica di default la regola \texttt{NO ACTION}. All'atto pratico, questa si comporta in modo analogo a \texttt{RESTRICT}, bloccando la transazione e sollevando un'eccezione in caso di tentativo di modifica di una chiave referenziata.
+
+Nelle architetture relazionali moderne, l'omissione volontaria della direttiva \texttt{ON UPDATE CASCADE} non \`e una dimenticanza, ma una scelta progettuale deliberata strettamente legata all'adozione delle \textbf{Chiavi Surrogate} (\textit{Surrogate Keys}).
+
+\begin{itemize}
+    \item \textbf{Approccio Legacy (Chiavi Naturali):} Storicamente, se una chiave primaria era costituita da un dato di business mutabile (es. il Codice Fiscale \texttt{fiscal\_code} o la targa di un veicolo \texttt{licence\_plate}), un'eventuale correzione anagrafica doveva necessariamente propagarsi a tutte le tabelle dipendenti. In questo specifico scenario, l'uso di \texttt{ON UPDATE CASCADE} era vitale per mantenere l'integrit\`a dei dati.
+    
+    \item \textbf{Approccio Moderno (Chiavi Surrogate):} Adottando un identificatore puramente numerico, autogenerato e totalmente slegato dalle logiche di business (nello standard PostgreSQL 10+: \texttt{BIGINT GENERATED ALWAYS AS IDENTITY}), la chiave primaria diviene \textbf{assolutamente immutabile}. L'ID assegnato dal motore SQL a una tupla al momento della \texttt{INSERT} non cambier\`a mai durante l'intero ciclo di vita del record, indipendentemente dalle modifiche ai suoi attributi anagrafici.
+\end{itemize}
+
+\textbf{Conclusione Architetturale:}\\
+Poich\'e in un sistema basato su chiavi surrogate l'evento di aggiornamento di una chiave primaria non si verificher\`a mai per design, specificare esplicitamente \texttt{ON UPDATE CASCADE} o \texttt{ON UPDATE RESTRICT} negli script DDL si tradurrebbe nell'inserimento di "codice morto". Omettere la direttiva mantiene lo schema fisico pi\`u pulito, compatto e focalizzato sulle uniche regole di integrit\`a referenziale che verranno effettivamente innescate dal dominio applicativo (tipicamente le regole \texttt{ON DELETE}).
+
 
 % \section{parte lezione 12 da ricontrollare}
 

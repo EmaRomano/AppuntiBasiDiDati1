@@ -526,42 +526,49 @@ Il progettista può scegliere tra quattro comportamenti distinti, da dichiarare 
     \end{itemize}
 \end{enumerate}
 
-\begin{tip}[Euristiche di scelta delle politiche]
+\begin{observation}[Euristiche di scelta delle politiche]
 La selezione della politica referenziale dipende esclusivamente dal significato semantico della relazione:
 \begin{itemize}
     \item Si usa \textbf{\texttt{CASCADE}} quando la tabella figlia descrive entità deboli che non hanno senso di esistere senza il padre (es. le righe di un ordine d'acquisto: se cancello l'ordine, devo distruggere le sue righe).
     \item Si usa \textbf{\texttt{RESTRICT}} quando l'eliminazione del padre sarebbe un errore operativo grave (es. non devo poter cancellare un corso di laurea se ci sono ancora studenti iscritti ad esso).
     \item Si usa \textbf{\texttt{SET NULL}} quando l'entità figlia ha vita propria ma perde il legame con il padre (es. se una scuderia di Formula 1 fallisce e si cancella la scuderia, i piloti rimangono nel database ma con la colonna \texttt{id\_scuderia} impostata a \texttt{NULL}).
 \end{itemize}
+\end{observation}
+
+\begin{tip}[L'obsolescenza di ON UPDATE nell'era delle Chiavi Surrogate]
+Nei database legacy o nei testi accademici che fanno largo uso di Chiavi Naturali, è considerata \textit{best practice} definire comportamenti misti, come:
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) REFERENCES studenti(matricola)
+    ON DELETE RESTRICT   -- Protegge dalla perdita accidentale dei dati
+    ON UPDATE CASCADE    -- Propaga la correzione della matricola
+\end{lstlisting}
+
+Tuttavia, l'ingegneria del software moderna impone quasi universalmente l'uso di \textbf{Chiavi Surrogate} (es. un \texttt{id} numerico auto-incrementante) come Primary Key. 
+La regola fondamentale di una chiave surrogata è la sua \textbf{immutabilità assoluta}: un \texttt{id} nasce e muore con il record e non ha alcun motivo di business per essere alterato.
+
+Di conseguenza, il problema di "cosa fare quando la chiave del padre cambia" cessa semplicemente di esistere. Nell'architettura backend odierna (specialmente lavorando con ORM come Spring Data JPA), la clausola \texttt{ON UPDATE} è quasi sempre omessa, poiché definire una politica di aggiornamento su una colonna immutabile genererebbe unicamente \textbf{codice morto}. 
+Il progettista moderno concentra l'attenzione esclusivamente sulla gestione del ciclo di vita dei dati (\texttt{ON DELETE}), affidandosi al \texttt{RESTRICT} predefinito per impedire matematicamente qualsiasi tentata, e illegittima, manipolazione degli identificatori di sistema.
 \end{tip}
 
-\begin{bestpractice}[Dichiarazione Multipla e Comportamenti Misti]
-È prassi comune assegnare comportamenti logici diversi per la cancellazione e per l'aggiornamento. Sintatticamente, le due clausole si scrivono in sequenza all'interno della dichiarazione del vincolo.
-
-\medskip
-
-\textit{Esempio di combinazione (Best Practice industriale):}
-\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
-CONSTRAINT fk_esami_studenti FOREIGN KEY (matr) 
-    REFERENCES studenti(matricola)
-    ON DELETE RESTRICT   -- Protegge dalla perdita accidentale dei dati
-    ON UPDATE CASCADE    -- Garantisce flessibilita' operativa sui codici
-\end{lstlisting}
-In questo specifico (e comunissimo) scenario, il DBMS impedirà la cancellazione di uno studente che ha già sostenuto esami, ma permetterà alla segreteria di correggerne o aggiornarne la matricola, propagando istantaneamente il nuovo codice in tutte le righe della tabella \texttt{esami}.
-\end{bestpractice}
-
-\begin{bestpractice}[Design Pattern: Il Record Fittizio (Dummy Record)]
+\begin{dettagli}[Design Pattern: Il Record Fittizio (Dummy Record)]
 Durante la modellazione fisica, la gestione dei valori \texttt{NULL} nelle chiavi esterne può generare complessità in fase di interrogazione dell'applicativo (necessità di \textit{Outer Join} e gestione delle incognite). 
 
 Per ovviare a questo problema, i progettisti adottano spesso il pattern del \textbf{Record Fittizio}. La tecnica consiste nell'inserire nella tabella padre una tupla convenzionale (es. con Primary Key \texttt{0} o \texttt{-1} e descrizione "Non Assegnato"). 
 Nella tabella figlia, la colonna dedicata alla chiave esterna viene dichiarata \texttt{NOT NULL} (impedendo l'incognita) e le viene assegnato come \texttt{DEFAULT} l'identificatore del record fittizio.
 
-\textit{Vantaggi architettonici:}
+\textit{Vantaggi architetturali:}
 \begin{itemize}
     \item \textbf{Integrità totale:} Ogni riga figlia punta sempre a un record padre esistente, eliminando il concetto di "puntatore vuoto".
-    \item \textbf{Sinergia con le politiche referenziali:} Questo pattern rende implementabile in modo logico la direttiva \texttt{ON DELETE SET DEFAULT}. Se un'entità padre viene eliminata, i record figli ad essa associati non assumono il valore \texttt{NULL}, ma vengono automaticamente riassegnati al record "Sconosciuto" (valore di default), preservando la continuità strutturale dei dati.
+    \item \textbf{Sinergia referenziale:} Rende implementabile logicamente la direttiva \texttt{ON DELETE SET DEFAULT}. Se un'entità padre viene eliminata, i record figli non diventano \texttt{NULL}, ma passano al record "Sconosciuto".
 \end{itemize}
-\end{bestpractice}
+
+\smallskip
+
+\textbf{Attenzione Architetturale (OLTP vs OLAP):} \\
+Questo pattern è considerato la \textit{prassi d'oro} nel mondo della \textbf{Business Intelligence e dei Data Warehouse (OLAP)}, in particolare nella modellazione dimensionale (Star Schema), dove le tabelle dei fatti non devono mai contenere chiavi esterne \texttt{NULL} per garantire la massima performance delle \textit{Inner Join} durante i calcoli di aggregazione.
+
+Al contrario, nei moderni database transazionali \textbf{(OLTP)} operati tramite \textbf{ORM} (es. Hibernate/Spring Boot), questo approccio è considerato un \textbf{Anti-Pattern}. Negli OLTP l'assenza di relazione deve essere modellata in modo semanticamente puro (accettando il \texttt{NULL} fisico) ed è delegata alla logica applicativa (es. l'uso di \texttt{Optional} in Java), poiché l'inserimento di record fittizi "inquinerebbe" il dominio, obbligando a filtri costanti per nascondere i dati inesistenti agli utenti finali.
+\end{dettagli}
 
 \begin{warningbox}[]
     In alcuni contesti didattici, con \textbf{Vincolo di Integrità Referenziale} si intende che la FK nella tabella figlia debba \textbf{sempre} puntare ad una tupla nella tabella padre, eventualmentente un dummy record (ad esempio, nel caso in cui la FK sia \texttt{NULL}). 
@@ -569,9 +576,7 @@ Nella tabella figlia, la colonna dedicata alla chiave esterna viene dichiarata \
 
 \subsection{Identificatori Univoci: Chiavi Surrogate e il costrutto IDENTITY}
 
-Nella modellazione di un database relazionale, ogni riga di una tabella deve poter essere identificata in modo univoco (Chiave Primaria). In molti scenari reali, i dati "naturali" di un'entità non sono adatti a questo scopo: i nomi omonimi esistono, le email possono essere cambiate e persino i codici fiscali possono essere soggetti a ricalcolo. 
-
-Come sappiamo, per garantire un'identificazione robusta e immutabile nel tempo, l'ingegneria del software ricorre quasi sempre alle \textbf{Chiavi Surrogate}: attributi artificiali, tipicamente un numero intero progressivo (es. 1, 2, 3...), privi di qualsiasi significato logico per l'utente, ma utilizzati dal motore relazionale per collegare le tabelle tra loro in modo sicuro.
+Come sappiamo dai capitoli precedenti, per garantire un'identificazione robusta e immutabile nel tempo, l'ingegneria del software ricorre quasi sempre alle \textbf{Chiavi Surrogate}: attributi artificiali, tipicamente un numero intero progressivo (es. 1, 2, 3...), privi di qualsiasi significato logico per l'utente, ma utilizzati dal motore relazionale per collegare le tabelle tra loro in modo sicuro.
 
 \begin{dettagli}[L'anti-pattern del MAX(id) + 1]
     Perché non possiamo semplicemente calcolare il nuovo ID con una query del tipo \textit{"Prendi il numero massimo attuale e aggiungi 1"} (\texttt{MAX(id) + 1})?
