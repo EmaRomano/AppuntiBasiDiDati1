@@ -358,12 +358,30 @@ Nello sviluppo software reale, le istruzioni DDL (creazione di architetture comp
 Per istruire PostgreSQL affinché legga ed esegua in blocco il contenuto di un file esterno, il backend developer dispone di due approcci fondamentali, a seconda del contesto operativo.
 
 \paragraph{Metodo 1: Esecuzione dall'interno di \texttt{psql}}
-Se la connessione al database è già aperta e la sessione interattiva è attiva, si utilizza il meta-comando \texttt{\textbackslash i} (include).
+Se la connessione al database è già aperta e la sessione interattiva è attiva, si utilizza il meta-comando \texttt{\textbackslash i} (include) seguito dal percorso del file.
 
 \begin{lstlisting}[language=PostgreSQL, title=Esecuzione interattiva di un file SQL]
--- Esegue lo script indicando il percorso (assoluto o relativo)
-\i /home/utente/progetti/ecommerce/init_schema.sql
+-- Esegue lo script indicando il percorso assoluto
+\i '/percorso/assoluto/del/file/schema.sql'
 \end{lstlisting}
+
+\begin{warningbox}[La Trappola dei Permessi su Linux]
+In ambienti Unix-like (come Fedora, Ubuntu o macOS), l'esecuzione di script tramite \texttt{\textbackslash i} nasconde un'insidia legata ai permessi di sistema. 
+Se si accede al terminale interattivo tramite il comando \texttt{sudo -u postgres psql}, il processo assume l'identità dell'utente di sistema \texttt{postgres}. Per ragioni di sicurezza, questo utente \textbf{non ha i permessi di lettura} all'interno delle directory personali degli altri utenti (es. \texttt{/home/nome\_utente/Documenti/}).
+
+Eseguire \texttt{\textbackslash i} puntando a un file nella propria \textit{home directory} genererà un errore di tipo \texttt{Permission denied}.
+
+\textbf{La soluzione architetturale:}
+Invece di alterare in modo insicuro i privilegi della propria cartella personale, la prassi sistemistica consiste nel copiare temporaneamente il file \texttt{.sql} nella directory temporanea di sistema (\texttt{/tmp}), che è nativamente accessibile in lettura a tutti gli utenti:
+
+\begin{lstlisting}[language=TerminalBash]
+# 1. Da un normale terminale, copiare il file in /tmp
+cp /home/utente/progetto/schema.sql /tmp/schema.sql
+
+# 2. Dall'interno del prompt psql, eseguire il file
+\i '/tmp/schema.sql'
+\end{lstlisting}
+\end{warningbox}
 
 \begin{tip}[Gestione dei percorsi in Linux]
 Quando si utilizza \texttt{\textbackslash i}, il client \texttt{psql} cerca il file partendo dalla directory in cui ci si trovava nel terminale Linux al momento dell'avvio di \texttt{psql} (la \textit{working directory}). In caso di errore "No such file or directory", è sempre preferibile fornire il \textbf{percorso assoluto} (che inizia con \texttt{/}) per garantire la risoluzione corretta del file.
@@ -380,4 +398,14 @@ sudo -u postgres psql -d java_backend_dev -f /tmp/popolamento.sql
 \begin{tip}[Comportamento in caso di errore]
 Sia utilizzando \texttt{\textbackslash i} che il flag \texttt{-f}, se lo script contiene molteplici istruzioni SQL e una di queste fallisce (es. violazione di un vincolo o sintassi errata), PostgreSQL stamperà l'errore a schermo ma \textbf{continuerà a eseguire le istruzioni successive} presenti nel file. Per forzare l'interruzione immediata al primo errore (comportamento "fail-fast", consigliato in produzione), si deve avviare il client aggiungendo il flag \texttt{-v ON\_ERROR\_STOP=1}.
 \end{tip}
+
+\begin{bestpractice}[Terminale Interattivo vs. Script Esterni]
+Nello sviluppo software professionale, è fondamentale tracciare una linea netta tra le operazioni da eseguire direttamente nel prompt interattivo e quelle da delegare a file esterni.
+
+\begin{itemize}
+    \item \textbf{Uso del Terminale (\texttt{psql}):} L'interfaccia interattiva è progettata per l'esplorazione e il collaudo rapido. È lo strumento ideale per eseguire query di lettura (\texttt{SELECT}), testare funzioni di aggregazione, esplorare l'architettura con i meta-comandi (\texttt{\textbackslash d}, \texttt{\textbackslash dt}) e verificare lo stato dei dati. È invece \textbf{fortemente sconsigliato} per la stesura di architetture DDL o per inserimenti massivi: incollare blocchi di codice lunghi nel terminale può causare la perdita di formattazione, l'interpretazione errata di caratteri invisibili e l'esecuzione parziale in caso di errori a metà blocco.
+    
+    \item \textbf{Uso degli Script (\texttt{.sql}):} L'intera definizione strutturale del database (Tabelle, Tipi, Vincoli) e il suo popolamento iniziale (Seed DML) devono risiedere in file di testo puro con estensione \texttt{.sql}. Questo garantisce la totale riproducibilità dell'ambiente, la pulizia del codice (scritto tramite IDE professionali dotati di \textit{syntax highlighting}) e, soprattutto, permette di tracciare l'evoluzione del database nei sistemi di versionamento del codice come Git.
+\end{itemize}
+\end{bestpractice}
 
