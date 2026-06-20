@@ -471,6 +471,54 @@ Analizziamo ogni singolo vincolo applicato alla tabella \texttt{esami}, esplicit
 \end{enumerate}
 \end{example}
 
+\subsection{Validazione Avanzata: Pattern Matching e Regex}
+
+Finora abbiamo visto vincoli di dominio (\texttt{CHECK}) basati su confronti matematici semplici (es. \texttt{prezzo > 0}). Tuttavia, quando si modellano stringhe di testo che devono rispettare rigorosi standard legali o di business (come un Codice Fiscale, un'Email o una Partita IVA), la semplice verifica della lunghezza o l'uso dell'operatore \texttt{LIKE} risulta insufficiente.
+
+L'operatore \texttt{LIKE '\%@\%.\%'} può verificare rozzamente se una stringa contiene una chiocciola e un punto, ma non può impedire l'inserimento di valori insensati come \texttt{"@@@..."}.
+
+Per risolvere questo problema, i moderni DBMS relazionali implementano il supporto alle \textbf{Espressioni Regolari (Regular Expressions o Regex)}, ovvero sequenze di caratteri che definiscono un pattern di ricerca estremamente preciso.
+
+\paragraph{L'operatore POSIX in PostgreSQL}
+Mentre lo standard SQL prevede la clausola \texttt{SIMILAR TO}, nell'ingegneria backend su PostgreSQL è considerato standard architetturale l'utilizzo dell'operatore nativo POSIX \textbf{\texttt{\textasciitilde}} (tilde) all'interno dei vincoli \texttt{CHECK}.
+
+\begin{itemize}
+    \item \texttt{colonna \textasciitilde\ 'pattern'}: La stringa deve rispettare il pattern (Case-sensitive).
+    \item \texttt{colonna \textasciitilde* 'pattern'}: La stringa deve rispettare il pattern (Case-insensitive).
+    \item \texttt{colonna !\textasciitilde\ 'pattern'}: La stringa \textbf{non} deve rispettare il pattern.
+\end{itemize}
+
+\begin{example}[La Difesa in Profondità nel Dominio SafeDrive]
+Si consideri lo schema per memorizzare i dati di un perito assicurativo e di un cliente. I campi come il CAP o la Partita IVA devono essere validati.
+\begin{lstlisting}[language=SQL, basicstyle=\ttfamily\small, keywordstyle=\color{blue}\bfseries]
+CREATE TABLE customer (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    cap_code CHAR(5) NOT NULL,
+    fiscal_code CHAR(16) UNIQUE NOT NULL,
+    
+    -- Il CAP deve essere composto ESATTAMENTE da 5 numeri
+    CONSTRAINT chk_cap_format CHECK (cap_code ~ '^[0-9]{5}$'),
+    
+    -- Il C.F. deve essere ESATTAMENTE di 16 caratteri (lettere o numeri)
+    CONSTRAINT chk_fiscal_code CHECK (fiscal_code ~ '^[A-Z0-9]{16}$')
+);
+\end{lstlisting}
+
+\textbf{Anatomia del Pattern \texttt{'\textasciicircum[0-9]\{5\}\$'}:}
+\begin{itemize}
+    \item \textbf{\texttt{\textasciicircum}} : Ancora di inizio. Indica che il pattern deve partire dal primissimo carattere della stringa.
+    \item \textbf{\texttt{[0-9]}} : Classe di caratteri. Ammette esclusivamente le cifre da 0 a 9.
+    \item \textbf{\texttt{\{5\}}} : Quantificatore. Impone che la classe precedente (le cifre) si ripeta esattamente 5 volte.
+    \item \textbf{\texttt{\$}} : Ancora di fine. Indica che la stringa deve terminare immediatamente dopo il quinto numero, impedendo l'inserimento di caratteri extra alla fine.
+\end{itemize}
+\end{example}
+
+\begin{observation}[L'importanza architetturale (Defense in Depth)]
+Applicare le regex nel database non rende superflua la validazione a livello applicativo (es. tramite annotazioni \texttt{@Pattern} in Java/Spring Boot). Il livello Java deve continuare a validare i dati per restituire errori HTTP chiari (es. 400 Bad Request) all'utente. 
+
+Tuttavia, il vincolo \texttt{CHECK} sul database rappresenta la \textbf{difesa in profondità}: garantisce che i dati non vengano mai corrotti nemmeno se un amministratore effettua un inserimento manuale, se si esegue un'importazione massiva da un file CSV ignorando il backend, o se si verifica un bug nel codice dell'applicativo. Il database è l'ultima fonte di verità e deve sapersi difendere da solo.
+\end{observation}
+
 \subsection{Integrità Referenziale e Chiavi Esterne (FOREIGN KEY)}
 
 Il vincolo di \textbf{Chiave Esterna (FOREIGN KEY)} è il più importante tra i vincoli \textbf{inter-relazionali} (o di schema). Esso stabilisce una relazione di dipendenza tra due tabelle, imponendo che i valori presenti in un set di attributi della tabella corrente (\textit{tabella figlia} o \textit{referenziante}) debbano obbligatoriamente esistere all'interno del set di attributi che costituisce la chiave primaria (o un'altra chiave univoca) di un'altra tabella (\textit{tabella padre} o \textit{referenziata}).
